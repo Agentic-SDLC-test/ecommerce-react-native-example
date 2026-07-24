@@ -3,6 +3,10 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const { randomUUID } = require("crypto");
+const {
+  normalizePaymentType,
+  derivePaymentStatus,
+} = require("../utils/orderPayment");
 
 const PORT = 3002;
 const REVIEW_STATUSES = ["published", "hidden", "removed"];
@@ -12,6 +16,7 @@ const REVIEW_REASON = {
   REVIEW_EXISTS: "REVIEW_EXISTS",
   REMOVED_BY_ADMIN: "REMOVED_BY_ADMIN",
 };
+const PAYMENT_UPDATE_STATUSES = ["awaiting_payment", "paid", "payment_issue"];
 const uuidv4 = () => randomUUID();
 
 function createInitialState() {
@@ -710,6 +715,36 @@ function logEvent(event, payload) {
   console.log(event, payload);
 }
 
+function isSupportedPaymentType(paymentType) {
+  return paymentType === "cod" || paymentType === "card";
+}
+
+function hydrateOrderPayment(order) {
+  return {
+    ...order,
+    payment_type: normalizePaymentType(order?.payment_type),
+    payment_status: derivePaymentStatus(order),
+  };
+}
+
+function logPaymentStatusRejected({
+  orderId,
+  userId,
+  paymentType,
+  paymentStatus,
+  deliveryStatus,
+  reason,
+}) {
+  logEvent("order.payment_status_update_rejected", {
+    orderId,
+    userId,
+    paymentType,
+    paymentStatus,
+    deliveryStatus,
+    reason,
+  });
+}
+
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, path.join(__dirname, "uploads")),
   filename: (req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
@@ -935,7 +970,7 @@ app.get("/dashboard", adminMiddleware, (req, res) => {
 });
 
 app.get("/admin/orders", adminMiddleware, (req, res) => {
-  res.json({ success: true, data: orders });
+  res.json({ success: true, data: orders.map(hydrateOrderPayment) });
 });
 
 app.get("/admin/users", adminMiddleware, (req, res) => {
@@ -968,12 +1003,14 @@ app.get("/admin/order-status", adminMiddleware, (req, res) => {
   res.json({
     success: true,
     message: `Order status updated to ${status}`,
-    data: order,
+    data: hydrateOrderPayment(order),
   });
 });
 
 app.get("/orders", authMiddleware, (req, res) => {
-  const userOrders = orders.filter((order) => order.user._id === req.user._id);
+  const userOrders = orders
+    .filter((order) => order.user._id === req.user._id)
+    .map(hydrateOrderPayment);
   res.json({ success: true, data: userOrders });
 });
 
@@ -1072,11 +1109,21 @@ app.post("/checkout", authMiddleware, (req, res) => {
     city,
     zipcode,
     shippingAddress,
-    status,
   } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
   }
+  if (!isSupportedPaymentType(payment_type)) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Unsupported payment type" });
+  }
+  if (!country || !city || !zipcode || !shippingAddress) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Shipping address is incomplete" });
+  }
+
   const orderItems = items.map((item) => {
     const product = products.find((productItem) => productItem._id === item.productId);
     return {
@@ -1098,20 +1145,124 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
-    country: country || "",
-    city: city || "",
-    zipcode: zipcode || "",
-    shippingAddress: shippingAddress || "",
-    status: status || "pending",
+    payment_type,
+    payment_status:
+      payment_type === "card" ? "awaiting_payment" : "due_on_delivery",
+    country,
+    city,
+    zipcode,
+    shippingAddress,
+    status: "pending",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
   orders.push(newOrder);
+  const hydratedOrder = hydrateOrderPayment(newOrder);
+
+  logEvent("order.checkout_created", {
+    orderId: hydratedOrder.orderId,
+    userId: req.user._id,
+    paymentType: hydratedOrder.payment_type,
+    paymentStatus: hydratedOrder.payment_status,
+    deliveryStatus: hydratedOrder.status,
+    itemCount: orderItems.length,
+  });
+
   res.json({
     success: true,
     message: "Order placed successfully",
-    data: newOrder,
+    data: hydratedOrder,
+  });
+});
+
+app.post("/update-order-payment", authMiddleware, (req, res) => {
+  const { id } = req.query;
+  const { payment_status } = req.body || {};
+  const order = orders.find((item) => item._id === id);
+
+  if (!order) {
+    logPaymentStatusRejected({
+      orderId: id,
+      userId: req.user._id,
+      paymentType: null,
+      paymentStatus: payment_status || null,
+      deliveryStatus: null,
+      reason: "ORDER_NOT_FOUND",
+    });
+    return res.status(404).json({ success: false, message: "Order not found" });
+  }
+
+  const hydratedOrder = hydrateOrderPayment(order);
+  if (hydratedOrder.user._id !== req.user._id) {
+    logPaymentStatusRejected({
+      orderId: hydratedOrder.orderId,
+      userId: req.user._id,
+      paymentType: hydratedOrder.payment_type,
+      paymentStatus: hydratedOrder.payment_status,
+      deliveryStatus: hydratedOrder.status,
+      reason: "ORDER_ACCESS_DENIED",
+    });
+    return res
+      .status(403)
+      .json({ success: false, message: "You can only update your own orders" });
+  }
+
+  if (hydratedOrder.payment_type !== "card") {
+    logPaymentStatusRejected({
+      orderId: hydratedOrder.orderId,
+      userId: req.user._id,
+      paymentType: hydratedOrder.payment_type,
+      paymentStatus: hydratedOrder.payment_status,
+      deliveryStatus: hydratedOrder.status,
+      reason: "COD_PAYMENT_UPDATE_NOT_ALLOWED",
+    });
+    return res
+      .status(400)
+      .json({ success: false, message: "Cash on delivery orders cannot update payment" });
+  }
+
+  if (!PAYMENT_UPDATE_STATUSES.includes(payment_status)) {
+    logPaymentStatusRejected({
+      orderId: hydratedOrder.orderId,
+      userId: req.user._id,
+      paymentType: hydratedOrder.payment_type,
+      paymentStatus: hydratedOrder.payment_status,
+      deliveryStatus: hydratedOrder.status,
+      reason: "INVALID_PAYMENT_STATUS",
+    });
+    return res
+      .status(400)
+      .json({ success: false, message: "Invalid payment status value" });
+  }
+
+  if (hydratedOrder.payment_status === payment_status) {
+    return res.json({
+      success: true,
+      message: `Payment status updated to ${payment_status}`,
+      data: hydratedOrder,
+    });
+  }
+
+  const previousStatus = hydratedOrder.payment_status;
+  order.payment_type = hydratedOrder.payment_type;
+  order.payment_status = payment_status;
+  order.updatedAt = new Date().toISOString();
+
+  const updatedOrder = hydrateOrderPayment(order);
+  logEvent("order.payment_status_updated", {
+    orderId: updatedOrder.orderId,
+    userId: req.user._id,
+    paymentType: updatedOrder.payment_type,
+    paymentStatus: updatedOrder.payment_status,
+    deliveryStatus: updatedOrder.status,
+    fromStatus: previousStatus,
+    toStatus: updatedOrder.payment_status,
+  });
+
+  res.json({
+    success: true,
+    message: `Payment status updated to ${payment_status}`,
+    data: updatedOrder,
   });
 });
 
@@ -1419,6 +1570,7 @@ function printStartupInfo(port) {
   console.log(`   GET    /admin/review-status?id=&status=  (admin)`);
   console.log(`   GET    /orders               (user)`);
   console.log(`   POST   /checkout             (user)`);
+  console.log(`   POST   /update-order-payment?id=  (user)`);
   console.log(`   GET    /delete-user?id=`);
   console.log(`   POST   /reset-password?id=`);
   console.log(`   POST   /photos/upload`);

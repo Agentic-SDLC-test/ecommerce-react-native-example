@@ -15,11 +15,12 @@ import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import CustomButton from "../../components/CustomButton";
 import DropDownPicker from "react-native-dropdown-picker";
+import * as orderPayment from "../../utils/orderPayment";
 
 const ViewOrderDetailScreen = ({ navigation, route }) => {
-  const { orderDetail } = route.params;
+  const { orderDetail: initialOrderDetail } = route.params;
   const [isloading, setIsloading] = useState(false);
-  const [label, setLabel] = useState("Loading..");
+  const [label] = useState("Loading..");
   const [error, setError] = useState("");
   const [alertType, setAlertType] = useState("error");
   const [totalCost, setTotalCost] = useState(0);
@@ -27,26 +28,25 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(null);
   const [statusDisable, setStatusDisable] = useState(false);
+  const [orderDetail, setOrderDetail] = useState(initialOrderDetail);
   const [items, setItems] = useState([
     { label: "Pending", value: "pending" },
     { label: "Shipped", value: "shipped" },
     { label: "Delivered", value: "delivered" },
   ]);
 
-  //method to convert the time into AM PM format
   function tConvert(time) {
     time = time
       .toString()
       .match(/^([01]\d|2[0-3])(:)([0-5]\d)(:[0-5]\d)?$/) || [time];
     if (time.length > 1) {
-      time = time.slice(1); // Remove full string match value
-      time[5] = +time[0] < 12 ? "AM" : "PM"; // Set AM/PM
-      time[0] = +time[0] % 12 || 12; // Adjust hours
+      time = time.slice(1);
+      time[5] = +time[0] < 12 ? "AM" : "PM";
+      time[0] = +time[0] % 12 || 12;
     }
     return time.join("");
   }
 
-  //method to convert the Data into dd-mm-yyyy format
   const dateFormat = (datex) => {
     let t = new Date(datex);
     const date = ("0" + t.getDate()).slice(-2);
@@ -56,43 +56,34 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
     const minutes = ("0" + t.getMinutes()).slice(-2);
     const seconds = ("0" + t.getSeconds()).slice(-2);
     const time = tConvert(`${hours}:${minutes}:${seconds}`);
-    const newDate = `${date}-${month}-${year}, ${time}`;
-
-    return newDate;
+    return `${date}-${month}-${year}, ${time}`;
   };
 
-  //method to update the status using API call
   const handleUpdateStatus = (id) => {
     setIsloading(true);
     setError("");
     setAlertType("error");
 
     api
-      .updateOrderStatus(id, value) //API call
+      .updateOrderStatus(id, value)
       .then((result) => {
         if (result.success == true) {
+          setOrderDetail(result.data);
           setError(`Order status is successfully updated to ${value}`);
           setAlertType("success");
           setIsloading(false);
         }
       })
-      .catch((error) => {
+      .catch((requestError) => {
         setAlertType("error");
-        setError(error);
-        console.log("error", error);
+        setError(requestError.message || "Unable to update order status");
+        console.log("error", requestError);
         setIsloading(false);
       });
   };
 
-  // calculate the total cost and set the all requried variables on initial render
   useEffect(() => {
-    setError("");
-    setAlertType("error");
-    if (orderDetail?.status == "delivered") {
-      setStatusDisable(true);
-    } else {
-      setStatusDisable(false);
-    }
+    setStatusDisable(orderDetail?.status == "delivered");
     setValue(orderDetail?.status);
     setAddress(
       orderDetail?.country +
@@ -103,10 +94,11 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
     );
     setTotalCost(
       orderDetail?.items.reduce((accumulator, object) => {
-        return (accumulator + object.price) * object.quantity;
-      }, 0) // calculate the total cost
+        return accumulator + Number(object.price) * Number(object.quantity);
+      }, 0)
     );
-  }, []);
+  }, [orderDetail]);
+
   return (
     <View style={styles.container} testID="view-order-detail-screen">
       <ProgressDialog visible={isloading} label={label} />
@@ -164,7 +156,7 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
             Order # {orderDetail?.orderId}
           </Text>
           <Text style={styles.secondarytextSm} testID="view-order-detail-ordered-date">
-            Ordered on {dateFormat(orderDetail?.updatedAt)}
+            Ordered on {dateFormat(orderDetail?.createdAt)}
           </Text>
           {orderDetail?.shippedOn && (
             <Text style={styles.secondarytextSm} testID="view-order-detail-shipped-date">
@@ -174,6 +166,37 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
           {orderDetail?.deliveredOn && (
             <Text style={styles.secondarytextSm} testID="view-order-detail-delivered-date">
               Delivered on {orderDetail?.deliveredOn}
+            </Text>
+          )}
+        </View>
+        <View style={styles.containerNameContainer}>
+          <View>
+            <Text style={styles.containerNameText} testID="view-order-detail-payment-heading">
+              Payment
+            </Text>
+          </View>
+        </View>
+        <View style={styles.orderInfoContainer}>
+          <View style={styles.orderItemContainer}>
+            <Text style={styles.orderItemText}>Payment method</Text>
+            <Text testID="view-order-detail-payment-method">
+              {orderPayment.getPaymentMethodLabel(orderDetail?.payment_type)}
+            </Text>
+          </View>
+          <View style={styles.orderItemContainer}>
+            <Text style={styles.orderItemText}>Payment status</Text>
+            <Text testID="view-order-detail-payment-status">
+              {orderPayment.getPaymentStatusLabel(
+                orderPayment.derivePaymentStatus(orderDetail)
+              )}
+            </Text>
+          </View>
+          {orderPayment.getPaymentDisclaimer(orderDetail) && (
+            <Text
+              style={[styles.secondarytextSm, styles.paymentDisclaimer]}
+              testID="view-order-detail-payment-disclaimer"
+            >
+              {orderPayment.getPaymentDisclaimer(orderDetail)}
             </Text>
           )}
         </View>
@@ -189,7 +212,7 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
           </View>
           <View style={styles.orderItemContainer}>
             <Text style={styles.orderItemText} testID="view-order-detail-package-date">
-              Order on : {dateFormat(orderDetail?.updatedAt)}
+              Order on : {dateFormat(orderDetail?.createdAt)}
             </Text>
           </View>
           <ScrollView
@@ -235,15 +258,12 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
           />
         </View>
         <View>
-          {statusDisable == false ? (
-            <CustomButton
-              text={"Update"}
-              onPress={() => handleUpdateStatus(orderDetail?._id)}
-              testID="view-order-detail-update-btn"
-            />
-          ) : (
-            <CustomButton text={"Update"} disabled testID="view-order-detail-update-btn" />
-          )}
+          <CustomButton
+            text={"Update"}
+            onPress={() => handleUpdateStatus(orderDetail?._id)}
+            testID="view-order-detail-update-btn"
+            disabled={statusDisable}
+          />
         </View>
       </View>
     </View>
@@ -269,7 +289,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-
   screenNameContainer: {
     marginTop: 10,
     width: "100%",
@@ -327,7 +346,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     padding: 10,
     borderRadius: 10,
-
     borderColor: colors.muted,
     elevation: 3,
     marginBottom: 10,
@@ -362,7 +380,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-
     paddingLeft: 10,
     paddingRight: 10,
   },
@@ -375,15 +392,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     padding: 10,
     borderRadius: 10,
-
     borderColor: colors.muted,
     elevation: 1,
     marginBottom: 10,
-  },
-  primarytextMedian: {
-    color: colors.primary,
-    fontSize: 15,
-    fontWeight: "bold",
+    width: "100%",
   },
   secondarytextMedian: {
     color: colors.muted,
@@ -392,5 +404,8 @@ const styles = StyleSheet.create({
   },
   emptyView: {
     height: 20,
+  },
+  paymentDisclaimer: {
+    marginTop: 10,
   },
 });
