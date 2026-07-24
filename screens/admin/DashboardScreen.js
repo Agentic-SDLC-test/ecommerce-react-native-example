@@ -5,7 +5,6 @@ import {
   TouchableOpacity,
   Text,
   ScrollView,
-  FlatList,
   RefreshControl,
 } from "react-native";
 import React, { useState, useEffect } from "react";
@@ -18,11 +17,13 @@ import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
 import * as api from "../../api";
 import * as session from "../../utils/session";
 import ProgressDialog from "react-native-progress-dialog";
+import { isReviewsEnabled } from "../../utils/features";
 
 const DashboardScreen = ({ navigation, route }) => {
   const { authUser } = route.params;
-  const [user, setUser] = useState(authUser);
-  const [label, setLabel] = useState("Loading...");
+  const reviewsEnabled = isReviewsEnabled();
+  const [user] = useState(authUser);
+  const [label] = useState("Loading...");
   const [error, setError] = useState("");
   const [isloading, setIsloading] = useState(false);
   const [data, setData] = useState([]);
@@ -40,8 +41,7 @@ const DashboardScreen = ({ navigation, route }) => {
       .getDashboard()
       .then((result) => {
         if (result.success == true) {
-          //set the fetched data to Data state
-          setData([
+          const nextData = [
             {
               id: 1,
               title: "Users",
@@ -74,7 +74,18 @@ const DashboardScreen = ({ navigation, route }) => {
               type: "muted",
               screenName: "viewcategories",
             },
-          ]);
+          ];
+          if (reviewsEnabled) {
+            nextData.push({
+              id: 5,
+              title: "Reviews",
+              value: result.data?.reviewsCount ?? 0,
+              iconName: "chatbubble-ellipses",
+              type: "info",
+              screenName: "viewreviews",
+            });
+          }
+          setData(nextData);
           setError("");
           setIsloading(false);
         } else {
@@ -209,6 +220,18 @@ const DashboardScreen = ({ navigation, route }) => {
               }
               type="morden"
             />
+            {reviewsEnabled && (
+              <OptionList
+                testID="dashboard-reviews-option"
+                text={"Reviews"}
+                Icon={Ionicons}
+                iconName={"chatbubble-ellipses"}
+                onPress={() =>
+                  navigation.navigate("viewreviews", { authUser: user })
+                }
+                type="morden"
+              />
+            )}
 
             <View style={{ height: 20 }}></View>
           </ScrollView>

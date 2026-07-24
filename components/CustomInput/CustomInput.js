@@ -14,6 +14,10 @@ const CustomInput = ({
   keyboardType,
   maxLength,
   testID,
+  multiline = false,
+  numberOfLines,
+  inputStyle,
+  textAlignVertical,
 }) => {
   return (
     <View style={{ width: width }} testID={testID ? `${testID}-wrapper` : undefined}>
@@ -22,12 +26,19 @@ const CustomInput = ({
         onChangeText={setValue}
         value={value}
         secureTextEntry={secureTextEntry}
-        style={styles.CustomInput}
+        style={[
+          styles.CustomInput,
+          multiline ? styles.CustomInputMultiline : null,
+          inputStyle,
+        ]}
         placeholderTextColor={placeholderTextColor}
         onFocus={onFocus}
         borderRadius={radius}
         maxLength={maxLength}
         keyboardType={keyboardType}
+        multiline={multiline}
+        numberOfLines={numberOfLines}
+        textAlignVertical={textAlignVertical}
         testID={testID}
       />
     </View>
@@ -46,5 +57,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     elevation: 5,
     paddingHorizontal: 20,
+  },
+  CustomInputMultiline: {
+    minHeight: 100,
+    paddingTop: 12,
+    paddingBottom: 12,
   },
 });

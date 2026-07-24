@@ -39,6 +39,16 @@ export const getAdminOrders = () => get("/admin/orders");
 export const updateOrderStatus = (orderId, status) =>
   get(`/admin/order-status?orderId=${q(orderId)}&status=${q(status)}`);
 
+// ---- Reviews ----
+export const getProductReviews = (productId) =>
+  get(`/product-reviews?productId=${q(productId)}`);
+export const createReview = (payload) => post("/review", payload);
+export const updateReview = (id, payload) =>
+  post(`/update-review?id=${q(id)}`, payload);
+export const getAdminReviews = () => get("/admin/reviews");
+export const updateReviewStatus = (id, status) =>
+  get(`/admin/review-status?id=${q(id)}&status=${q(status)}`);
+
 // ---- Wishlist ----
 export const getWishlist = () => get("/wishlist");
 export const addToWishlist = (productId, quantity = 1) =>

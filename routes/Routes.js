@@ -18,6 +18,8 @@ import ProductDetailScreen from "../screens/user/ProductDetailScreen";
 import EditProductScreen from "../screens/admin/EditProductScreen";
 import ViewOrdersScreen from "../screens/admin/ViewOrdersScreen";
 import ViewOrderDetailScreen from "../screens/admin/ViewOrderDetailScreen";
+import ViewReviewsScreen from "../screens/admin/ViewReviewsScreen";
+import ViewReviewDetailScreen from "../screens/admin/ViewReviewDetailScreen";
 import MyOrderScreen from "../screens/user/MyOrderScreen";
 import MyOrderDetailScreen from "../screens/user/MyOrderDetailScreen";
 import ViewCategoryScreen from "../screens/admin/ViewCategoryScreen";
@@ -56,6 +58,11 @@ const Routes = () => {
         <Stack.Screen
           name="vieworderdetails"
           component={ViewOrderDetailScreen}
+        />
+        <Stack.Screen name="viewreviews" component={ViewReviewsScreen} />
+        <Stack.Screen
+          name="viewreviewdetails"
+          component={ViewReviewDetailScreen}
         />
         <Stack.Screen name="myorder" component={MyOrderScreen} />
         <Stack.Screen name="myorderdetail" component={MyOrderDetailScreen} />
