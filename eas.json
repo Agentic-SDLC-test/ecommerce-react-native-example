@@ -1,0 +1,30 @@
+{
+  "cli": {
+    "appVersionSource": "remote",
+    "requireCommit": false
+  },
+  "build": {
+    "local": {
+      "developmentClient": true,
+      "distribution": "internal",
+      "environment": "development",
+      "channel": "local"
+    },
+    "staging": {
+      "developmentClient": false,
+      "distribution": "internal",
+      "credentialsSource": "remote",
+      "environment": "preview",
+      "autoIncrement": true,
+      "ios": {
+        "enterpriseProvisioning": "universal",
+        "image": "latest"
+      },
+      "android": {
+        "buildType": "apk",
+        "image": "latest"
+      },
+      "channel": "main"
+    }
+  }
+}
