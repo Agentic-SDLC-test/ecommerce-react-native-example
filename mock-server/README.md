@@ -7,7 +7,7 @@ A local Express.js mock server that replicates all API endpoints used by the Eas
 ```bash
 cd mock-server
 npm install       # only needed once
-npm start         # starts server on http://localhost:3001
+npm start         # starts server on http://localhost:3002
 # or
 npm run dev       # starts with nodemon (auto-restart on file changes)
 ```
@@ -26,10 +26,18 @@ npm run dev       # starts with nodemon (auto-restart on file changes)
 | POST | `/category` | Admin | Add a category |
 | POST | `/update-category?id=` | Admin | Update a category |
 | GET | `/delete-category?id=` | Admin | Delete a category |
-| GET | `/dashboard` | Admin | Stats (users/orders/products/categories count) |
+| GET | `/dashboard` | Admin | Stats (users/orders/products/categories/reviews count) |
 | GET | `/admin/orders` | Admin | All orders |
 | GET | `/admin/users` | Admin | All users |
 | GET | `/admin/order-status?orderId=&status=` | Admin | Update order status |
+| GET | `/wishlist` | User | Current user's wishlist |
+| POST | `/add-to-wishlist` | User | Add a product to wishlist |
+| GET | `/remove-from-wishlist?id=` | User | Remove a product from wishlist |
+| GET | `/product-reviews?productId=` | Optional auth | Public review summary + viewer state |
+| POST | `/review` | User | Submit a verified-purchase review |
+| POST | `/update-review?id=` | User | Edit an existing review |
+| GET | `/admin/reviews` | Admin | Moderation list with review metadata |
+| GET | `/admin/review-status?id=&status=` | Admin | Update review moderation status |
 | GET | `/orders` | User | Current user's orders |
 | POST | `/checkout` | User | Place an order |
 | GET | `/delete-user?id=` | — | Delete a user account |
@@ -58,10 +66,11 @@ Pass the token in the `x-auth-token` header for protected routes.
 
 ## Using with a Physical Device
 
-If you're running the app on a physical device (not a simulator), replace `localhost` with your Mac's local IP address in `constants/Network.js`:
+If you're running the app on a physical device (not a simulator), set `EXPO_PUBLIC_API_URL` to your Mac's local IP address in `.env`:
 
-```js
-serverip: "http://192.168.1.X:3001",  // replace with your actual local IP
+```bash
+EXPO_PUBLIC_API_URL=http://192.168.1.X:3002
+EXPO_PUBLIC_ENABLE_REVIEWS=true
 ```
 
 Find your local IP with:
@@ -75,6 +84,7 @@ The server starts with pre-seeded data:
 - **4 categories**: Garments, Electronics, Cosmetics, Groceries
 - **8 products**: 2 per category
 - **3 users**: 1 admin + 2 regular users
-- **3 orders**: in various statuses (pending, shipped, delivered)
+- **6 orders**: in various statuses (pending, shipped, delivered)
+- **4 reviews**: published, hidden, and removed moderation states
 
 All data is stored in-memory and resets when the server restarts.
