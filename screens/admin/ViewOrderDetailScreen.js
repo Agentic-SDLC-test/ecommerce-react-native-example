@@ -15,11 +15,17 @@ import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import CustomButton from "../../components/CustomButton";
 import DropDownPicker from "react-native-dropdown-picker";
+import {
+  formatPaymentUpdatedAt,
+  getPaymentMethodLabel,
+  getPaymentStatusLabel,
+  isDigitalPaymentType,
+} from "../../utils/payment";
 
 const ViewOrderDetailScreen = ({ navigation, route }) => {
-  const { orderDetail } = route.params;
+  const [currentOrderDetail, setCurrentOrderDetail] = useState(route.params.orderDetail);
   const [isloading, setIsloading] = useState(false);
-  const [label, setLabel] = useState("Loading..");
+  const label = "Loading..";
   const [error, setError] = useState("");
   const [alertType, setAlertType] = useState("error");
   const [totalCost, setTotalCost] = useState(0);
@@ -32,6 +38,11 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
     { label: "Shipped", value: "shipped" },
     { label: "Delivered", value: "delivered" },
   ]);
+  const unpaidDigitalOrder =
+    isDigitalPaymentType(currentOrderDetail?.payment_type) &&
+    currentOrderDetail?.payment_status !== "paid";
+  const shippingBlocked =
+    unpaidDigitalOrder && ["shipped", "delivered"].includes(value);
 
   //method to convert the time into AM PM format
   function tConvert(time) {
@@ -71,15 +82,20 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
       .updateOrderStatus(id, value) //API call
       .then((result) => {
         if (result.success == true) {
-          setError(`Order status is successfully updated to ${value}`);
+          setCurrentOrderDetail(result.data);
+          setError(result.message);
           setAlertType("success");
-          setIsloading(false);
+        } else {
+          setAlertType("error");
+          setError(result.message);
         }
       })
-      .catch((error) => {
+      .catch((requestError) => {
         setAlertType("error");
-        setError(error);
-        console.log("error", error);
+        setError(requestError?.message || "Unable to update order status");
+        console.log("error", requestError);
+      })
+      .finally(() => {
         setIsloading(false);
       });
   };
@@ -88,25 +104,25 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
   useEffect(() => {
     setError("");
     setAlertType("error");
-    if (orderDetail?.status == "delivered") {
+    if (currentOrderDetail?.status == "delivered") {
       setStatusDisable(true);
     } else {
       setStatusDisable(false);
     }
-    setValue(orderDetail?.status);
+    setValue(currentOrderDetail?.status);
     setAddress(
-      orderDetail?.country +
+      currentOrderDetail?.country +
         ", " +
-        orderDetail?.city +
+        currentOrderDetail?.city +
         ", " +
-        orderDetail?.shippingAddress
+        currentOrderDetail?.shippingAddress
     );
     setTotalCost(
-      orderDetail?.items.reduce((accumulator, object) => {
-        return (accumulator + object.price) * object.quantity;
+      currentOrderDetail?.items.reduce((accumulator, object) => {
+        return accumulator + Number(object.price) * Number(object.quantity);
       }, 0) // calculate the total cost
     );
-  }, []);
+  }, [currentOrderDetail]);
   return (
     <View style={styles.container} testID="view-order-detail-screen">
       <ProgressDialog visible={isloading} label={label} />
@@ -148,34 +164,63 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
         </View>
         <View style={styles.ShipingInfoContainer}>
           <Text style={styles.secondarytextMedian} testID="view-order-detail-user-name">
-            {orderDetail?.user?.name}
+            {currentOrderDetail?.user?.name}
           </Text>
           <Text style={styles.secondarytextMedian} testID="view-order-detail-user-email">
-            {orderDetail?.user?.email}
+            {currentOrderDetail?.user?.email}
           </Text>
           <Text style={styles.secondarytextSm} testID="view-order-detail-address">{address}</Text>
-          <Text style={styles.secondarytextSm} testID="view-order-detail-zipcode">{orderDetail?.zipcode}</Text>
+          <Text style={styles.secondarytextSm} testID="view-order-detail-zipcode">{currentOrderDetail?.zipcode}</Text>
         </View>
         <View>
           <Text style={styles.containerNameText} testID="view-order-detail-order-info-heading">Order Info</Text>
         </View>
         <View style={styles.orderInfoContainer}>
           <Text style={styles.secondarytextMedian} testID="view-order-detail-order-id">
-            Order # {orderDetail?.orderId}
+            Order # {currentOrderDetail?.orderId}
           </Text>
           <Text style={styles.secondarytextSm} testID="view-order-detail-ordered-date">
-            Ordered on {dateFormat(orderDetail?.updatedAt)}
+            Ordered on {dateFormat(currentOrderDetail?.updatedAt)}
           </Text>
-          {orderDetail?.shippedOn && (
+          {currentOrderDetail?.shippedOn && (
             <Text style={styles.secondarytextSm} testID="view-order-detail-shipped-date">
-              Shipped on {orderDetail?.shippedOn}
+              Shipped on {currentOrderDetail?.shippedOn}
             </Text>
           )}
-          {orderDetail?.deliveredOn && (
+          {currentOrderDetail?.deliveredOn && (
             <Text style={styles.secondarytextSm} testID="view-order-detail-delivered-date">
-              Delivered on {orderDetail?.deliveredOn}
+              Delivered on {currentOrderDetail?.deliveredOn}
             </Text>
           )}
+        </View>
+        <View style={styles.containerNameContainer}>
+          <View>
+            <Text style={styles.containerNameText} testID="view-order-detail-payment-heading">
+              Payment Details
+            </Text>
+          </View>
+        </View>
+        <View style={styles.paymentInfoContainer}>
+          <Text style={styles.secondarytextMedian} testID="view-order-detail-payment-method">
+            {getPaymentMethodLabel(currentOrderDetail?.payment_type)}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="view-order-detail-payment-status">
+            Status: {getPaymentStatusLabel(currentOrderDetail?.payment_status)}
+          </Text>
+          <Text
+            style={styles.secondarytextSm}
+            testID="view-order-detail-payment-updated-at"
+          >
+            Updated: {formatPaymentUpdatedAt(currentOrderDetail?.payment_updated_at)}
+          </Text>
+          {currentOrderDetail?.payment_failure_reason ? (
+            <Text
+              style={styles.secondarytextSm}
+              testID="view-order-detail-payment-failure"
+            >
+              Failure reason: {currentOrderDetail?.payment_failure_reason}
+            </Text>
+          ) : null}
         </View>
         <View style={styles.containerNameContainer}>
           <View>
@@ -189,7 +234,7 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
           </View>
           <View style={styles.orderItemContainer}>
             <Text style={styles.orderItemText} testID="view-order-detail-package-date">
-              Order on : {dateFormat(orderDetail?.updatedAt)}
+              Order on : {dateFormat(currentOrderDetail?.updatedAt)}
             </Text>
           </View>
           <ScrollView
@@ -197,7 +242,7 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
             nestedScrollEnabled={true}
             testID="view-order-detail-summary-scroll"
           >
-            {orderDetail?.items.map((product, index) => (
+            {currentOrderDetail?.items.map((product, index) => (
               <View key={index}>
                 <BasicProductList
                   title={product?.productId?.title}
@@ -216,6 +261,13 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
         <View style={styles.emptyView}></View>
       </ScrollView>
       <View style={styles.bottomContainer}>
+        {unpaidDigitalOrder ? (
+          <View style={styles.warningBanner} testID="view-order-detail-payment-warning">
+            <Text style={styles.warningText}>
+              EasyBuy Wallet payment must be paid before this order can ship.
+            </Text>
+          </View>
+        ) : null}
         <View>
           <DropDownPicker
             style={{ width: 200 }}
@@ -235,10 +287,10 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
           />
         </View>
         <View>
-          {statusDisable == false ? (
+          {statusDisable == false && shippingBlocked == false ? (
             <CustomButton
               text={"Update"}
-              onPress={() => handleUpdateStatus(orderDetail?._id)}
+              onPress={() => handleUpdateStatus(currentOrderDetail?._id)}
               testID="view-order-detail-update-btn"
             />
           ) : (
@@ -332,6 +384,20 @@ const styles = StyleSheet.create({
     elevation: 3,
     marginBottom: 10,
   },
+  paymentInfoContainer: {
+    marginTop: 5,
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "flex-start",
+    backgroundColor: colors.white,
+    padding: 10,
+    borderRadius: 10,
+    borderColor: colors.muted,
+    elevation: 3,
+    marginBottom: 10,
+    width: "100%",
+  },
   orderItemContainer: {
     width: "100%",
     display: "flex",
@@ -354,7 +420,7 @@ const styles = StyleSheet.create({
   bottomContainer: {
     backgroundColor: colors.white,
     width: "110%",
-    height: 70,
+    minHeight: 70,
     borderTopLeftRadius: 10,
     borderTopEndRadius: 10,
     elevation: 5,
@@ -365,6 +431,7 @@ const styles = StyleSheet.create({
 
     paddingLeft: 10,
     paddingRight: 10,
+    paddingVertical: 10,
   },
   orderInfoContainer: {
     marginTop: 5,
@@ -392,5 +459,17 @@ const styles = StyleSheet.create({
   },
   emptyView: {
     height: 20,
+  },
+  warningBanner: {
+    flex: 1,
+    backgroundColor: colors.warning,
+    borderRadius: 10,
+    padding: 10,
+    marginRight: 10,
+  },
+  warningText: {
+    color: colors.dark,
+    fontWeight: "bold",
+    fontSize: 12,
   },
 });

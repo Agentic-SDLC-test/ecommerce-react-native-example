@@ -7,23 +7,27 @@ import {
   TouchableOpacity,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import StepIndicator from "react-native-step-indicator";
+import {
+  formatPaymentUpdatedAt,
+  getPaymentMethodLabel,
+  getPaymentStatusLabel,
+} from "../../utils/payment";
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
-  const [isloading, setIsloading] = useState(false);
-  const [label, setLabel] = useState("Loading..");
+  const isloading = false;
+  const label = "Loading..";
   const [error, setError] = useState("");
   const [alertType, setAlertType] = useState("error");
   const [totalCost, setTotalCost] = useState(0);
   const [address, setAddress] = useState("");
   const [value, setValue] = useState(null);
-  const [statusDisable, setStatusDisable] = useState(false);
   const labels = ["Processing", "Shipping", "Delivery"];
   const [trackingState, setTrackingState] = useState(1);
   const customStyles = {
@@ -82,11 +86,6 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
   useEffect(() => {
     setError("");
     setAlertType("error");
-    if (orderDetail?.status == "delivered") {
-      setStatusDisable(true);
-    } else {
-      setStatusDisable(false);
-    }
     setValue(orderDetail?.status);
     setAddress(
       orderDetail?.country +
@@ -97,7 +96,7 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
     );
     setTotalCost(
       orderDetail?.items.reduce((accumulator, object) => {
-        return (accumulator + object.price) * object.quantity;
+        return accumulator + Number(object.price) * Number(object.quantity);
       }, 0)
     );
     if (orderDetail?.status === "pending") {
@@ -107,7 +106,7 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
     } else {
       setTrackingState(3);
     }
-  }, []);
+  }, [orderDetail]);
 
   return (
     <View style={styles.container} testID="my-order-detail-screen">
@@ -182,6 +181,32 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
             />
           </View>
         </View>
+        <View style={styles.containerNameContainer}>
+          <View>
+            <Text style={styles.containerNameText} testID="my-order-detail-payment-heading">
+              Payment Details
+            </Text>
+          </View>
+        </View>
+        <View style={styles.paymentInfoContainer}>
+          <Text style={styles.secondarytextMedian} testID="my-order-detail-payment-method">
+            {getPaymentMethodLabel(orderDetail?.payment_type)}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-status">
+            Status: {getPaymentStatusLabel(orderDetail?.payment_status)}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-updated-at">
+            Updated: {formatPaymentUpdatedAt(orderDetail?.payment_updated_at)}
+          </Text>
+          {orderDetail?.payment_failure_reason ? (
+            <Text
+              style={styles.secondarytextSm}
+              testID="my-order-detail-payment-failure"
+            >
+              Failure reason: {orderDetail?.payment_failure_reason}
+            </Text>
+          ) : null}
+        </View>
 
         <View style={styles.containerNameContainer}>
           <View>
@@ -195,7 +220,7 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
           </View>
           <View style={styles.orderItemContainer}>
             <Text style={styles.orderItemText} testID="my-order-detail-package-date">
-              Order on : {orderDetail?.updatedAt}
+              Order on : {dateFormat(orderDetail?.updatedAt)}
             </Text>
           </View>
           <ScrollView
@@ -306,6 +331,20 @@ const styles = StyleSheet.create({
     borderColor: colors.muted,
     elevation: 3,
     marginBottom: 10,
+  },
+  paymentInfoContainer: {
+    marginTop: 5,
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "flex-start",
+    backgroundColor: colors.white,
+    padding: 10,
+    borderRadius: 10,
+    borderColor: colors.muted,
+    elevation: 3,
+    marginBottom: 10,
+    width: "100%",
   },
   orderItemContainer: {
     width: "100%",

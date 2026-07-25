@@ -3,6 +3,13 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
+const {
+  PAYMENT_TYPES,
+  normalizeOrderPayment,
+  resolveInitialPaymentStatus,
+  updateOrderPayment,
+  canAdvanceFulfillment,
+} = require("./payment");
 
 const app = express();
 const PORT = 3002;
@@ -211,6 +218,10 @@ let orders = [
     amount: 129.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "pay_on_delivery",
+    payment_reference: null,
+    payment_failure_reason: null,
+    payment_updated_at: new Date("2024-01-15T10:30:00Z").toISOString(),
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -239,7 +250,11 @@ let orders = [
     ],
     amount: 24.99,
     discount: 0,
-    payment_type: "cod",
+    payment_type: "wallet",
+    payment_status: "paid",
+    payment_reference: "mock-wallet-ord-2024-002",
+    payment_failure_reason: null,
+    payment_updated_at: new Date("2024-01-16T14:15:00Z").toISOString(),
     country: "Canada",
     city: "Vancouver",
     zipcode: "V6B 1A1",
@@ -270,6 +285,10 @@ let orders = [
     amount: 38.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "pay_on_delivery",
+    payment_reference: null,
+    payment_failure_reason: null,
+    payment_updated_at: new Date("2024-01-12T16:00:00Z").toISOString(),
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -281,6 +300,19 @@ let orders = [
     updatedAt: new Date("2024-01-12T16:00:00Z").toISOString(),
   },
 ];
+
+orders = orders.map((order) => normalizeOrderPayment(order));
+
+const logOrderEvent = (eventName, order, actorRole) => {
+  const normalizedOrder = normalizeOrderPayment(order);
+  console.log(eventName, {
+    orderId: normalizedOrder.orderId,
+    userId: normalizedOrder.user?._id,
+    paymentType: normalizedOrder.payment_type,
+    paymentStatus: normalizedOrder.payment_status,
+    actorRole,
+  });
+};
 
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
 const authMiddleware = (req, res, next) => {
@@ -463,7 +495,7 @@ app.get("/dashboard", adminMiddleware, (req, res) => {
 
 // GET /admin/orders  (admin: all orders)
 app.get("/admin/orders", adminMiddleware, (req, res) => {
-  res.json({ success: true, data: orders });
+  res.json({ success: true, data: orders.map((order) => normalizeOrderPayment(order)) });
 });
 
 // GET /admin/users  (admin: all users)
@@ -483,6 +515,13 @@ app.get("/admin/order-status", adminMiddleware, (req, res) => {
   if (!order) {
     return res.status(404).json({ success: false, message: "Order not found" });
   }
+  normalizeOrderPayment(order);
+  if (!canAdvanceFulfillment(order, status)) {
+    logOrderEvent("admin.fulfillment_blocked", order, "admin");
+    return res
+      .status(400)
+      .json({ success: false, message: "Digital orders must be paid before shipping" });
+  }
   order.status = status;
   order.updatedAt = new Date().toISOString();
   if (status === "shipped") order.shippedOn = new Date().toISOString().split("T")[0];
@@ -492,7 +531,9 @@ app.get("/admin/order-status", adminMiddleware, (req, res) => {
 
 // GET /orders  (user: their own orders)
 app.get("/orders", authMiddleware, (req, res) => {
-  const userOrders = orders.filter((o) => o.user._id === req.user._id);
+  const userOrders = orders
+    .filter((o) => o.user._id === req.user._id)
+    .map((order) => normalizeOrderPayment(order));
   res.json({ success: true, data: userOrders });
 });
 
@@ -501,6 +542,9 @@ app.post("/checkout", authMiddleware, (req, res) => {
   const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
+  }
+  if (!PAYMENT_TYPES.includes(payment_type)) {
+    return res.status(400).json({ success: false, message: "Invalid payment type" });
   }
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
@@ -512,6 +556,7 @@ app.post("/checkout", authMiddleware, (req, res) => {
       quantity: item.quantity,
     };
   });
+  const now = new Date().toISOString();
   const newOrder = {
     _id: uuidv4(),
     orderId: `ORD-${Date.now()}`,
@@ -523,17 +568,54 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
+    payment_type,
+    payment_status: resolveInitialPaymentStatus(payment_type),
+    payment_reference: null,
+    payment_failure_reason: null,
+    payment_updated_at: now,
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",
     shippingAddress: shippingAddress || "",
     status: status || "pending",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    createdAt: now,
+    updatedAt: now,
   };
   orders.push(newOrder);
+  logOrderEvent("checkout.created", newOrder, "user");
   res.json({ success: true, message: "Order placed successfully", data: newOrder });
+});
+
+// POST /order-payment?id=  (user: update wallet payment status)
+app.post("/order-payment", authMiddleware, (req, res) => {
+  const { id } = req.query;
+  const { payment_status, payment_reference, failure_reason } = req.body;
+  const order = orders.find((entry) => entry._id === id);
+
+  if (!order) {
+    return res.status(404).json({ success: false, message: "Order not found" });
+  }
+  if (order.user._id !== req.user._id) {
+    return res
+      .status(403)
+      .json({ success: false, message: "You can only update your own orders" });
+  }
+
+  const paymentResult = updateOrderPayment(order, payment_status, {
+    payment_reference,
+    failure_reason,
+  });
+  if (!paymentResult.ok) {
+    logOrderEvent("payment.status_blocked", order, "user");
+    return res.status(400).json({ success: false, message: paymentResult.message });
+  }
+
+  logOrderEvent("payment.status_updated", order, "user");
+  res.json({
+    success: true,
+    message: `Payment status updated to ${order.payment_status}`,
+    data: order,
+  });
 });
 
 // GET /delete-user?id=
@@ -595,35 +677,38 @@ app.get("/uploads/:filename", (req, res) => {
 });
 
 // ─── Start server ─────────────────────────────────────────────────────────────
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`\n🚀 EasyBuy Mock Server running at http://localhost:${PORT}`);
-  console.log(`\n📋 Available endpoints:`);
-  console.log(`   POST   /register`);
-  console.log(`   POST   /login`);
-  console.log(`   GET    /products`);
-  console.log(`   POST   /product              (admin)`);
-  console.log(`   POST   /update-product?id=   (admin)`);
-  console.log(`   GET    /delete-product?id=   (admin)`);
-  console.log(`   GET    /categories`);
-  console.log(`   POST   /category             (admin)`);
-  console.log(`   POST   /update-category?id=  (admin)`);
-  console.log(`   GET    /delete-category?id=  (admin)`);
-  console.log(`   GET    /dashboard            (admin)`);
-  console.log(`   GET    /admin/orders         (admin)`);
-  console.log(`   GET    /admin/users          (admin)`);
-  console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
-  console.log(`   GET    /orders               (user)`);
-  console.log(`   POST   /checkout             (user)`);
-  console.log(`   GET    /delete-user?id=`);
-  console.log(`   POST   /reset-password?id=`);
-  console.log(`   POST   /photos/upload`);
-  console.log(`   GET    /uploads/:filename`);
-  console.log(`\n🔑 Test tokens:`);
-  console.log(`   Admin token : mock-admin-token-001`);
-  console.log(`   User token  : mock-user-token-001`);
-  console.log(`\n👤 Test credentials:`);
-  console.log(`   Admin  → email: admin@easybuy.com  | password: admin123`);
-  console.log(`   User   → email: user@easybuy.com   | password: user123\n`);
-});
+if (require.main === module) {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`\n🚀 EasyBuy Mock Server running at http://localhost:${PORT}`);
+    console.log(`\n📋 Available endpoints:`);
+    console.log(`   POST   /register`);
+    console.log(`   POST   /login`);
+    console.log(`   GET    /products`);
+    console.log(`   POST   /product              (admin)`);
+    console.log(`   POST   /update-product?id=   (admin)`);
+    console.log(`   GET    /delete-product?id=   (admin)`);
+    console.log(`   GET    /categories`);
+    console.log(`   POST   /category             (admin)`);
+    console.log(`   POST   /update-category?id=  (admin)`);
+    console.log(`   GET    /delete-category?id=  (admin)`);
+    console.log(`   GET    /dashboard            (admin)`);
+    console.log(`   GET    /admin/orders         (admin)`);
+    console.log(`   GET    /admin/users          (admin)`);
+    console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
+    console.log(`   GET    /orders               (user)`);
+    console.log(`   POST   /checkout             (user)`);
+    console.log(`   POST   /order-payment?id=    (user)`);
+    console.log(`   GET    /delete-user?id=`);
+    console.log(`   POST   /reset-password?id=`);
+    console.log(`   POST   /photos/upload`);
+    console.log(`   GET    /uploads/:filename`);
+    console.log(`\n🔑 Test tokens:`);
+    console.log(`   Admin token : mock-admin-token-001`);
+    console.log(`   User token  : mock-user-token-001`);
+    console.log(`\n👤 Test credentials:`);
+    console.log(`   Admin  → email: admin@easybuy.com  | password: admin123`);
+    console.log(`   User   → email: user@easybuy.com   | password: user123\n`);
+  });
+}
 
-// Made with Bob
+module.exports = { app };
