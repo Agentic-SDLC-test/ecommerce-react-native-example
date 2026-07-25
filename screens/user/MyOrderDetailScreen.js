@@ -1,31 +1,51 @@
 import {
+  ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
-  StatusBar,
-  View,
-  ScrollView,
   TouchableOpacity,
+  View,
 } from "react-native";
-import React, { useState, useEffect } from "react";
-import { colors, network } from "../../constants";
+import React, { useMemo, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
-import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
-import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import StepIndicator from "react-native-step-indicator";
+import { colors } from "../../constants";
+import BasicProductList from "../../components/BasicProductList/BasicProductList";
+import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import CustomButton from "../../components/CustomButton";
+import PaymentStatusBadge from "../../components/PaymentStatusBadge";
+import {
+  canResumeWalletPayment,
+  getPaymentMethodLabel,
+} from "../../utils/paymentPresentation";
+import { isWalletMockEnabled } from "../../utils/featureFlags";
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
-  const { orderDetail } = route.params;
-  const [isloading, setIsloading] = useState(false);
-  const [label, setLabel] = useState("Loading..");
-  const [error, setError] = useState("");
-  const [alertType, setAlertType] = useState("error");
-  const [totalCost, setTotalCost] = useState(0);
-  const [address, setAddress] = useState("");
-  const [value, setValue] = useState(null);
-  const [statusDisable, setStatusDisable] = useState(false);
+  const order = route.params?.orderDetail;
+  const [isloading] = useState(false);
+  const [label] = useState("Loading..");
+  const [error] = useState("");
+  const [alertType] = useState("error");
+  const walletEnabled = isWalletMockEnabled();
+
   const labels = ["Processing", "Shipping", "Delivery"];
-  const [trackingState, setTrackingState] = useState(1);
+  const trackingState =
+    order?.status === "pending" ? 1 : order?.status === "shipped" ? 2 : 3;
+  const address = [order?.country, order?.city, order?.shippingAddress]
+    .filter(Boolean)
+    .join(", ");
+  const totalCost = useMemo(
+    () =>
+      Number(order?.amount) ||
+      order?.items?.reduce(
+        (total, item) =>
+          total + Number(item.price || 0) * Number(item.quantity || 0),
+        0
+      ),
+    [order]
+  );
+
   const customStyles = {
     stepIndicatorSize: 25,
     currentStepIndicatorSize: 30,
@@ -50,20 +70,18 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
     currentStepLabelColor: "#fe7013",
   };
 
-  //method to convert time to AM PM format
   function tConvert(time) {
     time = time
       .toString()
       .match(/^([01]\d|2[0-3])(:)([0-5]\d)(:[0-5]\d)?$/) || [time];
     if (time.length > 1) {
-      time = time.slice(1); // Remove full string match value
-      time[5] = +time[0] < 12 ? "AM" : "PM"; // Set AM/PM
-      time[0] = +time[0] % 12 || 12; // Adjust hours
+      time = time.slice(1);
+      time[5] = +time[0] < 12 ? "AM" : "PM";
+      time[0] = +time[0] % 12 || 12;
     }
     return time.join("");
   }
 
-  //method to convert data to dd-mm-yyyy  format
   const dateFormat = (datex) => {
     let t = new Date(datex);
     const date = ("0" + t.getDate()).slice(-2);
@@ -73,41 +91,8 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
     const minutes = ("0" + t.getMinutes()).slice(-2);
     const seconds = ("0" + t.getSeconds()).slice(-2);
     const time = tConvert(`${hours}:${minutes}:${seconds}`);
-    const newDate = `${date}-${month}-${year}, ${time}`;
-
-    return newDate;
+    return `${date}-${month}-${year}, ${time}`;
   };
-
-  // set total cost, order detail, order status on initial render
-  useEffect(() => {
-    setError("");
-    setAlertType("error");
-    if (orderDetail?.status == "delivered") {
-      setStatusDisable(true);
-    } else {
-      setStatusDisable(false);
-    }
-    setValue(orderDetail?.status);
-    setAddress(
-      orderDetail?.country +
-        ", " +
-        orderDetail?.city +
-        ", " +
-        orderDetail?.shippingAddress
-    );
-    setTotalCost(
-      orderDetail?.items.reduce((accumulator, object) => {
-        return (accumulator + object.price) * object.quantity;
-      }, 0)
-    );
-    if (orderDetail?.status === "pending") {
-      setTrackingState(1);
-    } else if (orderDetail?.status === "shipped") {
-      setTrackingState(2);
-    } else {
-      setTrackingState(3);
-    }
-  }, []);
 
   return (
     <View style={styles.container} testID="my-order-detail-screen">
@@ -116,9 +101,7 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
       <View style={styles.TopBarContainer}>
         <TouchableOpacity
           testID="my-order-detail-back-btn"
-          onPress={() => {
-            navigation.goBack();
-          }}
+          onPress={() => navigation.goBack()}
         >
           <Ionicons
             name="arrow-back-circle-outline"
@@ -129,10 +112,15 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
       </View>
       <View style={styles.screenNameContainer}>
         <View>
-          <Text style={styles.screenNameText} testID="my-order-detail-heading">Order Detials</Text>
+          <Text style={styles.screenNameText} testID="my-order-detail-heading">
+            Order Detials
+          </Text>
         </View>
         <View>
-          <Text style={styles.screenNameParagraph} testID="my-order-detail-subtitle">
+          <Text
+            style={styles.screenNameParagraph}
+            testID="my-order-detail-subtitle"
+          >
             View all detail about order
           </Text>
         </View>
@@ -145,31 +133,51 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
       >
         <View style={styles.containerNameContainer}>
           <View>
-            <Text style={styles.containerNameText} testID="my-order-detail-shipping-heading">Shipping Address</Text>
+            <Text
+              style={styles.containerNameText}
+              testID="my-order-detail-shipping-heading"
+            >
+              Shipping Address
+            </Text>
           </View>
         </View>
         <View style={styles.ShipingInfoContainer}>
-          <Text style={styles.secondarytextSm} testID="my-order-detail-address">{address}</Text>
-          <Text style={styles.secondarytextSm} testID="my-order-detail-zipcode">{orderDetail?.zipcode}</Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-address">
+            {address}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-zipcode">
+            {order?.zipcode}
+          </Text>
         </View>
         <View>
-          <Text style={styles.containerNameText} testID="my-order-detail-order-info-heading">Order Info</Text>
+          <Text
+            style={styles.containerNameText}
+            testID="my-order-detail-order-info-heading"
+          >
+            Order Info
+          </Text>
         </View>
         <View style={styles.orderInfoContainer}>
           <Text style={styles.secondarytextMedian} testID="my-order-detail-order-id">
-            Order # {orderDetail?.orderId}
+            Order # {order?.orderId}
           </Text>
           <Text style={styles.secondarytextSm} testID="my-order-detail-ordered-date">
-            Ordered on {dateFormat(orderDetail?.updatedAt)}
+            Ordered on {dateFormat(order?.updatedAt)}
           </Text>
-          {orderDetail?.shippedOn && (
-            <Text style={styles.secondarytextSm} testID="my-order-detail-shipped-date">
-              Shipped on {orderDetail?.shippedOn}
+          {order?.shippedOn && (
+            <Text
+              style={styles.secondarytextSm}
+              testID="my-order-detail-shipped-date"
+            >
+              Shipped on {order?.shippedOn}
             </Text>
           )}
-          {orderDetail?.deliveredOn && (
-            <Text style={styles.secondarytextSm} testID="my-order-detail-delivered-date">
-              Delivered on {orderDetail?.deliveredOn}
+          {order?.deliveredOn && (
+            <Text
+              style={styles.secondarytextSm}
+              testID="my-order-detail-delivered-date"
+            >
+              Delivered on {order?.deliveredOn}
             </Text>
           )}
           <View style={{ marginTop: 15, width: "100%" }}>
@@ -185,17 +193,90 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
 
         <View style={styles.containerNameContainer}>
           <View>
-            <Text style={styles.containerNameText} testID="my-order-detail-package-heading">Package Details</Text>
+            <Text
+              style={styles.containerNameText}
+              testID="my-order-detail-payment-heading"
+            >
+              Payment
+            </Text>
+          </View>
+        </View>
+        <View style={styles.paymentInfoContainer}>
+          <View style={styles.paymentRow}>
+            <Text style={styles.orderItemText}>Method</Text>
+            <Text
+              style={styles.secondarytextMedian}
+              testID="my-order-detail-payment-method"
+            >
+              {getPaymentMethodLabel(order?.payment_type)}
+            </Text>
+          </View>
+          <View style={styles.paymentRow}>
+            <Text style={styles.orderItemText}>Status</Text>
+            <PaymentStatusBadge
+              paymentStatus={order?.payment_status}
+              paymentType={order?.payment_type}
+              testID="my-order-detail-payment-status"
+            />
+          </View>
+          <View style={styles.paymentRow}>
+            <Text style={styles.orderItemText}>Last updated</Text>
+            <Text
+              style={styles.secondarytextSm}
+              testID="my-order-detail-payment-updated-at"
+            >
+              {dateFormat(order?.payment_updated_at || order?.updatedAt)}
+            </Text>
+          </View>
+          {order?.payment_failure_reason ? (
+            <Text
+              style={styles.paymentFailureText}
+              testID="my-order-detail-payment-failure"
+            >
+              {order.payment_failure_reason}
+            </Text>
+          ) : null}
+          {walletEnabled && canResumeWalletPayment(order) && (
+            <View style={styles.paymentActionContainer}>
+              <CustomButton
+                testID="my-order-detail-resume-payment-btn"
+                text={
+                  order?.payment_status === "pending"
+                    ? "Resume wallet payment"
+                    : "Try wallet payment again"
+                }
+                onPress={() =>
+                  navigation.navigate("walletpayment", {
+                    order,
+                    origin: "my-order-detail",
+                  })
+                }
+              />
+            </View>
+          )}
+        </View>
+
+        <View style={styles.containerNameContainer}>
+          <View>
+            <Text
+              style={styles.containerNameText}
+              testID="my-order-detail-package-heading"
+            >
+              Package Details
+            </Text>
           </View>
         </View>
         <View style={styles.orderItemsContainer}>
           <View style={styles.orderItemContainer}>
             <Text style={styles.orderItemText}>Package</Text>
-            <Text testID="my-order-detail-package-status">{value}</Text>
+            <Text testID="my-order-detail-package-status">{order?.status}</Text>
           </View>
           <View style={styles.orderItemContainer}>
-            <Text style={styles.orderItemText} testID="my-order-detail-package-date">
-              Order on : {orderDetail?.updatedAt}
+            <Text
+              style={styles.orderItemText}
+              testID="my-order-detail-package-date"
+            >
+              Order on : {order?.updatedAt}
             </Text>
           </View>
           <ScrollView
@@ -203,7 +284,7 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
             style={styles.orderSummaryContainer}
             nestedScrollEnabled={true}
           >
-            {orderDetail?.items.map((product, index) => (
+            {order?.items.map((product, index) => (
               <View key={index}>
                 <BasicProductList
                   testID={`my-order-detail-product-${index}`}
@@ -215,7 +296,9 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
             ))}
           </ScrollView>
           <View style={styles.orderItemContainer}>
-            <Text style={styles.orderItemText} testID="my-order-detail-total-label">Total</Text>
+            <Text style={styles.orderItemText} testID="my-order-detail-total-label">
+              Total
+            </Text>
             <Text testID="my-order-detail-total-value">{totalCost}$</Text>
           </View>
         </View>
@@ -244,7 +327,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-
   screenNameContainer: {
     marginTop: 10,
     width: "100%",
@@ -302,7 +384,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     padding: 10,
     borderRadius: 10,
-
     borderColor: colors.muted,
     elevation: 3,
     marginBottom: 10,
@@ -326,21 +407,6 @@ const styles = StyleSheet.create({
     width: "100%",
     marginBottom: 5,
   },
-  bottomContainer: {
-    backgroundColor: colors.white,
-    width: "110%",
-    height: 70,
-    borderTopLeftRadius: 10,
-    borderTopEndRadius: 10,
-    elevation: 5,
-    display: "flex",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-
-    paddingLeft: 10,
-    paddingRight: 10,
-  },
   orderInfoContainer: {
     marginTop: 5,
     display: "flex",
@@ -350,20 +416,36 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     padding: 10,
     borderRadius: 10,
-
     borderColor: colors.muted,
     elevation: 1,
     marginBottom: 10,
-  },
-  primarytextMedian: {
-    color: colors.primary,
-    fontSize: 15,
-    fontWeight: "bold",
   },
   secondarytextMedian: {
     color: colors.muted,
     fontSize: 15,
     fontWeight: "bold",
+  },
+  paymentInfoContainer: {
+    width: "100%",
+    backgroundColor: colors.white,
+    borderRadius: 10,
+    padding: 12,
+    elevation: 2,
+  },
+  paymentRow: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 12,
+  },
+  paymentFailureText: {
+    color: colors.danger,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  paymentActionContainer: {
+    marginTop: 10,
   },
   emptyView: {
     height: 20,

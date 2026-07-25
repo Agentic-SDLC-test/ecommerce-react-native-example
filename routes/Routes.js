@@ -26,10 +26,14 @@ import ViewUsersScreen from "../screens/admin/ViewUsersScreen";
 import CategoriesScreen from "../screens/user/CategoriesScreen";
 import EditCategoryScreen from "../screens/admin/EditCategoryScreen";
 import MyWishlistScreen from "../screens/profile/MyWishlistScreen";
+import WalletPaymentScreen from "../screens/user/WalletPaymentScreen";
+import { isWalletMockEnabled } from "../utils/featureFlags";
 
 const Stack = createNativeStackNavigator();
 
 const Routes = () => {
+  const walletEnabled = isWalletMockEnabled();
+
   return (
     <NavigationContainer ref={navigationRef} testID="navigation-container">
       <Stack.Navigator
@@ -51,6 +55,9 @@ const Routes = () => {
         <Stack.Screen name="cart" component={CartScreen} />
         <Stack.Screen name="checkout" component={CheckoutScreen} />
         <Stack.Screen name="orderconfirm" component={OrderConfirmScreen} />
+        {walletEnabled && (
+          <Stack.Screen name="walletpayment" component={WalletPaymentScreen} />
+        )}
         <Stack.Screen name="productdetail" component={ProductDetailScreen} />
         <Stack.Screen name="vieworder" component={ViewOrdersScreen} />
         <Stack.Screen
