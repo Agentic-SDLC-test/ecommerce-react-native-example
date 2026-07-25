@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React, { useState, useEffect } from "react";
+import React, { useMemo } from "react";
 import { colors } from "../../constants";
+import { getPaymentMethodLabel, getPaymentStatusLabel } from "../../utils/payments";
 
 function getTime(date) {
   let t = new Date(date);
@@ -8,18 +9,14 @@ function getTime(date) {
   const minutes = ("0" + t.getMinutes()).slice(-2);
   const seconds = ("0" + t.getSeconds()).slice(-2);
   let time = `${hours}:${minutes}:${seconds}`;
-  // Check correct time format and split into components
-  time = time.toString().match(/^([01]\d|2[0-3])(:)([0-5]\d)(:[0-5]\d)?$/) || [
-    time,
-  ];
+  time = time.toString().match(/^([01]\d|2[0-3])(:)([0-5]\d)(:[0-5]\d)?$/) || [time];
 
   if (time.length > 1) {
-    // If time format correct
-    time = time.slice(1); // Remove full string match value
-    time[5] = +time[0] < 12 ? " AM" : " PM"; // Set AM/PM
-    time[0] = +time[0] % 12 || 12; // Adjust hours
+    time = time.slice(1);
+    time[5] = +time[0] < 12 ? " AM" : " PM";
+    time[0] = +time[0] % 12 || 12;
   }
-  return time.join(""); // return adjusted time or original string
+  return time.join("");
 }
 
 const dateFormat = (datex) => {
@@ -27,36 +24,35 @@ const dateFormat = (datex) => {
   const date = ("0" + t.getDate()).slice(-2);
   const month = ("0" + (t.getMonth() + 1)).slice(-2);
   const year = t.getFullYear();
-  const hours = ("0" + t.getHours()).slice(-2);
-  const minutes = ("0" + t.getMinutes()).slice(-2);
-  const seconds = ("0" + t.getSeconds()).slice(-2);
-  const newDate = `${date}-${month}-${year}`;
-
-  return newDate;
+  return `${date}-${month}-${year}`;
 };
 
-const OrderList = ({ item, onPress, testID }) => {
-  const [totalCost, setTotalCost] = useState(0);
-  const [quantity, setQuantity] = useState(0);
+function formatDeliveryStatus(status) {
+  if (!status) return "Pending";
+  return status.charAt(0).toUpperCase() + status.slice(1);
+}
 
-  useEffect(() => {
-    let packageItems = 0;
-    item?.items.forEach(() => {
-      ++packageItems;
-    });
-    setQuantity(packageItems);
-    setTotalCost(
-      item?.items.reduce((accumulator, object) => {
-        return (accumulator + object.price) * object.quantity;
-      }, 0)
-    );
-  }, []);
+const OrderList = ({ item, onPress, testID }) => {
+  const quantity = useMemo(
+    () => item?.items?.reduce((total, product) => total + Number(product.quantity || 0), 0) || 0,
+    [item]
+  );
+  const totalCost = useMemo(
+    () =>
+      item?.items?.reduce(
+        (total, product) => total + Number(product.price || 0) * Number(product.quantity || 0),
+        0
+      ) || 0,
+    [item]
+  );
 
   return (
     <View style={styles.container} testID={testID}>
       <View style={styles.innerRow}>
         <View>
-          <Text style={styles.primaryText} testID={testID ? `${testID}-order-id` : undefined}>Order # {item?.orderId}</Text>
+          <Text style={styles.primaryText} testID={testID ? `${testID}-order-id` : undefined}>
+            Order # {item?.orderId}
+          </Text>
         </View>
         <View style={styles.timeDateContainer}>
           <Text style={styles.secondaryTextSm} testID={testID ? `${testID}-date` : undefined}>
@@ -67,23 +63,57 @@ const OrderList = ({ item, onPress, testID }) => {
       </View>
       {item?.user?.name && (
         <View style={styles.innerRow}>
-          <Text style={styles.secondaryText} testID={testID ? `${testID}-name` : undefined}>{item?.user?.name} </Text>
+          <Text style={styles.secondaryText} testID={testID ? `${testID}-name` : undefined}>
+            {item?.user?.name}
+          </Text>
         </View>
       )}
       {item?.user?.email && (
         <View style={styles.innerRow}>
-          <Text style={styles.secondaryText} testID={testID ? `${testID}-email` : undefined}>{item?.user?.email} </Text>
+          <Text style={styles.secondaryText} testID={testID ? `${testID}-email` : undefined}>
+            {item?.user?.email}
+          </Text>
         </View>
       )}
       <View style={styles.innerRow}>
-        <Text style={styles.secondaryText} testID={testID ? `${testID}-quantity` : undefined}>Quantity : {quantity}</Text>
-        <Text style={styles.secondaryText} testID={testID ? `${testID}-total` : undefined}>Total Amount : {totalCost}$</Text>
+        <Text style={styles.secondaryText} testID={testID ? `${testID}-quantity` : undefined}>
+          Quantity : {quantity}
+        </Text>
+        <Text style={styles.secondaryText} testID={testID ? `${testID}-total` : undefined}>
+          Total Amount : {totalCost}$
+        </Text>
+      </View>
+      <View style={styles.innerColumn}>
+        <Text
+          style={styles.secondaryText}
+          testID={testID ? `${testID}-delivery-status` : undefined}
+        >
+          Delivery : {formatDeliveryStatus(item?.status)}
+        </Text>
+        <Text
+          style={styles.secondaryText}
+          testID={testID ? `${testID}-payment-method` : undefined}
+        >
+          Payment Method : {getPaymentMethodLabel(item?.payment_type)}
+        </Text>
+        <Text
+          style={styles.secondaryText}
+          testID={testID ? `${testID}-payment-status` : undefined}
+        >
+          Payment Status : {getPaymentStatusLabel(item?.payment_status)}
+        </Text>
       </View>
       <View style={styles.innerRow}>
-        <TouchableOpacity style={styles.detailButton} onPress={onPress} testID={testID ? `${testID}-details-btn` : undefined}>
+        <TouchableOpacity
+          style={styles.detailButton}
+          onPress={onPress}
+          testID={testID ? `${testID}-details-btn` : undefined}
+        >
           <Text>Details</Text>
         </TouchableOpacity>
-        <Text style={styles.secondaryText} testID={testID ? `${testID}-status` : undefined}>{item?.status}</Text>
+        <Text style={styles.secondaryText} testID={testID ? `${testID}-status` : undefined}>
+          {formatDeliveryStatus(item?.status)}
+        </Text>
       </View>
     </View>
   );
@@ -104,6 +134,7 @@ const styles = StyleSheet.create({
     padding: 10,
     marginBottom: 10,
     elevation: 1,
+    gap: 6,
   },
   innerRow: {
     display: "flex",
@@ -111,6 +142,10 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     width: "100%",
+  },
+  innerColumn: {
+    width: "100%",
+    gap: 4,
   },
   primaryText: {
     fontSize: 15,

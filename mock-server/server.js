@@ -12,6 +12,10 @@ const REVIEW_REASON = {
   REVIEW_EXISTS: "REVIEW_EXISTS",
   REMOVED_BY_ADMIN: "REMOVED_BY_ADMIN",
 };
+const PAYMENT_TYPES = ["cod", "wallet_mock"];
+const PAYMENT_TERMINAL_STATUSES = ["paid", "failed"];
+const PAYMENT_STATUSES = ["pending", ...PAYMENT_TERMINAL_STATUSES];
+const PAYMENT_FAILURE_REASONS = ["cancelled", "declined", "timeout"];
 const uuidv4 = () => randomUUID();
 
 function createInitialState() {
@@ -452,12 +456,158 @@ function clone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
+function nowIso() {
+  return new Date().toISOString();
+}
+
+function normalizeSeedOrderPayment(order) {
+  const paymentType =
+    order.payment_type === "card"
+      ? "wallet_mock"
+      : PAYMENT_TYPES.includes(order.payment_type)
+        ? order.payment_type
+        : "cod";
+
+  let paymentStatus = order.payment_status;
+  if (!PAYMENT_STATUSES.includes(paymentStatus)) {
+    paymentStatus = paymentType === "wallet_mock" ? "paid" : "pending";
+  }
+
+  const paymentFailureReason =
+    paymentStatus === "failed" && PAYMENT_FAILURE_REASONS.includes(order.payment_failure_reason)
+      ? order.payment_failure_reason
+      : null;
+
+  return {
+    ...order,
+    payment_type: paymentType,
+    payment_status: paymentStatus,
+    payment_status_updated_at:
+      order.payment_status_updated_at || order.updatedAt || order.createdAt || nowIso(),
+    payment_failure_reason: paymentFailureReason,
+  };
+}
+
+function logOrderEvent(event, order) {
+  console.info(event, {
+    orderId: order.orderId,
+    userId: order.user?._id,
+    payment_type: order.payment_type,
+    payment_status: order.payment_status,
+    payment_failure_reason: order.payment_failure_reason,
+    status: order.status,
+  });
+}
+
+function buildNewOrder(body, user) {
+  const timestamp = nowIso();
+  return {
+    _id: uuidv4(),
+    orderId: `ORD-${Date.now()}`,
+    user: {
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+    },
+    items: body.items.map((item) => {
+      const product = products.find((productItem) => productItem._id === item.productId);
+      return {
+        productId: product
+          ? { _id: product._id, title: product.title }
+          : { _id: item.productId, title: "Unknown Product" },
+        price: item.price,
+        quantity: item.quantity,
+      };
+    }),
+    amount: body.amount || 0,
+    discount: body.discount || 0,
+    payment_type: body.payment_type,
+    payment_status: "pending",
+    payment_status_updated_at: timestamp,
+    payment_failure_reason: null,
+    country: body.country || "",
+    city: body.city || "",
+    zipcode: body.zipcode || "",
+    shippingAddress: body.shippingAddress || "",
+    status: body.status || "pending",
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  };
+}
+
+function updateOrderPaymentState(order, nextStatus, failureReason) {
+  if (order.payment_type !== "wallet_mock") {
+    return {
+      status: 409,
+      success: false,
+      message: "Only wallet_mock orders can update payment status",
+    };
+  }
+
+  if (!PAYMENT_TERMINAL_STATUSES.includes(nextStatus)) {
+    return {
+      status: 400,
+      success: false,
+      message: "Invalid payment status value",
+    };
+  }
+
+  if (nextStatus === "failed" && !PAYMENT_FAILURE_REASONS.includes(failureReason)) {
+    return {
+      status: 400,
+      success: false,
+      message: "payment_failure_reason is required when payment_status is failed",
+    };
+  }
+
+  if (nextStatus === "paid" && failureReason) {
+    return {
+      status: 400,
+      success: false,
+      message: "payment_failure_reason is only allowed when payment_status is failed",
+    };
+  }
+
+  const currentStatus = order.payment_status || "pending";
+  if (currentStatus === "pending") {
+    order.payment_status = nextStatus;
+    order.payment_status_updated_at = nowIso();
+    order.payment_failure_reason = nextStatus === "failed" ? failureReason : null;
+    order.updatedAt = order.payment_status_updated_at;
+    return {
+      status: 200,
+      success: true,
+      message: "Order payment updated successfully",
+      data: order,
+    };
+  }
+
+  const sameFailedReason =
+    currentStatus === "failed" &&
+    (!failureReason || order.payment_failure_reason === failureReason);
+
+  if (currentStatus === nextStatus && (nextStatus === "paid" || sameFailedReason)) {
+    return {
+      status: 200,
+      success: true,
+      message: "Order payment updated successfully",
+      data: order,
+    };
+  }
+
+  return {
+    status: 409,
+    success: false,
+    message: "Order payment is already finalized",
+  };
+}
+
 function resetMockData(overrides = {}) {
   const initialState = createInitialState();
   users = clone(overrides.users || initialState.users);
   categories = clone(overrides.categories || initialState.categories);
   products = clone(overrides.products || initialState.products);
-  orders = clone(overrides.orders || initialState.orders);
+  orders = clone(overrides.orders || initialState.orders).map(normalizeSeedOrderPayment);
   reviews = clone(overrides.reviews || initialState.reviews);
   wishlists = clone(
     overrides.wishlists || [
@@ -977,6 +1127,42 @@ app.get("/orders", authMiddleware, (req, res) => {
   res.json({ success: true, data: userOrders });
 });
 
+app.post("/update-order-payment", authMiddleware, (req, res) => {
+  const { id } = req.query;
+  const order = orders.find((item) => item._id === id);
+
+  if (!order) {
+    return res.status(404).json({ success: false, message: "Order not found" });
+  }
+
+  if (order.user._id !== req.user._id) {
+    return res.status(403).json({ success: false, message: "Forbidden" });
+  }
+
+  const nextStatus = req.body?.payment_status;
+  const failureReason = req.body?.payment_failure_reason;
+  const result = updateOrderPaymentState(order, nextStatus, failureReason);
+
+  if (!result.success) {
+    console.warn("order_payment_update_rejected", {
+      orderId: order.orderId,
+      userId: req.user._id,
+      payment_type: order.payment_type,
+      payment_status: order.payment_status,
+      nextStatus,
+      payment_failure_reason: failureReason || null,
+      status: order.status,
+    });
+    return res.status(result.status).json({
+      success: false,
+      message: result.message,
+    });
+  }
+
+  logOrderEvent("order_payment_updated", order);
+  return res.status(result.status).json(result);
+});
+
 app.get("/wishlist", authMiddleware, (req, res) => {
   const userWishlist = wishlists.find((item) => item.userId === req.user._id);
   if (!userWishlist) {
@@ -1065,49 +1251,22 @@ app.get("/remove-from-wishlist", authMiddleware, (req, res) => {
 app.post("/checkout", authMiddleware, (req, res) => {
   const {
     items,
-    amount,
-    discount,
     payment_type,
-    country,
-    city,
-    zipcode,
-    shippingAddress,
-    status,
   } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
   }
-  const orderItems = items.map((item) => {
-    const product = products.find((productItem) => productItem._id === item.productId);
-    return {
-      productId: product
-        ? { _id: product._id, title: product.title }
-        : { _id: item.productId, title: "Unknown Product" },
-      price: item.price,
-      quantity: item.quantity,
-    };
-  });
-  const newOrder = {
-    _id: uuidv4(),
-    orderId: `ORD-${Date.now()}`,
-    user: {
-      _id: req.user._id,
-      name: req.user.name,
-      email: req.user.email,
-    },
-    items: orderItems,
-    amount: amount || 0,
-    discount: discount || 0,
-    payment_type: payment_type || "cod",
-    country: country || "",
-    city: city || "",
-    zipcode: zipcode || "",
-    shippingAddress: shippingAddress || "",
-    status: status || "pending",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
-  };
+
+  if (!PAYMENT_TYPES.includes(payment_type)) {
+    return res.status(400).json({
+      success: false,
+      message: "Invalid payment type",
+    });
+  }
+
+  const newOrder = buildNewOrder(req.body, req.user);
   orders.push(newOrder);
+  logOrderEvent("checkout_created", newOrder);
   res.json({
     success: true,
     message: "Order placed successfully",
@@ -1419,6 +1578,7 @@ function printStartupInfo(port) {
   console.log(`   GET    /admin/review-status?id=&status=  (admin)`);
   console.log(`   GET    /orders               (user)`);
   console.log(`   POST   /checkout             (user)`);
+  console.log(`   POST   /update-order-payment?id=  (user)`);
   console.log(`   GET    /delete-user?id=`);
   console.log(`   POST   /reset-password?id=`);
   console.log(`   POST   /photos/upload`);

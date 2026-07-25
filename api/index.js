@@ -34,6 +34,8 @@ export const deleteCategory = (id) => get(`/delete-category?id=${q(id)}`);
 
 // ---- Orders ----
 export const checkout = (payload) => post("/checkout", payload);
+export const updateOrderPayment = (orderId, payload) =>
+  post(`/update-order-payment?id=${q(orderId)}`, payload);
 export const getOrders = () => get("/orders");
 export const getAdminOrders = () => get("/admin/orders");
 export const updateOrderStatus = (orderId, status) =>

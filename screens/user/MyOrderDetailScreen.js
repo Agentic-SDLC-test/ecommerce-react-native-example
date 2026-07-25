@@ -6,26 +6,70 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native";
-import React, { useState, useEffect } from "react";
-import { colors, network } from "../../constants";
+import React, { useMemo, useState } from "react";
+import { colors } from "../../constants";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import StepIndicator from "react-native-step-indicator";
+import {
+  getPaymentMethodLabel,
+  getPaymentStatusLabel,
+  getPaymentStatusMessage,
+} from "../../utils/payments";
+
+function tConvert(time) {
+  time = time.toString().match(/^([01]\d|2[0-3])(:)([0-5]\d)(:[0-5]\d)?$/) || [time];
+  if (time.length > 1) {
+    time = time.slice(1);
+    time[5] = +time[0] < 12 ? "AM" : "PM";
+    time[0] = +time[0] % 12 || 12;
+  }
+  return time.join("");
+}
+
+const dateFormat = (datex) => {
+  let t = new Date(datex);
+  const date = ("0" + t.getDate()).slice(-2);
+  const month = ("0" + (t.getMonth() + 1)).slice(-2);
+  const year = t.getFullYear();
+  const hours = ("0" + t.getHours()).slice(-2);
+  const minutes = ("0" + t.getMinutes()).slice(-2);
+  const seconds = ("0" + t.getSeconds()).slice(-2);
+  const time = tConvert(`${hours}:${minutes}:${seconds}`);
+  return `${date}-${month}-${year}, ${time}`;
+};
+
+function deriveOrderState(orderDetail) {
+  const deliveryStatus = orderDetail?.status || "pending";
+  return {
+    address: [orderDetail?.country, orderDetail?.city, orderDetail?.shippingAddress]
+      .filter(Boolean)
+      .join(", "),
+    deliveryStatus,
+    trackingState:
+      deliveryStatus === "pending" ? 1 : deliveryStatus === "shipped" ? 2 : 3,
+    totalCost:
+      orderDetail?.items?.reduce(
+        (accumulator, object) =>
+          accumulator + Number(object.price || 0) * Number(object.quantity || 0),
+        0
+      ) || 0,
+    paymentMethod: getPaymentMethodLabel(orderDetail?.payment_type),
+    paymentStatus: getPaymentStatusLabel(orderDetail?.payment_status),
+    paymentMessage: getPaymentStatusMessage(orderDetail || {}),
+  };
+}
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
-  const [isloading, setIsloading] = useState(false);
-  const [label, setLabel] = useState("Loading..");
-  const [error, setError] = useState("");
-  const [alertType, setAlertType] = useState("error");
-  const [totalCost, setTotalCost] = useState(0);
-  const [address, setAddress] = useState("");
-  const [value, setValue] = useState(null);
-  const [statusDisable, setStatusDisable] = useState(false);
+  const [isloading] = useState(false);
+  const [label] = useState("Loading..");
+  const [error] = useState("");
+  const [alertType] = useState("error");
   const labels = ["Processing", "Shipping", "Delivery"];
-  const [trackingState, setTrackingState] = useState(1);
+  const orderState = useMemo(() => deriveOrderState(orderDetail), [orderDetail]);
   const customStyles = {
     stepIndicatorSize: 25,
     currentStepIndicatorSize: 30,
@@ -50,65 +94,6 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
     currentStepLabelColor: "#fe7013",
   };
 
-  //method to convert time to AM PM format
-  function tConvert(time) {
-    time = time
-      .toString()
-      .match(/^([01]\d|2[0-3])(:)([0-5]\d)(:[0-5]\d)?$/) || [time];
-    if (time.length > 1) {
-      time = time.slice(1); // Remove full string match value
-      time[5] = +time[0] < 12 ? "AM" : "PM"; // Set AM/PM
-      time[0] = +time[0] % 12 || 12; // Adjust hours
-    }
-    return time.join("");
-  }
-
-  //method to convert data to dd-mm-yyyy  format
-  const dateFormat = (datex) => {
-    let t = new Date(datex);
-    const date = ("0" + t.getDate()).slice(-2);
-    const month = ("0" + (t.getMonth() + 1)).slice(-2);
-    const year = t.getFullYear();
-    const hours = ("0" + t.getHours()).slice(-2);
-    const minutes = ("0" + t.getMinutes()).slice(-2);
-    const seconds = ("0" + t.getSeconds()).slice(-2);
-    const time = tConvert(`${hours}:${minutes}:${seconds}`);
-    const newDate = `${date}-${month}-${year}, ${time}`;
-
-    return newDate;
-  };
-
-  // set total cost, order detail, order status on initial render
-  useEffect(() => {
-    setError("");
-    setAlertType("error");
-    if (orderDetail?.status == "delivered") {
-      setStatusDisable(true);
-    } else {
-      setStatusDisable(false);
-    }
-    setValue(orderDetail?.status);
-    setAddress(
-      orderDetail?.country +
-        ", " +
-        orderDetail?.city +
-        ", " +
-        orderDetail?.shippingAddress
-    );
-    setTotalCost(
-      orderDetail?.items.reduce((accumulator, object) => {
-        return (accumulator + object.price) * object.quantity;
-      }, 0)
-    );
-    if (orderDetail?.status === "pending") {
-      setTrackingState(1);
-    } else if (orderDetail?.status === "shipped") {
-      setTrackingState(2);
-    } else {
-      setTrackingState(3);
-    }
-  }, []);
-
   return (
     <View style={styles.container} testID="my-order-detail-screen">
       <ProgressDialog visible={isloading} label={label} />
@@ -129,7 +114,9 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
       </View>
       <View style={styles.screenNameContainer}>
         <View>
-          <Text style={styles.screenNameText} testID="my-order-detail-heading">Order Detials</Text>
+          <Text style={styles.screenNameText} testID="my-order-detail-heading">
+            Order Detials
+          </Text>
         </View>
         <View>
           <Text style={styles.screenNameParagraph} testID="my-order-detail-subtitle">
@@ -145,15 +132,44 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
       >
         <View style={styles.containerNameContainer}>
           <View>
-            <Text style={styles.containerNameText} testID="my-order-detail-shipping-heading">Shipping Address</Text>
+            <Text style={styles.containerNameText} testID="my-order-detail-shipping-heading">
+              Shipping Address
+            </Text>
           </View>
         </View>
         <View style={styles.ShipingInfoContainer}>
-          <Text style={styles.secondarytextSm} testID="my-order-detail-address">{address}</Text>
-          <Text style={styles.secondarytextSm} testID="my-order-detail-zipcode">{orderDetail?.zipcode}</Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-address">
+            {orderState.address}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-zipcode">
+            {orderDetail?.zipcode}
+          </Text>
+        </View>
+        <View style={styles.containerNameContainer}>
+          <View>
+            <Text style={styles.containerNameText} testID="my-order-detail-payment-heading">
+              Payment Summary
+            </Text>
+          </View>
+        </View>
+        <View style={styles.orderInfoContainer}>
+          <Text style={styles.secondarytextMedian} testID="my-order-detail-payment-method">
+            Method: {orderState.paymentMethod}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-status">
+            Status: {orderState.paymentStatus}
+          </Text>
+          <Text style={styles.secondarytextMedian} testID="my-order-detail-payment-title">
+            {orderState.paymentMessage.title}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-detail">
+            {orderState.paymentMessage.detail}
+          </Text>
         </View>
         <View>
-          <Text style={styles.containerNameText} testID="my-order-detail-order-info-heading">Order Info</Text>
+          <Text style={styles.containerNameText} testID="my-order-detail-order-info-heading">
+            Order Info
+          </Text>
         </View>
         <View style={styles.orderInfoContainer}>
           <Text style={styles.secondarytextMedian} testID="my-order-detail-order-id">
@@ -176,7 +192,7 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
             <StepIndicator
               testID="my-order-detail-step-indicator"
               customStyles={customStyles}
-              currentPosition={trackingState}
+              currentPosition={orderState.trackingState}
               stepCount={3}
               labels={labels}
             />
@@ -185,13 +201,15 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
 
         <View style={styles.containerNameContainer}>
           <View>
-            <Text style={styles.containerNameText} testID="my-order-detail-package-heading">Package Details</Text>
+            <Text style={styles.containerNameText} testID="my-order-detail-package-heading">
+              Package Details
+            </Text>
           </View>
         </View>
         <View style={styles.orderItemsContainer}>
           <View style={styles.orderItemContainer}>
             <Text style={styles.orderItemText}>Package</Text>
-            <Text testID="my-order-detail-package-status">{value}</Text>
+            <Text testID="my-order-detail-package-status">{orderState.deliveryStatus}</Text>
           </View>
           <View style={styles.orderItemContainer}>
             <Text style={styles.orderItemText} testID="my-order-detail-package-date">
@@ -215,8 +233,10 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
             ))}
           </ScrollView>
           <View style={styles.orderItemContainer}>
-            <Text style={styles.orderItemText} testID="my-order-detail-total-label">Total</Text>
-            <Text testID="my-order-detail-total-value">{totalCost}$</Text>
+            <Text style={styles.orderItemText} testID="my-order-detail-total-label">
+              Total
+            </Text>
+            <Text testID="my-order-detail-total-value">{orderState.totalCost}$</Text>
           </View>
         </View>
         <View style={styles.emptyView}></View>
@@ -244,7 +264,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-
   screenNameContainer: {
     marginTop: 10,
     width: "100%",
@@ -302,7 +321,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     padding: 10,
     borderRadius: 10,
-
     borderColor: colors.muted,
     elevation: 3,
     marginBottom: 10,
@@ -326,21 +344,6 @@ const styles = StyleSheet.create({
     width: "100%",
     marginBottom: 5,
   },
-  bottomContainer: {
-    backgroundColor: colors.white,
-    width: "110%",
-    height: 70,
-    borderTopLeftRadius: 10,
-    borderTopEndRadius: 10,
-    elevation: 5,
-    display: "flex",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-
-    paddingLeft: 10,
-    paddingRight: 10,
-  },
   orderInfoContainer: {
     marginTop: 5,
     display: "flex",
@@ -350,15 +353,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     padding: 10,
     borderRadius: 10,
-
     borderColor: colors.muted,
     elevation: 1,
     marginBottom: 10,
-  },
-  primarytextMedian: {
-    color: colors.primary,
-    fontSize: 15,
-    fontWeight: "bold",
+    width: "100%",
+    gap: 4,
   },
   secondarytextMedian: {
     color: colors.muted,
