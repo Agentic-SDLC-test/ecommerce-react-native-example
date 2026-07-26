@@ -1,6 +1,11 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { colors } from "../../constants";
+import PaymentStatusBadge from "../PaymentStatusBadge";
+import {
+  PAYMENT_METHOD_LABELS,
+  getEffectivePaymentStatus,
+} from "../../constants/payment";
 
 function getTime(date) {
   let t = new Date(date);
@@ -27,30 +32,28 @@ const dateFormat = (datex) => {
   const date = ("0" + t.getDate()).slice(-2);
   const month = ("0" + (t.getMonth() + 1)).slice(-2);
   const year = t.getFullYear();
-  const hours = ("0" + t.getHours()).slice(-2);
-  const minutes = ("0" + t.getMinutes()).slice(-2);
-  const seconds = ("0" + t.getSeconds()).slice(-2);
   const newDate = `${date}-${month}-${year}`;
 
   return newDate;
 };
 
-const OrderList = ({ item, onPress, testID }) => {
-  const [totalCost, setTotalCost] = useState(0);
-  const [quantity, setQuantity] = useState(0);
+export const formatTotal = (items = []) =>
+  items.reduce((accumulator, object) => {
+    return accumulator + Number(object.price || 0) * Number(object.quantity || 0);
+  }, 0);
 
-  useEffect(() => {
-    let packageItems = 0;
-    item?.items.forEach(() => {
-      ++packageItems;
-    });
-    setQuantity(packageItems);
-    setTotalCost(
-      item?.items.reduce((accumulator, object) => {
-        return (accumulator + object.price) * object.quantity;
-      }, 0)
-    );
-  }, []);
+export const renderOrderMeta = (item = {}) => ({
+  quantity: (item.items || []).reduce((count, orderItem) => {
+    return count + Number(orderItem.quantity || 0);
+  }, 0),
+  totalCost: formatTotal(item.items || []),
+  paymentMethodLabel:
+    PAYMENT_METHOD_LABELS[item.payment_type] || PAYMENT_METHOD_LABELS.cod,
+  paymentStatus: getEffectivePaymentStatus(item),
+});
+
+const OrderList = ({ item, onPress, testID }) => {
+  const meta = renderOrderMeta(item);
 
   return (
     <View style={styles.container} testID={testID}>
@@ -76,8 +79,30 @@ const OrderList = ({ item, onPress, testID }) => {
         </View>
       )}
       <View style={styles.innerRow}>
-        <Text style={styles.secondaryText} testID={testID ? `${testID}-quantity` : undefined}>Quantity : {quantity}</Text>
-        <Text style={styles.secondaryText} testID={testID ? `${testID}-total` : undefined}>Total Amount : {totalCost}$</Text>
+        <Text style={styles.secondaryText} testID={testID ? `${testID}-quantity` : undefined}>Quantity : {meta.quantity}</Text>
+        <Text style={styles.secondaryText} testID={testID ? `${testID}-total` : undefined}>Total Amount : {meta.totalCost}$</Text>
+      </View>
+      <View style={styles.innerRow}>
+        <Text
+          style={styles.secondaryText}
+          testID={testID ? `${testID}-payment-method` : undefined}
+        >
+          Payment Method : {meta.paymentMethodLabel}
+        </Text>
+      </View>
+      <View style={styles.innerRow}>
+        <Text
+          style={styles.secondaryText}
+          testID={testID ? `${testID}-payment-status-text` : undefined}
+        >
+          Payment Status
+        </Text>
+        <PaymentStatusBadge
+          paymentType={item?.payment_type}
+          paymentStatus={meta.paymentStatus}
+          fulfillmentStatus={item?.status}
+          testID={testID ? `${testID}-payment-status` : undefined}
+        />
       </View>
       <View style={styles.innerRow}>
         <TouchableOpacity style={styles.detailButton} onPress={onPress} testID={testID ? `${testID}-details-btn` : undefined}>
@@ -111,6 +136,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     width: "100%",
+    gap: 8,
   },
   primaryText: {
     fontSize: 15,

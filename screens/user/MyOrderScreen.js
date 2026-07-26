@@ -18,9 +18,9 @@ import * as api from "../../api";
 const MyOrderScreen = ({ navigation, route }) => {
   const { user } = route.params;
   const [isloading, setIsloading] = useState(false);
-  const [label, setLabel] = useState("Please wait...");
+  const label = "Please wait...";
   const [refeshing, setRefreshing] = useState(false);
-  const [alertType, setAlertType] = useState("error");
+  const alertType = "error";
   const [error, setError] = useState("");
   const [orders, setOrders] = useState([]);
   const [UserInfo, setUserInfo] = useState({});
@@ -29,7 +29,7 @@ const MyOrderScreen = ({ navigation, route }) => {
   const convertToJSON = (obj) => {
     try {
       setUserInfo(JSON.parse(obj));
-    } catch (e) {
+    } catch (_error) {
       setUserInfo(obj);
     }
   };
@@ -72,7 +72,7 @@ const MyOrderScreen = ({ navigation, route }) => {
   useEffect(() => {
     convertToJSON(user);
     fetchOrders();
-  }, []);
+  }, [user]);
 
   return (
     <View style={styles.container} testID="my-orders-screen">
@@ -102,15 +102,15 @@ const MyOrderScreen = ({ navigation, route }) => {
         </View>
         <View>
           <Text style={styles.screenNameParagraph} testID="my-orders-subtitle">
-            Your order and your order status
+            Your orders, delivery status, and payment progress
           </Text>
         </View>
       </View>
       <CustomAlert message={error} type={alertType} testID="my-orders-alert" />
-      {orders.length == 0 ? (
+      {orders.length === 0 ? (
         <View style={styles.ListContiainerEmpty}>
           <Text style={styles.secondaryTextSmItalic} testID="my-orders-empty-text">
-            "There are no orders placed yet."
+            There are no orders placed yet.
           </Text>
         </View>
       ) : (

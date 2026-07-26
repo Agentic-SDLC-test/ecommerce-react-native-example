@@ -2,7 +2,7 @@ const express = require("express");
 const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
-const { v4: uuidv4 } = require("uuid");
+const { randomUUID } = require("crypto");
 
 const app = express();
 const PORT = 3002;
@@ -20,7 +20,10 @@ const upload = multer({ storage });
 
 // ─── In-memory data store ──────────────────────────────────────────────────────
 
-let users = [
+const VALID_PAYMENT_TYPES = ["cod", "wallet"];
+const VALID_PAYMENT_STATUSES = ["pending", "paid", "failed"];
+
+const initialUsers = [
   {
     _id: "admin001",
     name: "Admin User",
@@ -47,7 +50,7 @@ let users = [
   },
 ];
 
-let categories = [
+const initialCategories = [
   {
     _id: "62fe244f58f7aa8230817f89",
     title: "Garments",
@@ -74,7 +77,7 @@ let categories = [
   },
 ];
 
-let products = [
+const initialProducts = [
   {
     _id: "prod001",
     title: "Classic White T-Shirt",
@@ -181,7 +184,7 @@ let products = [
   },
 ];
 
-let orders = [
+const initialOrders = [
   {
     _id: "order001",
     orderId: "ORD-2024-001",
@@ -282,6 +285,71 @@ let orders = [
   },
 ];
 
+const cloneData = (value) => JSON.parse(JSON.stringify(value));
+
+let users = cloneData(initialUsers);
+let categories = cloneData(initialCategories);
+let products = cloneData(initialProducts);
+let orders = cloneData(initialOrders);
+
+const isWalletPayment = (paymentType) => paymentType === "wallet";
+
+const hydratePaymentFields = (order) => {
+  if (!order) return order;
+  const paymentType = VALID_PAYMENT_TYPES.includes(order.payment_type)
+    ? order.payment_type
+    : "cod";
+  const paymentStatus = VALID_PAYMENT_STATUSES.includes(order.payment_status)
+    ? order.payment_status
+    : paymentType === "cod" && order.status === "delivered"
+      ? "paid"
+      : "pending";
+
+  order.payment_type = paymentType;
+  order.payment_status = paymentStatus;
+  return order;
+};
+
+const canTransitionPaymentStatus = (order, nextStatus) => {
+  const hydratedOrder = hydratePaymentFields(order);
+
+  if (!hydratedOrder || !isWalletPayment(hydratedOrder.payment_type)) {
+    return false;
+  }
+
+  if (!["paid", "failed"].includes(nextStatus)) {
+    return false;
+  }
+
+  return ["pending", "failed"].includes(hydratedOrder.payment_status);
+};
+
+const emitOrderEvent = (event, req, order, previousState) => {
+  console.log(
+    JSON.stringify({
+      event,
+      requestPath: req.path,
+      orderId: order.orderId,
+      userId: req.user?._id || null,
+      paymentType: order.payment_type,
+      paymentStatus: order.payment_status,
+      status: order.status,
+      previousState: previousState || null,
+      nextState: {
+        paymentStatus: order.payment_status,
+        status: order.status,
+      },
+    })
+  );
+};
+
+const resetMockData = () => {
+  users = cloneData(initialUsers);
+  categories = cloneData(initialCategories);
+  products = cloneData(initialProducts);
+  orders = cloneData(initialOrders);
+};
+
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
 const authMiddleware = (req, res, next) => {
   const token = req.headers["x-auth-token"];
@@ -317,12 +385,12 @@ app.post("/register", (req, res) => {
     return res.status(400).json({ success: false, message: "Email already registered" });
   }
   const newUser = {
-    _id: uuidv4(),
+    _id: randomUUID(),
     name,
     email,
     password,
     userType: userType || "USER",
-    token: `mock-token-${uuidv4()}`,
+    token: `mock-token-${randomUUID()}`,
   };
   users.push(newUser);
   const { password: _, ...safeUser } = newUser;
@@ -353,7 +421,7 @@ app.post("/product", adminMiddleware, (req, res) => {
   }
   const cat = categories.find((c) => c._id === category);
   const newProduct = {
-    _id: uuidv4(),
+    _id: randomUUID(),
     title,
     sku: sku || "",
     price: parseFloat(price),
@@ -411,7 +479,7 @@ app.post("/category", adminMiddleware, (req, res) => {
     return res.status(400).json({ success: false, message: "Title is required" });
   }
   const newCategory = {
-    _id: uuidv4(),
+    _id: randomUUID(),
     title,
     description: description || "",
     icon: image || "default.png",
@@ -463,7 +531,7 @@ app.get("/dashboard", adminMiddleware, (req, res) => {
 
 // GET /admin/orders  (admin: all orders)
 app.get("/admin/orders", adminMiddleware, (req, res) => {
-  res.json({ success: true, data: orders });
+  res.json({ success: true, data: orders.map((order) => hydratePaymentFields(order)) });
 });
 
 // GET /admin/users  (admin: all users)
@@ -483,24 +551,38 @@ app.get("/admin/order-status", adminMiddleware, (req, res) => {
   if (!order) {
     return res.status(404).json({ success: false, message: "Order not found" });
   }
+  hydratePaymentFields(order);
+  const previousState = {
+    paymentStatus: order.payment_status,
+    status: order.status,
+  };
   order.status = status;
   order.updatedAt = new Date().toISOString();
   if (status === "shipped") order.shippedOn = new Date().toISOString().split("T")[0];
   if (status === "delivered") order.deliveredOn = new Date().toISOString().split("T")[0];
+  if (status === "delivered" && order.payment_type === "cod") {
+    order.payment_status = "paid";
+  }
+  emitOrderEvent("admin_order_status_updated", req, order, previousState);
   res.json({ success: true, message: `Order status updated to ${status}`, data: order });
 });
 
 // GET /orders  (user: their own orders)
 app.get("/orders", authMiddleware, (req, res) => {
-  const userOrders = orders.filter((o) => o.user._id === req.user._id);
+  const userOrders = orders
+    .filter((o) => o.user._id === req.user._id)
+    .map((order) => hydratePaymentFields(order));
   res.json({ success: true, data: userOrders });
 });
 
 // POST /checkout  (user: place order)
 app.post("/checkout", authMiddleware, (req, res) => {
-  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
+  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
+  }
+  if (!VALID_PAYMENT_TYPES.includes(payment_type)) {
+    return res.status(400).json({ success: false, message: "Invalid payment type" });
   }
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
@@ -513,7 +595,7 @@ app.post("/checkout", authMiddleware, (req, res) => {
     };
   });
   const newOrder = {
-    _id: uuidv4(),
+    _id: randomUUID(),
     orderId: `ORD-${Date.now()}`,
     user: {
       _id: req.user._id,
@@ -523,17 +605,61 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
+    payment_type,
+    payment_status: "pending",
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",
     shippingAddress: shippingAddress || "",
-    status: status || "pending",
+    status: "pending",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
   orders.push(newOrder);
+  emitOrderEvent("checkout_created", req, newOrder, null);
   res.json({ success: true, message: "Order placed successfully", data: newOrder });
+});
+
+// POST /order-payment-status?orderId=
+app.post("/order-payment-status", authMiddleware, (req, res) => {
+  const { orderId } = req.query;
+  const { payment_status } = req.body;
+
+  if (!["paid", "failed"].includes(payment_status)) {
+    return res.status(400).json({ success: false, message: "Invalid payment state" });
+  }
+
+  const order = orders.find((item) => item._id === orderId);
+  if (!order) {
+    return res.status(404).json({ success: false, message: "Order not found" });
+  }
+
+  hydratePaymentFields(order);
+
+  if (!isWalletPayment(order.payment_type)) {
+    return res.status(400).json({ success: false, message: "Invalid payment transition" });
+  }
+
+  const isAdmin = req.user.userType === "ADMIN";
+  if (!isAdmin && order.user._id !== req.user._id) {
+    return res.status(403).json({ success: false, message: "Caller does not own this wallet order" });
+  }
+
+  if (!canTransitionPaymentStatus(order, payment_status)) {
+    return res.status(400).json({ success: false, message: "Invalid payment transition" });
+  }
+
+  const previousState = {
+    paymentStatus: order.payment_status,
+    status: order.status,
+  };
+
+  order.payment_status = payment_status;
+  order.updatedAt = new Date().toISOString();
+
+  emitOrderEvent("payment_status_updated", req, order, previousState);
+
+  res.json({ success: true, message: "payment status updated", data: order });
 });
 
 // GET /delete-user?id=
@@ -595,35 +721,49 @@ app.get("/uploads/:filename", (req, res) => {
 });
 
 // ─── Start server ─────────────────────────────────────────────────────────────
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`\n🚀 EasyBuy Mock Server running at http://localhost:${PORT}`);
-  console.log(`\n📋 Available endpoints:`);
-  console.log(`   POST   /register`);
-  console.log(`   POST   /login`);
-  console.log(`   GET    /products`);
-  console.log(`   POST   /product              (admin)`);
-  console.log(`   POST   /update-product?id=   (admin)`);
-  console.log(`   GET    /delete-product?id=   (admin)`);
-  console.log(`   GET    /categories`);
-  console.log(`   POST   /category             (admin)`);
-  console.log(`   POST   /update-category?id=  (admin)`);
-  console.log(`   GET    /delete-category?id=  (admin)`);
-  console.log(`   GET    /dashboard            (admin)`);
-  console.log(`   GET    /admin/orders         (admin)`);
-  console.log(`   GET    /admin/users          (admin)`);
-  console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
-  console.log(`   GET    /orders               (user)`);
-  console.log(`   POST   /checkout             (user)`);
-  console.log(`   GET    /delete-user?id=`);
-  console.log(`   POST   /reset-password?id=`);
-  console.log(`   POST   /photos/upload`);
-  console.log(`   GET    /uploads/:filename`);
-  console.log(`\n🔑 Test tokens:`);
-  console.log(`   Admin token : mock-admin-token-001`);
-  console.log(`   User token  : mock-user-token-001`);
-  console.log(`\n👤 Test credentials:`);
-  console.log(`   Admin  → email: admin@easybuy.com  | password: admin123`);
-  console.log(`   User   → email: user@easybuy.com   | password: user123\n`);
-});
+if (require.main === module) {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`\n🚀 EasyBuy Mock Server running at http://localhost:${PORT}`);
+    console.log(`\n📋 Available endpoints:`);
+    console.log(`   POST   /register`);
+    console.log(`   POST   /login`);
+    console.log(`   GET    /products`);
+    console.log(`   POST   /product              (admin)`);
+    console.log(`   POST   /update-product?id=   (admin)`);
+    console.log(`   GET    /delete-product?id=   (admin)`);
+    console.log(`   GET    /categories`);
+    console.log(`   POST   /category             (admin)`);
+    console.log(`   POST   /update-category?id=  (admin)`);
+    console.log(`   GET    /delete-category?id=  (admin)`);
+    console.log(`   GET    /dashboard            (admin)`);
+    console.log(`   GET    /admin/orders         (admin)`);
+    console.log(`   GET    /admin/users          (admin)`);
+    console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
+    console.log(`   GET    /orders               (user)`);
+    console.log(`   POST   /checkout             (user)`);
+    console.log(`   POST   /order-payment-status?orderId=  (user/admin)`);
+    console.log(`   GET    /delete-user?id=`);
+    console.log(`   POST   /reset-password?id=`);
+    console.log(`   POST   /photos/upload`);
+    console.log(`   GET    /uploads/:filename`);
+    console.log(`\n🔑 Test tokens:`);
+    console.log(`   Admin token : mock-admin-token-001`);
+    console.log(`   User token  : mock-user-token-001`);
+    console.log(`\n👤 Test credentials:`);
+    console.log(`   Admin  → email: admin@easybuy.com  | password: admin123`);
+    console.log(`   User   → email: user@easybuy.com   | password: user123\n`);
+  });
+}
+
+module.exports = {
+  app,
+  resetMockData,
+  __testing: {
+    VALID_PAYMENT_TYPES,
+    VALID_PAYMENT_STATUSES,
+    hydratePaymentFields,
+    canTransitionPaymentStatus,
+  },
+};
 
 // Made with Bob

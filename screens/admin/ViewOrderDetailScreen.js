@@ -15,11 +15,13 @@ import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import CustomButton from "../../components/CustomButton";
 import DropDownPicker from "react-native-dropdown-picker";
+import PaymentStatusBadge from "../../components/PaymentStatusBadge";
+import { PAYMENT_METHOD_LABELS } from "../../constants/payment";
 
 const ViewOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
   const [isloading, setIsloading] = useState(false);
-  const [label, setLabel] = useState("Loading..");
+  const label = "Loading..";
   const [error, setError] = useState("");
   const [alertType, setAlertType] = useState("error");
   const [totalCost, setTotalCost] = useState(0);
@@ -27,6 +29,7 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState(null);
   const [statusDisable, setStatusDisable] = useState(false);
+  const [order, setOrder] = useState(orderDetail);
   const [items, setItems] = useState([
     { label: "Pending", value: "pending" },
     { label: "Shipped", value: "shipped" },
@@ -61,6 +64,24 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
     return newDate;
   };
 
+  const refreshOrderState = (nextOrder) => {
+    setOrder(nextOrder);
+    setStatusDisable(nextOrder?.status === "delivered");
+    setValue(nextOrder?.status);
+    setAddress(
+      nextOrder?.country +
+        ", " +
+        nextOrder?.city +
+        ", " +
+        nextOrder?.shippingAddress
+    );
+    setTotalCost(
+      nextOrder?.items.reduce((accumulator, object) => {
+        return accumulator + Number(object.price || 0) * Number(object.quantity || 0);
+      }, 0)
+    );
+  };
+
   //method to update the status using API call
   const handleUpdateStatus = (id) => {
     setIsloading(true);
@@ -70,7 +91,8 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
     api
       .updateOrderStatus(id, value) //API call
       .then((result) => {
-        if (result.success == true) {
+        if (result.success === true) {
+          refreshOrderState(result.data);
           setError(`Order status is successfully updated to ${value}`);
           setAlertType("success");
           setIsloading(false);
@@ -88,25 +110,8 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
   useEffect(() => {
     setError("");
     setAlertType("error");
-    if (orderDetail?.status == "delivered") {
-      setStatusDisable(true);
-    } else {
-      setStatusDisable(false);
-    }
-    setValue(orderDetail?.status);
-    setAddress(
-      orderDetail?.country +
-        ", " +
-        orderDetail?.city +
-        ", " +
-        orderDetail?.shippingAddress
-    );
-    setTotalCost(
-      orderDetail?.items.reduce((accumulator, object) => {
-        return (accumulator + object.price) * object.quantity;
-      }, 0) // calculate the total cost
-    );
-  }, []);
+    refreshOrderState(orderDetail);
+  }, [orderDetail]);
   return (
     <View style={styles.container} testID="view-order-detail-screen">
       <ProgressDialog visible={isloading} label={label} />
@@ -148,34 +153,45 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
         </View>
         <View style={styles.ShipingInfoContainer}>
           <Text style={styles.secondarytextMedian} testID="view-order-detail-user-name">
-            {orderDetail?.user?.name}
+            {order?.user?.name}
           </Text>
           <Text style={styles.secondarytextMedian} testID="view-order-detail-user-email">
-            {orderDetail?.user?.email}
+            {order?.user?.email}
           </Text>
           <Text style={styles.secondarytextSm} testID="view-order-detail-address">{address}</Text>
-          <Text style={styles.secondarytextSm} testID="view-order-detail-zipcode">{orderDetail?.zipcode}</Text>
+          <Text style={styles.secondarytextSm} testID="view-order-detail-zipcode">{order?.zipcode}</Text>
         </View>
         <View>
           <Text style={styles.containerNameText} testID="view-order-detail-order-info-heading">Order Info</Text>
         </View>
         <View style={styles.orderInfoContainer}>
           <Text style={styles.secondarytextMedian} testID="view-order-detail-order-id">
-            Order # {orderDetail?.orderId}
+            Order # {order?.orderId}
           </Text>
           <Text style={styles.secondarytextSm} testID="view-order-detail-ordered-date">
-            Ordered on {dateFormat(orderDetail?.updatedAt)}
+            Ordered on {dateFormat(order?.updatedAt)}
           </Text>
-          {orderDetail?.shippedOn && (
+          {order?.shippedOn && (
             <Text style={styles.secondarytextSm} testID="view-order-detail-shipped-date">
-              Shipped on {orderDetail?.shippedOn}
+              Shipped on {order?.shippedOn}
             </Text>
           )}
-          {orderDetail?.deliveredOn && (
+          {order?.deliveredOn && (
             <Text style={styles.secondarytextSm} testID="view-order-detail-delivered-date">
-              Delivered on {orderDetail?.deliveredOn}
+              Delivered on {order?.deliveredOn}
             </Text>
           )}
+          <View style={styles.paymentSummaryRow}>
+            <Text style={styles.orderItemText} testID="view-order-detail-payment-method">
+              Payment Method: {PAYMENT_METHOD_LABELS[order?.payment_type] || PAYMENT_METHOD_LABELS.cod}
+            </Text>
+            <PaymentStatusBadge
+              paymentType={order?.payment_type}
+              paymentStatus={order?.payment_status}
+              fulfillmentStatus={order?.status}
+              testID="view-order-detail-payment-status"
+            />
+          </View>
         </View>
         <View style={styles.containerNameContainer}>
           <View>
@@ -189,7 +205,7 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
           </View>
           <View style={styles.orderItemContainer}>
             <Text style={styles.orderItemText} testID="view-order-detail-package-date">
-              Order on : {dateFormat(orderDetail?.updatedAt)}
+              Order on : {dateFormat(order?.updatedAt)}
             </Text>
           </View>
           <ScrollView
@@ -197,7 +213,7 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
             nestedScrollEnabled={true}
             testID="view-order-detail-summary-scroll"
           >
-            {orderDetail?.items.map((product, index) => (
+            {order?.items.map((product, index) => (
               <View key={index}>
                 <BasicProductList
                   title={product?.productId?.title}
@@ -235,10 +251,10 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
           />
         </View>
         <View>
-          {statusDisable == false ? (
+          {statusDisable === false ? (
             <CustomButton
               text={"Update"}
-              onPress={() => handleUpdateStatus(orderDetail?._id)}
+              onPress={() => handleUpdateStatus(order?._id)}
               testID="view-order-detail-update-btn"
             />
           ) : (
@@ -379,6 +395,15 @@ const styles = StyleSheet.create({
     borderColor: colors.muted,
     elevation: 1,
     marginBottom: 10,
+  },
+  paymentSummaryRow: {
+    width: "100%",
+    marginTop: 12,
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 10,
   },
   primarytextMedian: {
     color: colors.primary,
