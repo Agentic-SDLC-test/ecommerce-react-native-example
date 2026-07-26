@@ -18,58 +18,89 @@ import { bindActionCreators } from "redux";
 import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import ProgressDialog from "react-native-progress-dialog";
+import { PAYMENT_METHODS, PAYMENT_METHOD_LABELS } from "../../constants/payment";
 
-const CheckoutScreen = ({ navigation, route }) => {
+export const buildCheckoutItems = (products = []) =>
+  products.map((product) => ({
+    productId: product._id,
+    price: product.price,
+    quantity: product.quantity,
+  }));
+
+export const isDigitalPaymentsEnabled = () =>
+  !(
+    typeof process !== "undefined" &&
+    process.env &&
+    process.env.EXPO_PUBLIC_ENABLE_DIGITAL_PAYMENTS === "false"
+  );
+
+export const buildCheckoutRequest = ({
+  cartItems = [],
+  paymentType,
+  country,
+  city,
+  zipcode,
+  shippingAddress,
+}) => {
+  const items = buildCheckoutItems(cartItems);
+  const amount = items.reduce((total, item) => {
+    return total + Number(item.price || 0) * Number(item.quantity || 0);
+  }, 0);
+
+  return {
+    items,
+    amount,
+    discount: 0,
+    payment_type: paymentType,
+    country,
+    city,
+    zipcode,
+    shippingAddress,
+  };
+};
+
+const CheckoutScreen = ({ navigation }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [isloading, setIsloading] = useState(false);
   const cartproduct = useSelector((state) => state.product);
   const dispatch = useDispatch();
   const { emptyCart } = bindActionCreators(actionCreaters, dispatch);
 
-  const [deliveryCost, setDeliveryCost] = useState(0);
+  const deliveryCost = 0;
   const [totalCost, setTotalCost] = useState(0);
   const [address, setAddress] = useState("");
   const [country, setCountry] = useState("");
   const [city, setCity] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
+  const [selectedPaymentType, setSelectedPaymentType] = useState(PAYMENT_METHODS.COD);
+  const walletEnabled = isDigitalPaymentsEnabled();
+
+  const handlePaymentSelection = (nextType) => {
+    setSelectedPaymentType(nextType);
+  };
 
   //method to handle checkout
   const handleCheckout = async () => {
     setIsloading(true);
 
-    var payload = [];
-    var totalamount = 0;
-
-    // fetch the cart items from redux and set the total cost
-    cartproduct.forEach((product) => {
-      let obj = {
-        productId: product._id,
-        price: product.price,
-        quantity: product.quantity,
-      };
-      totalamount += parseInt(product.price) * parseInt(product.quantity);
-      payload.push(obj);
-    });
-
     api
-      .checkout({
-        items: payload,
-        amount: totalamount,
-        discount: 0,
-        payment_type: "cod",
-        country: country,
-        status: "pending",
-        city: city,
-        zipcode: zipcode,
-        shippingAddress: streetAddress,
-      }) //API call
+      .checkout(
+        buildCheckoutRequest({
+          cartItems: cartproduct,
+          paymentType: selectedPaymentType,
+          country,
+          city,
+          zipcode,
+          shippingAddress: streetAddress,
+        })
+      )
       .then((result) => {
         console.log("Checkout=>", result);
-        if (result.success == true) {
+        if (result.success === true) {
           setIsloading(false);
+          navigation.replace("orderconfirm", { order: result.data });
           emptyCart("empty");
-          navigation.replace("orderconfirm");
         } else {
           setIsloading(false);
         }
@@ -82,7 +113,7 @@ const CheckoutScreen = ({ navigation, route }) => {
 
   // set the address and total cost on initital render
   useEffect(() => {
-    if (streetAddress && city && country != "") {
+    if (streetAddress && city && country !== "") {
       setAddress(`${streetAddress}, ${city},${country}`);
     } else {
       setAddress("");
@@ -92,7 +123,7 @@ const CheckoutScreen = ({ navigation, route }) => {
         return accumulator + object.price * object.quantity;
       }, 0)
     );
-  }, []);
+  }, [cartproduct, city, country, streetAddress]);
 
   return (
     <View style={styles.container} testID="checkout-screen">
@@ -170,7 +201,7 @@ const CheckoutScreen = ({ navigation, route }) => {
           >
             <Text style={styles.secondaryTextSm} testID="checkout-address-label">Address</Text>
             <View>
-              {country || city || streetAddress != "" ? (
+              {country || city || streetAddress !== "" ? (
                 <Text
                   testID="checkout-address-value"
                   style={styles.secondaryTextSm}
@@ -189,16 +220,45 @@ const CheckoutScreen = ({ navigation, route }) => {
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
         <View style={styles.listContainer}>
-          <View style={styles.list}>
-            <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
-          </View>
+          {[PAYMENT_METHODS.COD, ...(walletEnabled ? [PAYMENT_METHODS.WALLET] : [])].map(
+            (paymentType) => {
+              const isSelected = selectedPaymentType === paymentType;
+              return (
+                <TouchableOpacity
+                  key={paymentType}
+                  style={[
+                    styles.paymentOption,
+                    isSelected && styles.paymentOptionSelected,
+                  ]}
+                  onPress={() => handlePaymentSelection(paymentType)}
+                  testID={`checkout-payment-option-${paymentType}`}
+                >
+                  <View>
+                    <Text style={styles.secondaryTextSm}>
+                      {PAYMENT_METHOD_LABELS[paymentType]}
+                    </Text>
+                    <Text style={styles.paymentHelperText}>
+                      {paymentType === PAYMENT_METHODS.WALLET
+                        ? "Demo payment - no real charge"
+                        : "Collected when your order is delivered"}
+                    </Text>
+                  </View>
+                  <Text
+                    style={isSelected ? styles.primaryTextSm : styles.secondaryTextSm}
+                    testID={`checkout-payment-option-${paymentType}-state`}
+                  >
+                    {isSelected ? "Selected" : "Select"}
+                  </Text>
+                </TouchableOpacity>
+              );
+            }
+          )}
         </View>
 
         <View style={styles.emptyView}></View>
       </ScrollView>
       <View style={styles.buttomContainer}>
-        {country && city && streetAddress != "" ? (
+        {country && city && streetAddress !== "" ? (
           <CustomButton
             testID="checkout-submit-btn"
             text={"Submit Order"}
@@ -247,7 +307,7 @@ const CheckoutScreen = ({ navigation, route }) => {
               placeholder={"Enter ZipCode"}
               keyboardType={"number-pad"}
             />
-            {streetAddress || city || country != "" ? (
+            {streetAddress || city || country !== "" ? (
               <CustomButton
                 testID="checkout-save-address-btn"
                 onPress={() => {
@@ -343,6 +403,27 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 10,
     padding: 10,
+  },
+  paymentOption: {
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    minHeight: 72,
+    borderWidth: 1,
+    borderColor: colors.light,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 10,
+  },
+  paymentOptionSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.info,
+  },
+  paymentHelperText: {
+    marginTop: 4,
+    color: colors.muted,
+    fontSize: 12,
   },
   buttomContainer: {
     width: "100%",

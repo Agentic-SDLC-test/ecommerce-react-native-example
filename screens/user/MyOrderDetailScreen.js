@@ -7,12 +7,27 @@ import {
   TouchableOpacity,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import StepIndicator from "react-native-step-indicator";
+import CustomButton from "../../components/CustomButton";
+import PaymentStatusBadge from "../../components/PaymentStatusBadge";
+import * as api from "../../api";
+import {
+  PAYMENT_METHOD_LABELS,
+  PAYMENT_METHODS,
+  getEffectivePaymentStatus,
+  isWalletPayment,
+} from "../../constants/payment";
+
+export const deriveTrackingState = (status) => {
+  if (status === "pending") return 1;
+  if (status === "shipped") return 2;
+  return 3;
+};
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -22,8 +37,7 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
   const [alertType, setAlertType] = useState("error");
   const [totalCost, setTotalCost] = useState(0);
   const [address, setAddress] = useState("");
-  const [value, setValue] = useState(null);
-  const [statusDisable, setStatusDisable] = useState(false);
+  const [order, setOrder] = useState(orderDetail);
   const labels = ["Processing", "Shipping", "Delivery"];
   const [trackingState, setTrackingState] = useState(1);
   const customStyles = {
@@ -78,36 +92,54 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
     return newDate;
   };
 
+  const refreshOrderState = (nextOrder) => {
+    setOrder(nextOrder);
+    setAddress(
+      nextOrder?.country +
+        ", " +
+        nextOrder?.city +
+        ", " +
+        nextOrder?.shippingAddress
+    );
+    setTotalCost(
+      nextOrder?.items.reduce((accumulator, object) => {
+        return accumulator + Number(object.price || 0) * Number(object.quantity || 0);
+      }, 0)
+    );
+    setTrackingState(deriveTrackingState(nextOrder?.status));
+  };
+
+  const handlePaymentUpdate = (nextStatus) => {
+    setIsloading(true);
+    setLabel("Updating payment...");
+    setError("");
+
+    api
+      .updateOrderPaymentStatus(order?._id, nextStatus)
+      .then((result) => {
+        if (result.success) {
+          refreshOrderState(result.data);
+          setAlertType("success");
+          setError(`Payment status updated to ${nextStatus}`);
+        } else {
+          setAlertType("error");
+          setError(result.message);
+        }
+        setIsloading(false);
+      })
+      .catch((apiError) => {
+        setAlertType("error");
+        setError(apiError.message);
+        setIsloading(false);
+      });
+  };
+
   // set total cost, order detail, order status on initial render
   useEffect(() => {
     setError("");
     setAlertType("error");
-    if (orderDetail?.status == "delivered") {
-      setStatusDisable(true);
-    } else {
-      setStatusDisable(false);
-    }
-    setValue(orderDetail?.status);
-    setAddress(
-      orderDetail?.country +
-        ", " +
-        orderDetail?.city +
-        ", " +
-        orderDetail?.shippingAddress
-    );
-    setTotalCost(
-      orderDetail?.items.reduce((accumulator, object) => {
-        return (accumulator + object.price) * object.quantity;
-      }, 0)
-    );
-    if (orderDetail?.status === "pending") {
-      setTrackingState(1);
-    } else if (orderDetail?.status === "shipped") {
-      setTrackingState(2);
-    } else {
-      setTrackingState(3);
-    }
-  }, []);
+    refreshOrderState(orderDetail);
+  }, [orderDetail]);
 
   return (
     <View style={styles.container} testID="my-order-detail-screen">
@@ -150,26 +182,26 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
         </View>
         <View style={styles.ShipingInfoContainer}>
           <Text style={styles.secondarytextSm} testID="my-order-detail-address">{address}</Text>
-          <Text style={styles.secondarytextSm} testID="my-order-detail-zipcode">{orderDetail?.zipcode}</Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-zipcode">{order?.zipcode}</Text>
         </View>
         <View>
           <Text style={styles.containerNameText} testID="my-order-detail-order-info-heading">Order Info</Text>
         </View>
         <View style={styles.orderInfoContainer}>
           <Text style={styles.secondarytextMedian} testID="my-order-detail-order-id">
-            Order # {orderDetail?.orderId}
+            Order # {order?.orderId}
           </Text>
           <Text style={styles.secondarytextSm} testID="my-order-detail-ordered-date">
-            Ordered on {dateFormat(orderDetail?.updatedAt)}
+            Ordered on {dateFormat(order?.updatedAt)}
           </Text>
-          {orderDetail?.shippedOn && (
+          {order?.shippedOn && (
             <Text style={styles.secondarytextSm} testID="my-order-detail-shipped-date">
-              Shipped on {orderDetail?.shippedOn}
+              Shipped on {order?.shippedOn}
             </Text>
           )}
-          {orderDetail?.deliveredOn && (
+          {order?.deliveredOn && (
             <Text style={styles.secondarytextSm} testID="my-order-detail-delivered-date">
-              Delivered on {orderDetail?.deliveredOn}
+              Delivered on {order?.deliveredOn}
             </Text>
           )}
           <View style={{ marginTop: 15, width: "100%" }}>
@@ -191,11 +223,11 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
         <View style={styles.orderItemsContainer}>
           <View style={styles.orderItemContainer}>
             <Text style={styles.orderItemText}>Package</Text>
-            <Text testID="my-order-detail-package-status">{value}</Text>
+            <Text testID="my-order-detail-package-status">{order?.status}</Text>
           </View>
           <View style={styles.orderItemContainer}>
             <Text style={styles.orderItemText} testID="my-order-detail-package-date">
-              Order on : {orderDetail?.updatedAt}
+              Order on : {dateFormat(order?.updatedAt)}
             </Text>
           </View>
           <ScrollView
@@ -203,7 +235,7 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
             style={styles.orderSummaryContainer}
             nestedScrollEnabled={true}
           >
-            {orderDetail?.items.map((product, index) => (
+            {order?.items.map((product, index) => (
               <View key={index}>
                 <BasicProductList
                   testID={`my-order-detail-product-${index}`}
@@ -218,6 +250,61 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
             <Text style={styles.orderItemText} testID="my-order-detail-total-label">Total</Text>
             <Text testID="my-order-detail-total-value">{totalCost}$</Text>
           </View>
+        </View>
+        <View style={styles.containerNameContainer}>
+          <View>
+            <Text style={styles.containerNameText} testID="my-order-detail-payment-heading">Payment</Text>
+          </View>
+        </View>
+        <View style={styles.paymentContainer}>
+          <View style={styles.orderItemContainer}>
+            <Text style={styles.orderItemText} testID="my-order-detail-payment-method">
+              Method
+            </Text>
+            <Text style={styles.secondarytextMedian}>
+              {PAYMENT_METHOD_LABELS[order?.payment_type] || PAYMENT_METHOD_LABELS.cod}
+            </Text>
+          </View>
+          <View style={styles.paymentStatusRow}>
+            <Text style={styles.orderItemText} testID="my-order-detail-payment-status-text">
+              Status
+            </Text>
+            <PaymentStatusBadge
+              paymentType={order?.payment_type}
+              paymentStatus={order?.payment_status}
+              fulfillmentStatus={order?.status}
+              testID="my-order-detail-payment-status"
+            />
+          </View>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-message">
+            {order?.payment_type === PAYMENT_METHODS.WALLET
+              ? getEffectivePaymentStatus(order) === "failed"
+                ? "Your wallet payment failed. Retry or keep the order unpaid until you are ready."
+                : getEffectivePaymentStatus(order) === "paid"
+                  ? "Wallet payment completed successfully."
+                  : "This wallet order exists, but payment is still pending."
+              : "Cash on delivery will be collected when the order is delivered."}
+          </Text>
+          {isWalletPayment(order?.payment_type) ? (
+            <View style={styles.paymentActions}>
+              <View style={styles.paymentActionButton}>
+                <CustomButton
+                  text={"Mark Paid"}
+                  onPress={() => handlePaymentUpdate("paid")}
+                  disabled={isloading || getEffectivePaymentStatus(order) === "paid"}
+                  testID="my-order-detail-mark-paid-btn"
+                />
+              </View>
+              <View style={styles.paymentActionButton}>
+                <CustomButton
+                  text={"Mark Failed"}
+                  onPress={() => handlePaymentUpdate("failed")}
+                  disabled={isloading}
+                  testID="my-order-detail-mark-failed-btn"
+                />
+              </View>
+            </View>
+          ) : null}
         </View>
         <View style={styles.emptyView}></View>
       </ScrollView>
@@ -354,6 +441,31 @@ const styles = StyleSheet.create({
     borderColor: colors.muted,
     elevation: 1,
     marginBottom: 10,
+  },
+  paymentContainer: {
+    marginTop: 5,
+    backgroundColor: colors.white,
+    padding: 12,
+    borderRadius: 10,
+    width: "100%",
+    gap: 10,
+    elevation: 1,
+  },
+  paymentStatusRow: {
+    width: "100%",
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  paymentActions: {
+    width: "100%",
+    display: "flex",
+    flexDirection: "row",
+    gap: 10,
+  },
+  paymentActionButton: {
+    flex: 1,
   },
   primarytextMedian: {
     color: colors.primary,
