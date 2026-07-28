@@ -285,12 +285,15 @@ const initialOrders = [
   },
 ];
 
+const initialReviews = [];
+
 const cloneData = (value) => JSON.parse(JSON.stringify(value));
 
 let users = cloneData(initialUsers);
 let categories = cloneData(initialCategories);
 let products = cloneData(initialProducts);
 let orders = cloneData(initialOrders);
+let reviews = cloneData(initialReviews);
 
 const isWalletPayment = (paymentType) => paymentType === "wallet";
 
@@ -343,11 +346,55 @@ const emitOrderEvent = (event, req, order, previousState) => {
   );
 };
 
+const isVerifiedPurchaser = (userId, productId) =>
+  orders.some(
+    (order) =>
+      order.user._id === userId &&
+      order.status === "delivered" &&
+      order.items.some((item) => item.productId._id === productId)
+  );
+
+const findUserReview = (userId, productId) =>
+  reviews.find((review) => review.userId === userId && review.productId === productId);
+
+const computeReviewSummary = (productId) => {
+  const visibleReviews = reviews.filter(
+    (review) => review.productId === productId && review.status === "visible"
+  );
+  const distribution = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+  visibleReviews.forEach((review) => {
+    distribution[String(review.rating)] += 1;
+  });
+  const count = visibleReviews.length;
+  const average =
+    count === 0
+      ? 0
+      : Math.round((visibleReviews.reduce((sum, review) => sum + review.rating, 0) / count) * 10) / 10;
+  return { average, count, distribution };
+};
+
+const emitReviewEvent = (event, req, review, previousState) => {
+  console.log(
+    JSON.stringify({
+      event,
+      requestPath: req.path,
+      reviewId: review._id,
+      productId: review.productId,
+      userId: review.userId,
+      rating: review.rating,
+      status: review.status,
+      previousState: previousState || null,
+      nextState: { rating: review.rating, text: review.text, status: review.status },
+    })
+  );
+};
+
 const resetMockData = () => {
   users = cloneData(initialUsers);
   categories = cloneData(initialCategories);
   products = cloneData(initialProducts);
   orders = cloneData(initialOrders);
+  reviews = cloneData(initialReviews);
 };
 
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
@@ -662,6 +709,155 @@ app.post("/order-payment-status", authMiddleware, (req, res) => {
   res.json({ success: true, message: "payment status updated", data: order });
 });
 
+// GET /reviews?productId=  (public: review summary + visible reviews for a product)
+app.get("/reviews", (req, res) => {
+  const { productId } = req.query;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "productId is required" });
+  }
+
+  const visibleReviews = reviews
+    .filter((review) => review.productId === productId && review.status === "visible")
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+
+  const data = {
+    summary: computeReviewSummary(productId),
+    reviews: visibleReviews,
+  };
+
+  const token = req.headers["x-auth-token"];
+  const requester = token ? users.find((u) => u.token === token) : null;
+  data.isVerifiedPurchaser = requester ? isVerifiedPurchaser(requester._id, productId) : false;
+  data.myReview = requester ? findUserReview(requester._id, productId) || null : null;
+
+  res.json({ success: true, data });
+});
+
+// POST /reviews  (user: create a new review for a verified purchase)
+app.post("/reviews", authMiddleware, (req, res) => {
+  const { productId, rating, text } = req.body;
+
+  const product = products.find((p) => p._id === productId);
+  if (!product) {
+    return res.status(400).json({ success: false, message: "Product not found" });
+  }
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return res.status(400).json({ success: false, message: "rating must be an integer between 1 and 5" });
+  }
+  const trimmedText = (text || "").trim();
+  if (trimmedText.length > 1000) {
+    return res.status(400).json({ success: false, message: "text must be 1000 characters or fewer" });
+  }
+  if (!isVerifiedPurchaser(req.user._id, productId)) {
+    return res.status(403).json({ success: false, message: "Only verified purchasers can review this product" });
+  }
+  if (findUserReview(req.user._id, productId)) {
+    return res.status(409).json({
+      success: false,
+      message: "You have already reviewed this product - use update-review to edit it",
+    });
+  }
+
+  const qualifyingOrder = orders.find(
+    (order) =>
+      order.user._id === req.user._id &&
+      order.status === "delivered" &&
+      order.items.some((item) => item.productId._id === productId)
+  );
+
+  const now = new Date().toISOString();
+  const newReview = {
+    _id: randomUUID(),
+    productId,
+    userId: req.user._id,
+    userName: req.user.name,
+    orderId: qualifyingOrder._id,
+    rating,
+    text: trimmedText,
+    verifiedPurchase: true,
+    status: "visible",
+    createdAt: now,
+    updatedAt: now,
+  };
+  reviews.push(newReview);
+  emitReviewEvent("review_created", req, newReview, null);
+  res.status(201).json({ success: true, message: "Review submitted successfully", data: newReview });
+});
+
+// POST /update-review?id=  (user: edit their own review)
+app.post("/update-review", authMiddleware, (req, res) => {
+  const { id } = req.query;
+  const { rating, text } = req.body;
+
+  const review = reviews.find((r) => r._id === id);
+  if (!review) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+  if (review.userId !== req.user._id) {
+    return res.status(403).json({ success: false, message: "Cannot edit a review you do not own" });
+  }
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return res.status(400).json({ success: false, message: "rating must be an integer between 1 and 5" });
+  }
+  const trimmedText = (text || "").trim();
+  if (trimmedText.length > 1000) {
+    return res.status(400).json({ success: false, message: "text must be 1000 characters or fewer" });
+  }
+
+  const previousState = { rating: review.rating, text: review.text, status: review.status };
+  review.rating = rating;
+  review.text = trimmedText;
+  review.updatedAt = new Date().toISOString();
+  emitReviewEvent("review_updated", req, review, previousState);
+  res.json({ success: true, message: "Review updated successfully", data: review });
+});
+
+// GET /admin/reviews?productId=&status=  (admin: list reviews, optionally filtered)
+app.get("/admin/reviews", adminMiddleware, (req, res) => {
+  const { productId, status } = req.query;
+  const filtered = reviews.filter((review) => {
+    if (productId && review.productId !== productId) return false;
+    if (status && review.status !== status) return false;
+    return true;
+  });
+  const sorted = [...filtered]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .map((review) => {
+      const product = products.find((p) => p._id === review.productId);
+      return { ...review, productTitle: product ? product.title : "Unknown Product" };
+    });
+  res.json({ success: true, data: sorted });
+});
+
+// GET /admin/review-status?reviewId=&status=  (admin: hide/unhide a review)
+app.get("/admin/review-status", adminMiddleware, (req, res) => {
+  const { reviewId, status } = req.query;
+  if (!["visible", "hidden"].includes(status)) {
+    return res.status(400).json({ success: false, message: "Invalid status value" });
+  }
+  const review = reviews.find((r) => r._id === reviewId);
+  if (!review) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+  const previousState = { status: review.status };
+  review.status = status;
+  review.updatedAt = new Date().toISOString();
+  emitReviewEvent("review_status_updated", req, review, previousState);
+  res.json({ success: true, message: `Review status updated to ${status}`, data: review });
+});
+
+// GET /admin/delete-review?id=  (admin: permanently remove a review)
+app.get("/admin/delete-review", adminMiddleware, (req, res) => {
+  const { id } = req.query;
+  const idx = reviews.findIndex((r) => r._id === id);
+  if (idx === -1) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+  emitReviewEvent("review_deleted", req, reviews[idx], null);
+  reviews.splice(idx, 1);
+  res.json({ success: true, message: "Review deleted successfully" });
+});
+
 // GET /delete-user?id=
 app.get("/delete-user", (req, res) => {
   const { id } = req.query;
@@ -742,6 +938,12 @@ if (require.main === module) {
     console.log(`   GET    /orders               (user)`);
     console.log(`   POST   /checkout             (user)`);
     console.log(`   POST   /order-payment-status?orderId=  (user/admin)`);
+    console.log(`   GET    /reviews?productId=`);
+    console.log(`   POST   /reviews              (user)`);
+    console.log(`   POST   /update-review?id=    (user)`);
+    console.log(`   GET    /admin/reviews        (admin)`);
+    console.log(`   GET    /admin/review-status?reviewId=&status=  (admin)`);
+    console.log(`   GET    /admin/delete-review?id=  (admin)`);
     console.log(`   GET    /delete-user?id=`);
     console.log(`   POST   /reset-password?id=`);
     console.log(`   POST   /photos/upload`);
@@ -763,6 +965,9 @@ module.exports = {
     VALID_PAYMENT_STATUSES,
     hydratePaymentFields,
     canTransitionPaymentStatus,
+    isVerifiedPurchaser,
+    findUserReview,
+    computeReviewSummary,
   },
 };
 

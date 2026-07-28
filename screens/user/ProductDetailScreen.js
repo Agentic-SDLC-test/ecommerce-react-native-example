@@ -5,6 +5,7 @@ import {
   View,
   StatusBar,
   Text,
+  ScrollView,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,6 +17,8 @@ import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import * as api from "../../api";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import ReviewSummary from "../../components/ReviewSummary";
+import ReviewList from "../../components/ReviewList";
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -37,6 +40,10 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const [error, setError] = useState("");
   const [isDisable, setIsDisbale] = useState(true);
   const [alertType, setAlertType] = useState("error");
+  const [reviewSummary, setReviewSummary] = useState({ average: 0, count: 0, distribution: {} });
+  const [recentReviews, setRecentReviews] = useState([]);
+  const [isVerifiedPurchaser, setIsVerifiedPurchaser] = useState(false);
+  const [myReview, setMyReview] = useState(null);
 
   //method to fetch wishlist from server using API call
   const fetchWishlist = async () => {
@@ -61,6 +68,28 @@ const ProductDetailScreen = ({ navigation, route }) => {
         setError(error.message);
         console.log("error", error);
       });
+  };
+
+  //method to fetch review summary, recent reviews, and the caller's own review status
+  const fetchReviewData = async () => {
+    api
+      .getProductReviews(product?._id)
+      .then((result) => {
+        if (result.success) {
+          setReviewSummary(result.data.summary);
+          setRecentReviews(result.data.reviews.slice(0, 5));
+          setIsVerifiedPurchaser(result.data.isVerifiedPurchaser);
+          setMyReview(result.data.myReview);
+        }
+      })
+      .catch((error) => {
+        console.log("error", error);
+      });
+  };
+
+  //method to navigate to the write/edit review screen
+  const handleWriteReviewBtn = () => {
+    navigation.navigate("writereview", { product, existingReview: myReview });
   };
 
   //method to increase the product quantity
@@ -131,6 +160,7 @@ const ProductDetailScreen = ({ navigation, route }) => {
     setAvaiableQuantity(product.quantity);
     SetProductImage(`${network.serverip}/uploads/${product?.image}`);
     fetchWishlist();
+    fetchReviewData();
   }, []);
 
   //render whenever the value of wishlistItems change
@@ -207,6 +237,36 @@ const ProductDetailScreen = ({ navigation, route }) => {
             <View style={styles.productDescriptionContainer}>
               <Text style={styles.secondaryTextSm} testID="product-detail-description-label">Description:</Text>
               <Text testID="product-detail-description">{product?.description}</Text>
+            </View>
+            <View style={styles.reviewsSectionContainer} testID="product-detail-reviews-section">
+              <Text style={styles.reviewsSectionHeading} testID="product-detail-reviews-heading">
+                Ratings & Reviews
+              </Text>
+              <ReviewSummary summary={reviewSummary} testID="product-detail-review-summary" />
+              {isVerifiedPurchaser && (
+                <CustomButton
+                  text={myReview ? "Edit your review" : "Write a review"}
+                  onPress={handleWriteReviewBtn}
+                  testID="product-detail-write-review-btn"
+                />
+              )}
+              <ScrollView style={styles.reviewsListScroll} testID="product-detail-reviews-list">
+                {recentReviews.length === 0 ? (
+                  <Text style={styles.reviewsEmptyText} testID="product-detail-reviews-empty">
+                    Be the first to review this product.
+                  </Text>
+                ) : (
+                  recentReviews.map((review, index) => (
+                    <ReviewList
+                      item={review}
+                      isOwner={myReview?._id === review._id}
+                      onPressEdit={handleWriteReviewBtn}
+                      key={review._id || index}
+                      testID={`product-detail-review-${index}`}
+                    />
+                  ))
+                )}
+              </ScrollView>
             </View>
           </View>
           <View style={styles.productInfoBottomContainer}>
@@ -397,6 +457,27 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingLeft: 20,
     paddingRight: 20,
+  },
+  reviewsSectionContainer: {
+    width: "100%",
+    paddingHorizontal: 20,
+    paddingTop: 10,
+  },
+  reviewsSectionHeading: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.dark,
+    marginBottom: 5,
+  },
+  reviewsListScroll: {
+    maxHeight: 220,
+    width: "100%",
+  },
+  reviewsEmptyText: {
+    fontSize: 13,
+    color: colors.muted,
+    fontStyle: "italic",
+    marginTop: 5,
   },
   iconContainer: {
     display: "flex",
