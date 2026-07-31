@@ -34,6 +34,26 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
 
+  const [paymentType, setPaymentType] = useState("cod");
+  const [cardholderName, setCardholderName] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCVV, setCardCVV] = useState("");
+  const [progressLabel, setProgressLabel] = useState("Placing Order...");
+
+  /**
+   * Validate card input formats
+   * @returns {boolean} True if all card fields are valid
+   */
+  const validateCardInputs = () => {
+    if (!cardholderName.trim()) return false;
+    const cleanCardNumber = cardNumber.replace(/\s+/g, "");
+    if (!/^\d{16}$/.test(cleanCardNumber)) return false;
+    if (!/^\d{2}\/\d{2}$/.test(cardExpiry)) return false;
+    if (!/^\d{3,4}$/.test(cardCVV)) return false;
+    return true;
+  };
+
   //method to handle checkout
   const handleCheckout = async () => {
     setIsloading(true);
@@ -52,32 +72,48 @@ const CheckoutScreen = ({ navigation, route }) => {
       payload.push(obj);
     });
 
-    api
-      .checkout({
-        items: payload,
-        amount: totalamount,
-        discount: 0,
-        payment_type: "cod",
-        country: country,
-        status: "pending",
-        city: city,
-        zipcode: zipcode,
-        shippingAddress: streetAddress,
-      }) //API call
-      .then((result) => {
-        console.log("Checkout=>", result);
-        if (result.success == true) {
+    const runCheckoutApi = (pType, pStatus) => {
+      api
+        .checkout({
+          items: payload,
+          amount: totalamount,
+          discount: 0,
+          payment_type: pType,
+          payment_status: pStatus,
+          country: country,
+          status: "pending",
+          city: city,
+          zipcode: zipcode,
+          shippingAddress: streetAddress,
+        }) //API call
+        .then((result) => {
+          console.log("Checkout=>", result);
+          if (result.success == true) {
+            setIsloading(false);
+            emptyCart("empty");
+            navigation.replace("orderconfirm", {
+              payment_type: pType,
+              payment_status: pStatus,
+            });
+          } else {
+            setIsloading(false);
+          }
+        })
+        .catch((error) => {
           setIsloading(false);
-          emptyCart("empty");
-          navigation.replace("orderconfirm");
-        } else {
-          setIsloading(false);
-        }
-      })
-      .catch((error) => {
-        setIsloading(false);
-        console.log("error", error);
-      });
+          console.log("error", error);
+        });
+    };
+
+    if (paymentType === "card" || paymentType === "wallet") {
+      setProgressLabel("Processing Payment...");
+      setTimeout(() => {
+        runCheckoutApi(paymentType, "paid");
+      }, 1500);
+    } else {
+      setProgressLabel("Placing Order...");
+      runCheckoutApi("cod", "pending");
+    }
   };
 
   // set the address and total cost on initital render
@@ -97,7 +133,7 @@ const CheckoutScreen = ({ navigation, route }) => {
   return (
     <View style={styles.container} testID="checkout-screen">
       <StatusBar testID="checkout-status-bar"></StatusBar>
-      <ProgressDialog visible={isloading} label={"Placing Order..."} />
+      <ProgressDialog visible={isloading} label={progressLabel} />
       <View style={styles.topBarContainer}>
         <TouchableOpacity
           testID="checkout-back-btn"
@@ -188,21 +224,122 @@ const CheckoutScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
-        <View style={styles.listContainer}>
-          <View style={styles.list}>
-            <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
-          </View>
+        <View style={styles.listContainer} testID="checkout-payment-selector">
+          <TouchableOpacity
+            style={styles.list}
+            onPress={() => setPaymentType("cod")}
+            testID="checkout-payment-cod-btn"
+          >
+            <Text style={styles.secondaryTextSm}>Cash on Delivery</Text>
+            <Ionicons
+              name={paymentType === "cod" ? "radio-button-on" : "radio-button-off"}
+              size={20}
+              color={colors.primary}
+              testID="checkout-payment-cod-icon"
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.list}
+            onPress={() => setPaymentType("card")}
+            testID="checkout-payment-card-btn"
+          >
+            <Text style={styles.secondaryTextSm}>Credit/Debit Card</Text>
+            <Ionicons
+              name={paymentType === "card" ? "radio-button-on" : "radio-button-off"}
+              size={20}
+              color={colors.primary}
+              testID="checkout-payment-card-icon"
+            />
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.list}
+            onPress={() => setPaymentType("wallet")}
+            testID="checkout-payment-wallet-btn"
+          >
+            <Text style={styles.secondaryTextSm}>Digital Wallet</Text>
+            <Ionicons
+              name={paymentType === "wallet" ? "radio-button-on" : "radio-button-off"}
+              size={20}
+              color={colors.primary}
+              testID="checkout-payment-wallet-icon"
+            />
+          </TouchableOpacity>
         </View>
+
+        {paymentType === "card" && (
+          <View style={styles.cardFormContainer} testID="checkout-card-form">
+            <View style={styles.disclaimerContainer} testID="checkout-card-disclaimer">
+              <Text style={styles.disclaimerText}>
+                DEVELOPMENT MODE: Simulating payment only. Do NOT enter real card details.
+              </Text>
+            </View>
+            <CustomInput
+              testID="checkout-cardholder-name-input"
+              value={cardholderName}
+              setValue={setCardholderName}
+              placeholder={"Cardholder Name"}
+            />
+            <CustomInput
+              testID="checkout-card-number-input"
+              value={cardNumber}
+              setValue={(val) => {
+                const cleaned = val.replace(/[^0-9]/g, "");
+                let formatted = "";
+                for (let i = 0; i < cleaned.length && i < 16; i++) {
+                  if (i > 0 && i % 4 === 0) {
+                    formatted += " ";
+                  }
+                  formatted += cleaned[i];
+                }
+                setCardNumber(formatted);
+              }}
+              placeholder={"Card Number"}
+              keyboardType={"number-pad"}
+            />
+            <View style={styles.cardRow}>
+              <View style={{ flex: 1, marginRight: 10 }}>
+                <CustomInput
+                  testID="checkout-card-expiry-input"
+                  value={cardExpiry}
+                  setValue={(val) => {
+                    const cleaned = val.replace(/[^0-9]/g, "");
+                    let formatted = "";
+                    if (cleaned.length > 0) {
+                      formatted += cleaned.substring(0, 2);
+                    }
+                    if (cleaned.length > 2) {
+                      formatted += "/" + cleaned.substring(2, 4);
+                    }
+                    setCardExpiry(formatted);
+                  }}
+                  placeholder={"MM/YY"}
+                  keyboardType={"number-pad"}
+                />
+              </View>
+              <View style={{ flex: 1 }}>
+                <CustomInput
+                  testID="checkout-card-cvv-input"
+                  value={cardCVV}
+                  setValue={(val) => {
+                    const cleaned = val.replace(/[^0-9]/g, "").substring(0, 4);
+                    setCardCVV(cleaned);
+                  }}
+                  placeholder={"CVV"}
+                  keyboardType={"number-pad"}
+                  secureTextEntry={true}
+                />
+              </View>
+            </View>
+          </View>
+        )}
 
         <View style={styles.emptyView}></View>
       </ScrollView>
       <View style={styles.buttomContainer}>
-        {country && city && streetAddress != "" ? (
+        {country && city && streetAddress !== "" && (paymentType !== "card" || validateCardInputs()) ? (
           <CustomButton
             testID="checkout-submit-btn"
             text={"Submit Order"}
-            // onPress={() => navigation.replace("orderconfirm")}
             onPress={() => {
               handleCheckout();
             }}
@@ -372,5 +509,30 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 20,
     elevation: 3,
+  },
+  cardFormContainer: {
+    backgroundColor: colors.white,
+    borderRadius: 10,
+    padding: 15,
+    marginTop: 10,
+  },
+  disclaimerContainer: {
+    backgroundColor: "#ffebee",
+    borderWidth: 1,
+    borderColor: "#ef5350",
+    borderRadius: 5,
+    padding: 8,
+    marginBottom: 10,
+  },
+  disclaimerText: {
+    color: "#c62828",
+    fontSize: 12,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  cardRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
   },
 });

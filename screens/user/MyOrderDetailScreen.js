@@ -16,6 +16,29 @@ import StepIndicator from "react-native-step-indicator";
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
+
+  const getPaymentTypeLabel = (type) => {
+    switch (type) {
+      case "card":
+        return "Credit/Debit Card";
+      case "wallet":
+        return "Digital Wallet";
+      case "cod":
+      default:
+        return "Cash on Delivery";
+    }
+  };
+
+  const getPaymentStatusLabel = (status) => {
+    switch (status) {
+      case "paid":
+        return "Paid";
+      case "pending":
+      default:
+        return "Pending";
+    }
+  };
+
   const [isloading, setIsloading] = useState(false);
   const [label, setLabel] = useState("Loading..");
   const [error, setError] = useState("");
@@ -181,6 +204,20 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
               labels={labels}
             />
           </View>
+        </View>
+
+        <View style={styles.containerNameContainer}>
+          <View>
+            <Text style={styles.containerNameText} testID="my-order-detail-payment-heading">Payment Details</Text>
+          </View>
+        </View>
+        <View style={styles.orderInfoContainer}>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-method">
+            Payment Method: {getPaymentTypeLabel(orderDetail?.payment_type)}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-status">
+            Payment Status: {getPaymentStatusLabel(orderDetail?.payment_status)}
+          </Text>
         </View>
 
         <View style={styles.containerNameContainer}>
