@@ -272,7 +272,7 @@ let orders = [
     amount: 38.97,
     discount: 0,
     payment_type: "cod",
-    payment_status: "pending",
+    payment_status: "not",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
