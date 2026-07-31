@@ -7,7 +7,7 @@ describe("Colors constants", () => {
 
   it("defines the core color keys", () => {
     expect(Object.keys(colors)).toEqual(
-      expect.arrayContaining(["primary", "secondary", "white", "dark"])
+      expect.arrayContaining(["test", "primary", "secondary", "white", "dark"])
     );
   });
 });
