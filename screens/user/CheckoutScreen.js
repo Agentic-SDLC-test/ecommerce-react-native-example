@@ -10,7 +10,12 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
-import { colors } from "../../constants";
+import {
+  colors,
+  PAYMENT_TYPES,
+  PAYMENT_STATUSES,
+  DIGITAL_PAYMENT_ENABLED,
+} from "../../constants";
 import CustomButton from "../../components/CustomButton";
 import { useSelector, useDispatch } from "react-redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
@@ -18,6 +23,9 @@ import { bindActionCreators } from "redux";
 import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import ProgressDialog from "react-native-progress-dialog";
+import PaymentMethodSelector from "../../components/PaymentMethodSelector";
+import SimulatedPaymentModal from "../../components/SimulatedPaymentModal";
+import CustomAlert from "../../components/CustomAlert/CustomAlert";
 
 const CheckoutScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -33,9 +41,13 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [city, setCity] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
+  const [paymentType, setPaymentType] = useState(PAYMENT_TYPES.COD);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [error, setError] = useState("");
+  const [alertType, setAlertType] = useState("error");
 
-  //method to handle checkout
-  const handleCheckout = async () => {
+  //method to place the order once a payment outcome is resolved
+  const submitOrder = async (paymentStatus) => {
     setIsloading(true);
 
     var payload = [];
@@ -52,12 +64,17 @@ const CheckoutScreen = ({ navigation, route }) => {
       payload.push(obj);
     });
 
+    console.log(
+      `Checkout=> payment_type=${paymentType} payment_status=${paymentStatus}`
+    );
+
     api
       .checkout({
         items: payload,
         amount: totalamount,
         discount: 0,
-        payment_type: "cod",
+        payment_type: paymentType,
+        payment_status: paymentStatus,
         country: country,
         status: "pending",
         city: city,
@@ -69,7 +86,7 @@ const CheckoutScreen = ({ navigation, route }) => {
         if (result.success == true) {
           setIsloading(false);
           emptyCart("empty");
-          navigation.replace("orderconfirm");
+          navigation.replace("orderconfirm", { order: result.data });
         } else {
           setIsloading(false);
         }
@@ -78,6 +95,36 @@ const CheckoutScreen = ({ navigation, route }) => {
         setIsloading(false);
         console.log("error", error);
       });
+  };
+
+  //method invoked by the Submit Order button: gate card payments through the
+  //simulated modal; COD places the order immediately as awaiting payment
+  const onSubmitPressed = () => {
+    setError("");
+    if (paymentType === PAYMENT_TYPES.CARD && DIGITAL_PAYMENT_ENABLED) {
+      setPaymentModalVisible(true);
+    } else {
+      submitOrder(PAYMENT_STATUSES.AWAITING);
+    }
+  };
+
+  //method invoked with the simulated payment outcome; a success places a paid
+  //order, a failure/cancel places NO order and surfaces an inline alert
+  const onPaymentResult = (outcome) => {
+    setPaymentModalVisible(false);
+    console.log(
+      `Simulated payment result=${
+        outcome === PAYMENT_STATUSES.PAID ? "paid" : "failed"
+      }`
+    );
+    if (outcome === PAYMENT_STATUSES.PAID) {
+      submitOrder(PAYMENT_STATUSES.PAID);
+    } else {
+      setAlertType("error");
+      setError(
+        "Payment was not completed — try again or choose Cash On Delivery."
+      );
+    }
   };
 
   // set the address and total cost on initital render
@@ -189,11 +236,13 @@ const CheckoutScreen = ({ navigation, route }) => {
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
         <View style={styles.listContainer}>
-          <View style={styles.list}>
-            <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
-          </View>
+          <PaymentMethodSelector
+            testID="checkout-payment-selector"
+            selected={paymentType}
+            onSelect={setPaymentType}
+          />
         </View>
+        <CustomAlert message={error} type={alertType} testID="checkout-payment-alert" />
 
         <View style={styles.emptyView}></View>
       </ScrollView>
@@ -202,9 +251,8 @@ const CheckoutScreen = ({ navigation, route }) => {
           <CustomButton
             testID="checkout-submit-btn"
             text={"Submit Order"}
-            // onPress={() => navigation.replace("orderconfirm")}
             onPress={() => {
-              handleCheckout();
+              onSubmitPressed();
             }}
           />
         ) : (
@@ -268,6 +316,13 @@ const CheckoutScreen = ({ navigation, route }) => {
           </View>
         </View>
       </Modal>
+      <SimulatedPaymentModal
+        testID="checkout-payment-modal"
+        visible={paymentModalVisible}
+        amount={totalCost + deliveryCost}
+        onResult={onPaymentResult}
+        onCancel={() => setPaymentModalVisible(false)}
+      />
     </View>
   );
 };

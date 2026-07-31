@@ -1,12 +1,14 @@
 import { StyleSheet, Image, Text, View, StatusBar } from "react-native";
 import React, { useEffect, useState } from "react";
-import { colors } from "../../constants";
+import { colors, getPaymentMethodLabel } from "../../constants";
 import SuccessImage from "../../assets/image/success.png";
 import CustomButton from "../../components/CustomButton";
+import PaymentStatusBadge from "../../components/PaymentStatusBadge";
 import * as session from "../../utils/session";
 
-const OrderConfirmScreen = ({ navigation }) => {
+const OrderConfirmScreen = ({ navigation, route }) => {
   const [user, setUser] = useState({});
+  const order = route?.params?.order;
 
   //method to get authUser from session
   const getUserData = async () => {
@@ -26,6 +28,17 @@ const OrderConfirmScreen = ({ navigation }) => {
         <Image source={SuccessImage} style={styles.Image} testID="order-confirm-image" />
       </View>
       <Text style={styles.secondaryText} testID="order-confirm-text">Order has be confirmed</Text>
+      {order && (
+        <View style={styles.paymentContainer}>
+          <Text style={styles.paymentText} testID="order-confirm-method">
+            {getPaymentMethodLabel(order.payment_type)}
+          </Text>
+          <PaymentStatusBadge
+            status={order.payment_status}
+            testID="order-confirm-payment-status"
+          />
+        </View>
+      )}
       <View>
         <CustomButton
           testID="order-confirm-home-btn"
@@ -59,5 +72,17 @@ const styles = StyleSheet.create({
   secondaryText: {
     fontSize: 20,
     fontWeight: "bold",
+  },
+  paymentContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    marginTop: 10,
+  },
+  paymentText: {
+    fontSize: 15,
+    fontWeight: "bold",
+    color: colors.muted,
+    marginBottom: 6,
   },
 });

@@ -1,0 +1,103 @@
+{
+  "app_type": "mobile",
+  "ui": "react",
+  "overview": "EasyBuy is a cross-platform (iOS/Android/web) e-commerce mobile app built with Expo + React Native. It offers a customer storefront (browse catalog, search, cart, wishlist, checkout, order tracking) and an admin console (dashboard, product/category CRUD, order management, user management). Client state is held in Redux (cart) and React state; the authenticated user + JWT live behind a session module backed by expo-secure-store (native) / AsyncStorage (web). All backend access goes through a single API seam (api/client.js + api/index.js) that talks to a Node backend or the bundled Express mock-server over a flat REST contract.",
+  "domain_models": [
+    {
+      "name": "User",
+      "definition": "An authenticated account identified by _id/email with a name, password, a role discriminator (userType: USER | ADMIN), and an auth token. Serves as both storefront customer and, when userType is ADMIN, the admin operator."
+    },
+    {
+      "name": "Customer",
+      "definition": "A User with userType USER: the shopper persona who browses the catalog, maintains a cart and wishlist, and places orders."
+    },
+    {
+      "name": "Admin",
+      "definition": "A User with userType ADMIN: the operator persona who manages products, categories, orders, and users through the admin dashboard; enforced by session.isAdmin() and the mock-server adminMiddleware."
+    },
+    {
+      "name": "Product",
+      "definition": "A sellable catalog item with _id, title, sku, price, stock quantity, description, image, and an embedded category { _id, title }. Listed via GET /products and mutated by admins."
+    },
+    {
+      "name": "Category",
+      "definition": "A grouping of products (e.g. Garments, Electronics, Cosmetics, Groceries) with _id, title, description, and icon/image. Managed via /categories endpoints."
+    },
+    {
+      "name": "Cart",
+      "definition": "The client-side (Redux) list of products the customer intends to buy. Not persisted server-side; reduced by the cartReducer under the 'product' slice."
+    },
+    {
+      "name": "CartItem",
+      "definition": "A line within the Cart: a Product snapshot plus a chosen quantity and an avaiableQuantity (in-stock cap). Add/remove and increase/decrease-quantity actions mutate it."
+    },
+    {
+      "name": "Wishlist",
+      "definition": "A customer's saved-for-later collection of products (productId + quantity), managed via /wishlist, /add-to-wishlist, and /remove-from-wishlist."
+    },
+    {
+      "name": "Order",
+      "definition": "A placed purchase with orderId, buyer reference, line items, amount, discount, payment_type (cod), shipping fields (country/city/zipcode/shippingAddress), and a status lifecycle: pending -> shipped -> delivered, plus createdAt/updatedAt/shippedOn/deliveredOn."
+    },
+    {
+      "name": "OrderItem",
+      "definition": "A line within an Order: a productId reference { _id, title } with the price and quantity captured at checkout time."
+    },
+    {
+      "name": "Session",
+      "definition": "The authenticated identity lifecycle: the logged-in user object plus JWT-style token stored under 'authUser' in SecureStore (native) / AsyncStorage (web). The token is sent as the x-auth-token header; a 'jwt expired' response clears the session and resets navigation to login."
+    },
+    {
+      "name": "Dashboard",
+      "definition": "Admin aggregate view exposing counts of users, orders, products, and categories via GET /dashboard."
+    }
+  ],
+  "applications": [
+    {
+      "name": "easybuy-mobile",
+      "path": ".",
+      "app_type": "mobile",
+      "ui": "react",
+      "runtime": "expo-react-native",
+      "framework": "Expo SDK 55 / React Native 0.83 / React 19",
+      "entrypoints": ["node_modules/expo/AppEntry.js", "App.js", "routes/Routes.js"],
+      "state_management": "Redux + redux-thunk (react-redux); client-only cart slice",
+      "navigation": "@react-navigation (native-stack root + bottom-tabs)",
+      "storage": "expo-secure-store (native) / @react-native-async-storage (web) via utils/authStorage.js",
+      "backend_seam": "api/client.js (transport) + api/index.js (named REST operations); base URL resolved by api/config.js from EXPO_PUBLIC_API_URL",
+      "domain_ownership": [
+        "User",
+        "Customer",
+        "Admin",
+        "Product",
+        "Category",
+        "Cart",
+        "CartItem",
+        "Wishlist",
+        "Order",
+        "OrderItem",
+        "Session",
+        "Dashboard"
+      ]
+    },
+    {
+      "name": "easybuy-mock-server",
+      "path": "mock-server",
+      "app_type": "api",
+      "ui": null,
+      "runtime": "node",
+      "framework": "Express 4 (cors, multer, uuid)",
+      "entrypoints": ["mock-server/server.js"],
+      "description": "Local development-only Express server (port 3002) with in-memory seed data that replicates the flat REST contract the mobile app consumes (auth, products, categories, orders, wishlist, admin, uploads). Not shipped with the app.",
+      "domain_ownership": [
+        "User",
+        "Product",
+        "Category",
+        "Order",
+        "OrderItem",
+        "Wishlist",
+        "Dashboard"
+      ]
+    }
+  ]
+}

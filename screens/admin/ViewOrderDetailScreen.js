@@ -7,13 +7,14 @@ import {
   TouchableOpacity,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors } from "../../constants";
+import { colors, getPaymentMethodLabel } from "../../constants";
 import * as api from "../../api";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import CustomButton from "../../components/CustomButton";
+import PaymentStatusBadge from "../../components/PaymentStatusBadge";
 import DropDownPicker from "react-native-dropdown-picker";
 
 const ViewOrderDetailScreen = ({ navigation, route }) => {
@@ -176,6 +177,15 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
               Delivered on {orderDetail?.deliveredOn}
             </Text>
           )}
+          <View style={styles.paymentRow}>
+            <Text style={styles.secondarytextSm} testID="view-order-detail-payment-method">
+              {getPaymentMethodLabel(orderDetail?.payment_type)}
+            </Text>
+            <PaymentStatusBadge
+              status={orderDetail?.payment_status}
+              testID="view-order-detail-payment-status"
+            />
+          </View>
         </View>
         <View style={styles.containerNameContainer}>
           <View>
@@ -389,6 +399,14 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 15,
     fontWeight: "bold",
+  },
+  paymentRow: {
+    width: "100%",
+    marginTop: 5,
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   emptyView: {
     height: 20,

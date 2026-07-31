@@ -7,11 +7,12 @@ import {
   TouchableOpacity,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors, network } from "../../constants";
+import { colors, network, getPaymentMethodLabel } from "../../constants";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
+import PaymentStatusBadge from "../../components/PaymentStatusBadge";
 import StepIndicator from "react-native-step-indicator";
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
@@ -172,6 +173,15 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
               Delivered on {orderDetail?.deliveredOn}
             </Text>
           )}
+          <View style={styles.paymentRow}>
+            <Text style={styles.secondarytextSm} testID="my-order-detail-payment-method">
+              {getPaymentMethodLabel(orderDetail?.payment_type)}
+            </Text>
+            <PaymentStatusBadge
+              status={orderDetail?.payment_status}
+              testID="my-order-detail-payment-status"
+            />
+          </View>
           <View style={{ marginTop: 15, width: "100%" }}>
             <StepIndicator
               testID="my-order-detail-step-indicator"
@@ -364,6 +374,14 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontSize: 15,
     fontWeight: "bold",
+  },
+  paymentRow: {
+    width: "100%",
+    marginTop: 5,
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   emptyView: {
     height: 20,

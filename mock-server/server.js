@@ -211,6 +211,7 @@ let orders = [
     amount: 129.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "awaiting_payment",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -240,6 +241,7 @@ let orders = [
     amount: 24.99,
     discount: 0,
     payment_type: "cod",
+    payment_status: "awaiting_payment",
     country: "Canada",
     city: "Vancouver",
     zipcode: "V6B 1A1",
@@ -270,6 +272,7 @@ let orders = [
     amount: 38.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "awaiting_payment",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -498,10 +501,18 @@ app.get("/orders", authMiddleware, (req, res) => {
 
 // POST /checkout  (user: place order)
 app.post("/checkout", authMiddleware, (req, res) => {
-  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
+  const { items, amount, discount, payment_type, payment_status, country, city, zipcode, shippingAddress, status } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
   }
+  // Validate/default the additive payment fields; unknown values coerce to the
+  // backward-compatible defaults. Card-entry fields (number/expiry/CVV) are
+  // never destructured, so no sensitive card data is ever stored.
+  const safePaymentType = payment_type === "card" ? "card" : "cod";
+  const safePaymentStatus =
+    payment_status === "paid" || payment_status === "failed"
+      ? payment_status
+      : "awaiting_payment";
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
     return {
@@ -523,7 +534,9 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
+    payment_type: safePaymentType,
+    payment_status: safePaymentStatus,
+    paidAt: safePaymentStatus === "paid" ? new Date().toISOString() : null,
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",

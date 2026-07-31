@@ -1,0 +1,8 @@
+completed=true
+mode=deep
+scope=code-only
+graph=.alora/graph.json
+concept_nodes_added=9
+inferred_edges=36
+ambiguous_edges=2
+hyperedges=5

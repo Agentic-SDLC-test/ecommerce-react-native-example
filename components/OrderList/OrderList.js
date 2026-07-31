@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors } from "../../constants";
+import { colors, getPaymentMethodLabel } from "../../constants";
+import PaymentStatusBadge from "../PaymentStatusBadge";
 
 function getTime(date) {
   let t = new Date(date);
@@ -78,6 +79,15 @@ const OrderList = ({ item, onPress, testID }) => {
       <View style={styles.innerRow}>
         <Text style={styles.secondaryText} testID={testID ? `${testID}-quantity` : undefined}>Quantity : {quantity}</Text>
         <Text style={styles.secondaryText} testID={testID ? `${testID}-total` : undefined}>Total Amount : {totalCost}$</Text>
+      </View>
+      <View style={styles.innerRow}>
+        <Text style={styles.secondaryText} testID={testID ? `${testID}-payment-method` : undefined}>
+          {getPaymentMethodLabel(item?.payment_type)}
+        </Text>
+        <PaymentStatusBadge
+          status={item?.payment_status}
+          testID={testID ? `${testID}-payment-status` : undefined}
+        />
       </View>
       <View style={styles.innerRow}>
         <TouchableOpacity style={styles.detailButton} onPress={onPress} testID={testID ? `${testID}-details-btn` : undefined}>
