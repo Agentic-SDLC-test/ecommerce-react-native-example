@@ -32,6 +32,8 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
     { label: "Shipped", value: "shipped" },
     { label: "Delivered", value: "delivered" },
   ]);
+  const [paymentStatus, setPaymentStatus] = useState("Pending");
+  const [paymentType, setPaymentType] = useState("cod");
 
   //method to convert the time into AM PM format
   function tConvert(time) {
@@ -74,6 +76,9 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
           setError(`Order status is successfully updated to ${value}`);
           setAlertType("success");
           setIsloading(false);
+          if (result.data) {
+            setPaymentStatus(result.data.payment_status || "Pending");
+          }
         }
       })
       .catch((error) => {
@@ -106,6 +111,8 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
         return (accumulator + object.price) * object.quantity;
       }, 0) // calculate the total cost
     );
+    setPaymentStatus(orderDetail?.payment_status || "Pending");
+    setPaymentType(orderDetail?.payment_type || "cod");
   }, []);
   return (
     <View style={styles.container} testID="view-order-detail-screen">
@@ -176,6 +183,12 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
               Delivered on {orderDetail?.deliveredOn}
             </Text>
           )}
+          <Text style={styles.secondarytextSm} testID="view-order-detail-payment-type">
+            Payment Method: {paymentType ? paymentType.toUpperCase() : "COD"}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="view-order-detail-payment-status">
+            Payment Status: {paymentStatus}
+          </Text>
         </View>
         <View style={styles.containerNameContainer}>
           <View>

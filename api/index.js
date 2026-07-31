@@ -16,6 +16,8 @@ export const login = (email, password) => post("/login", { email, password });
 export const resetPassword = (userId, body) =>
   post(`/reset-password?id=${q(userId)}`, body);
 export const deleteUser = (userId) => get(`/delete-user?id=${q(userId)}`);
+export const getUserProfile = () => get("/user/profile");
+export const topup = (amount) => post("/user/topup", { amount });
 
 // ---- Products ----
 export const getProducts = (search) =>

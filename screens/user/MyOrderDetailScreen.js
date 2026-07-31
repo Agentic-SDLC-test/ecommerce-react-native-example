@@ -172,6 +172,12 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
               Delivered on {orderDetail?.deliveredOn}
             </Text>
           )}
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-type">
+            Payment Method: {orderDetail?.payment_type ? orderDetail.payment_type.toUpperCase() : "COD"}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-status">
+            Payment Status: {orderDetail?.payment_status || "Pending"}
+          </Text>
           <View style={{ marginTop: 15, width: "100%" }}>
             <StepIndicator
               testID="my-order-detail-step-indicator"

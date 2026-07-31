@@ -36,6 +36,7 @@ let users = [
     password: "user123",
     userType: "USER",
     token: "mock-user-token-001",
+    balance: 1000.00,
   },
   {
     _id: "user002",
@@ -44,6 +45,7 @@ let users = [
     password: "jane123",
     userType: "USER",
     token: "mock-user-token-002",
+    balance: 1000.00,
   },
 ];
 
@@ -322,6 +324,7 @@ app.post("/register", (req, res) => {
     email,
     password,
     userType: userType || "USER",
+    balance: 1000.00,
     token: `mock-token-${uuidv4()}`,
   };
   users.push(newUser);
@@ -338,6 +341,37 @@ app.post("/login", (req, res) => {
   }
   const { password: _, ...safeUser } = user;
   res.json({ success: true, message: "Login successful", data: safeUser });
+});
+
+// GET /user/profile
+app.get("/user/profile", authMiddleware, (req, res) => {
+  const user = users.find((u) => u._id === req.user._id);
+  if (!user) {
+    return res.status(404).json({ success: false, message: "User not found" });
+  }
+  const { password, token, ...safeUser } = user;
+  console.log(`[INFO] User ${user._id} balance loaded: $${(user.balance || 0).toFixed(2)}`);
+  res.json({ success: true, data: safeUser });
+});
+
+// POST /user/topup
+app.post("/user/topup", authMiddleware, (req, res) => {
+  const { amount } = req.body;
+  const numericAmount = Number(amount);
+  if (amount === undefined || isNaN(numericAmount) || numericAmount <= 0) {
+    return res.status(400).json({ success: false, message: "Amount must be a positive number" });
+  }
+  const user = users.find((u) => u._id === req.user._id);
+  if (!user) {
+    return res.status(404).json({ success: false, message: "User not found" });
+  }
+  if (user.balance === undefined) {
+    user.balance = 1000.00;
+  }
+  user.balance += numericAmount;
+  const { password, token, ...safeUser } = user;
+  console.log(`[INFO] User ${user._id} topped up $${numericAmount.toFixed(2)}. New balance: $${user.balance.toFixed(2)}`);
+  res.json({ success: true, message: "Funds added successfully", data: safeUser });
 });
 
 // GET /products
@@ -486,7 +520,13 @@ app.get("/admin/order-status", adminMiddleware, (req, res) => {
   order.status = status;
   order.updatedAt = new Date().toISOString();
   if (status === "shipped") order.shippedOn = new Date().toISOString().split("T")[0];
-  if (status === "delivered") order.deliveredOn = new Date().toISOString().split("T")[0];
+  if (status === "delivered") {
+    order.deliveredOn = new Date().toISOString().split("T")[0];
+    if (order.payment_type === "cod") {
+      order.payment_status = "Paid";
+      console.log(`[FULFILLMENT] Order ${order._id} marked delivered. COD Payment status updated to Paid.`);
+    }
+  }
   res.json({ success: true, message: `Order status updated to ${status}`, data: order });
 });
 
@@ -502,6 +542,22 @@ app.post("/checkout", authMiddleware, (req, res) => {
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
   }
+
+  const orderAmount = amount || 0;
+  const payType = payment_type || "cod";
+
+  if (payType === "wallet") {
+    const user = users.find((u) => u._id === req.user._id);
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found" });
+    }
+    if (user.balance === undefined || user.balance < orderAmount) {
+      return res.status(400).json({ success: false, message: "Insufficient wallet balance" });
+    }
+    user.balance -= orderAmount;
+    console.log(`[TRANSACTION] User ${user._id} spent $${orderAmount.toFixed(2)} via In-App Wallet. Remaining balance: $${user.balance.toFixed(2)}`);
+  }
+
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
     return {
@@ -512,6 +568,9 @@ app.post("/checkout", authMiddleware, (req, res) => {
       quantity: item.quantity,
     };
   });
+
+  const payStatus = (payType && payType !== "cod") ? "Paid" : "Pending";
+
   const newOrder = {
     _id: uuidv4(),
     orderId: `ORD-${Date.now()}`,
@@ -521,9 +580,10 @@ app.post("/checkout", authMiddleware, (req, res) => {
       email: req.user.email,
     },
     items: orderItems,
-    amount: amount || 0,
+    amount: orderAmount,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
+    payment_type: payType,
+    payment_status: payStatus,
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",

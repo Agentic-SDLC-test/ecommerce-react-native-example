@@ -11,10 +11,13 @@ import { Ionicons } from "@expo/vector-icons";
 import OptionList from "../../components/OptionList/OptionList";
 import { colors } from "../../constants";
 import * as session from "../../utils/session";
+import * as api from "../../api";
 
 const UserProfileScreen = ({ navigation, route }) => {
   const [userInfo, setUserInfo] = useState({});
   const { user } = route.params;
+
+  const [walletBalance, setWalletBalance] = useState(0);
 
   const convertToJSON = (obj) => {
     try {
@@ -24,9 +27,32 @@ const UserProfileScreen = ({ navigation, route }) => {
     }
   };
 
-  // covert  the user to Json object on initial render
+  const fetchProfile = async () => {
+    try {
+      const response = await api.getUserProfile();
+      if (response.success && response.data) {
+        setWalletBalance(response.data.balance || 0);
+      }
+    } catch (e) {
+      console.log("Error fetching user profile", e);
+    }
+  };
+
+  const handleTopup = async () => {
+    try {
+      const response = await api.topup(100.00);
+      if (response.success && response.data) {
+        setWalletBalance(response.data.balance);
+      }
+    } catch (e) {
+      console.log("Error topping up wallet", e);
+    }
+  };
+
+  // covert  the user to Json object on initial render and fetch wallet balance
   useEffect(() => {
     convertToJSON(user);
+    fetchProfile();
   }, []);
   return (
     <View style={styles.container} testID="user-profile-screen">
@@ -61,6 +87,20 @@ const UserProfileScreen = ({ navigation, route }) => {
           iconName={"heart"}
           onPress={() => navigation.navigate("mywishlist", { user: userInfo })}
           testID="user-profile-wishlist-option"
+        />
+        <OptionList
+          text={`Wallet Balance: $${walletBalance.toFixed(2)}`}
+          Icon={Ionicons}
+          iconName={"wallet"}
+          onPress={() => {}}
+          testID="user-profile-wallet-balance"
+        />
+        <OptionList
+          text={"Top Up Wallet ($100)"}
+          Icon={Ionicons}
+          iconName={"add-circle"}
+          onPress={handleTopup}
+          testID="user-profile-topup-option"
         />
         {/* !For future use --- */}
         {/* <OptionList
