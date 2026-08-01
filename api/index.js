@@ -53,6 +53,13 @@ export const getUsers = () => get("/admin/users");
 // ---- Uploads ----
 export const uploadPhoto = (formData) => post("/photos/upload", formData);
 
+// ---- Reviews ----
+export const getProductReviews = (productId) => get(`/reviews?productId=${q(productId)}`);
+export const createProductReview = (payload) => post("/reviews", payload);
+export const updateProductReview = (id, payload) => post(`/update-review?id=${q(id)}`, payload);
+export const deleteProductReview = (id) => get(`/delete-review?id=${q(id)}`);
+export const toggleProductReviewVisibility = (id) => get(`/admin/toggle-review-visibility?id=${q(id)}`);
+
 // Re-export the base-URL resolver so screens can build image URLs through
 // the same seam that decides where the backend lives.
 export { getBaseUrl, imageUrl } from "./config";
