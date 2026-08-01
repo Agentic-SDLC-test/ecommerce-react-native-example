@@ -31,7 +31,7 @@ describe("Verified Purchaser Ratings and Reviews Unit Tests", () => {
     });
 
     it("deleteReview returns a function", () => {
-      expect(typeof api.deleteReview).toBe("function");
+      expect(typeof api.deleteReview).toBe("test");
     });
   });
 
