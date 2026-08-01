@@ -210,7 +210,8 @@ let orders = [
     ],
     amount: 129.97,
     discount: 0,
-    payment_type: "cod",
+    payment_type: "Cash on Delivery",
+    payment_status: "Pending",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -239,7 +240,8 @@ let orders = [
     ],
     amount: 24.99,
     discount: 0,
-    payment_type: "cod",
+    payment_type: "Cash on Delivery",
+    payment_status: "Pending",
     country: "Canada",
     city: "Vancouver",
     zipcode: "V6B 1A1",
@@ -269,7 +271,8 @@ let orders = [
     ],
     amount: 38.97,
     discount: 0,
-    payment_type: "cod",
+    payment_type: "Cash on Delivery",
+    payment_status: "Pending",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -281,6 +284,11 @@ let orders = [
     updatedAt: new Date("2024-01-12T16:00:00Z").toISOString(),
   },
 ];
+
+let userWallets = {
+  "user001": 500.00,
+  "user002": 500.00,
+};
 
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
 const authMiddleware = (req, res, next) => {
@@ -496,12 +504,55 @@ app.get("/orders", authMiddleware, (req, res) => {
   res.json({ success: true, data: userOrders });
 });
 
+// GET /wallet-balance
+app.get("/wallet-balance", authMiddleware, (req, res) => {
+  const userId = req.user._id;
+  if (userWallets[userId] === undefined) {
+    userWallets[userId] = 500.00;
+  }
+  res.json({ success: true, balance: userWallets[userId] });
+});
+
 // POST /checkout  (user: place order)
 app.post("/checkout", authMiddleware, (req, res) => {
-  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
+  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status, card_details } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
   }
+
+  // Card decline check
+  if (payment_type === "Card" || payment_type === "Debit/Credit Card") {
+    if (card_details) {
+      const cvv = card_details.cvv ? card_details.cvv.toString() : "";
+      const cardNumber = card_details.card_number ? card_details.card_number.toString() : "";
+      if (cvv === "999" || cardNumber.startsWith("4000")) {
+        return res.status(400).json({
+          success: false,
+          message: "Payment Declined: Invalid card or insufficient funds."
+        });
+      }
+    }
+  }
+
+  // Wallet validation & deduction
+  if (payment_type === "Wallet" || payment_type === "EasyBuy Wallet") {
+    const userId = req.user._id;
+    if (userWallets[userId] === undefined) {
+      userWallets[userId] = 500.00;
+    }
+    const currentBalance = userWallets[userId];
+    if (currentBalance < (amount || 0)) {
+      return res.status(400).json({
+        success: false,
+        message: "Payment Declined: Insufficient wallet balance."
+      });
+    }
+    userWallets[userId] = Number((currentBalance - (amount || 0)).toFixed(2));
+    console.log("Wallet balance updated for user: ", req.user._id, " remaining: ", userWallets[req.user._id]);
+  }
+
+  console.log("Payment processing initialized for type: ", payment_type || "Cash on Delivery");
+
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
     return {
@@ -512,6 +563,7 @@ app.post("/checkout", authMiddleware, (req, res) => {
       quantity: item.quantity,
     };
   });
+  const isDigital = payment_type === "Card" || payment_type === "Debit/Credit Card" || payment_type === "Wallet" || payment_type === "EasyBuy Wallet";
   const newOrder = {
     _id: uuidv4(),
     orderId: `ORD-${Date.now()}`,
@@ -523,7 +575,8 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
+    payment_type: payment_type || "Cash on Delivery",
+    payment_status: isDigital ? "Paid" : "Pending",
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",

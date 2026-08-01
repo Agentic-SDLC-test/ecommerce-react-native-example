@@ -6,6 +6,8 @@ import {
   Text,
   ScrollView,
   Modal,
+  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
@@ -34,6 +36,61 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
 
+  // Payment states
+  const [paymentType, setPaymentType] = useState("Cash on Delivery");
+  const [cardDetails, setCardDetails] = useState({
+    card_number: "",
+    cardholder_name: "",
+    expiry: "",
+    cvv: "",
+  });
+  const [walletVerified, setWalletVerified] = useState(false);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [walletLoading, setWalletLoading] = useState(false);
+  const [cardModalVisible, setCardModalVisible] = useState(false);
+
+  // States for CC input modal
+  const [cardNumberInput, setCardNumberInput] = useState("");
+  const [cardholderNameInput, setCardholderNameInput] = useState("");
+  const [cardExpiryInput, setCardExpiryInput] = useState("");
+  const [cardCvvInput, setCardCvvInput] = useState("");
+
+  const isCardValid =
+    cardDetails.card_number.length === 16 &&
+    /^(0[1-9]|1[0-2])\/[0-9]{2}$/.test(cardDetails.expiry) &&
+    cardDetails.cvv.length === 3 &&
+    cardDetails.cardholder_name.trim().length > 0;
+
+  const isAddressValid = country && city && streetAddress != "";
+  const isPaymentValid =
+    paymentType === "Cash on Delivery" ||
+    (paymentType === "Debit/Credit Card" && isCardValid) ||
+    (paymentType === "EasyBuy Wallet" && walletVerified);
+
+  const canSubmit = isAddressValid && isPaymentValid;
+
+  const handleWalletVerify = async () => {
+    setWalletLoading(true);
+    setTimeout(() => {
+      api.getWalletBalance()
+        .then((res) => {
+          if (res.success) {
+            setWalletBalance(res.balance);
+            setWalletVerified(true);
+          } else {
+            alert("Failed to fetch wallet balance.");
+          }
+        })
+        .catch((err) => {
+          console.log("Wallet fetch error", err);
+          alert("Error verifying wallet.");
+        })
+        .finally(() => {
+          setWalletLoading(false);
+        });
+    }, 800);
+  };
+
   //method to handle checkout
   const handleCheckout = async () => {
     setIsloading(true);
@@ -57,26 +114,33 @@ const CheckoutScreen = ({ navigation, route }) => {
         items: payload,
         amount: totalamount,
         discount: 0,
-        payment_type: "cod",
+        payment_type: paymentType,
         country: country,
         status: "pending",
         city: city,
         zipcode: zipcode,
         shippingAddress: streetAddress,
+        card_details: paymentType === "Debit/Credit Card" ? cardDetails : undefined,
       }) //API call
       .then((result) => {
         console.log("Checkout=>", result);
         if (result.success == true) {
           setIsloading(false);
           emptyCart("empty");
-          navigation.replace("orderconfirm");
+          navigation.replace("orderconfirm", {
+            amount: totalamount,
+            payment_type: paymentType,
+            payment_status: result.data ? result.data.payment_status : (paymentType === "Cash on Delivery" ? "Pending" : "Paid"),
+          });
         } else {
           setIsloading(false);
+          alert(result.message || "Failed to place order");
         }
       })
       .catch((error) => {
         setIsloading(false);
         console.log("error", error);
+        alert(error.message || "An error occurred during checkout");
       });
   };
 
@@ -188,21 +252,115 @@ const CheckoutScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
-        <View style={styles.listContainer}>
-          <View style={styles.list}>
-            <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
-          </View>
+        <View style={styles.paymentSelectionContainer}>
+          {/* COD Tab */}
+          <TouchableOpacity
+            testID="checkout-payment-cod"
+            style={[
+              styles.paymentTab,
+              paymentType === "Cash on Delivery" && styles.paymentTabSelected,
+            ]}
+            onPress={() => setPaymentType("Cash on Delivery")}
+          >
+            <View style={styles.paymentTabRow}>
+              <Ionicons
+                name={paymentType === "Cash on Delivery" ? "radio-button-on" : "radio-button-off"}
+                size={20}
+                color={paymentType === "Cash on Delivery" ? colors.primary : colors.muted}
+              />
+              <Text style={styles.paymentTabText}>Cash On Delivery (COD)</Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Card Tab */}
+          <TouchableOpacity
+            testID="checkout-payment-card"
+            style={[
+              styles.paymentTab,
+              paymentType === "Debit/Credit Card" && styles.paymentTabSelected,
+            ]}
+            onPress={() => {
+              setPaymentType("Debit/Credit Card");
+              setCardModalVisible(true);
+            }}
+          >
+            <View style={styles.paymentTabRow}>
+              <Ionicons
+                name={paymentType === "Debit/Credit Card" ? "radio-button-on" : "radio-button-off"}
+                size={20}
+                color={paymentType === "Debit/Credit Card" ? colors.primary : colors.muted}
+              />
+              <Text style={styles.paymentTabText}>Debit/Credit Card</Text>
+            </View>
+            {paymentType === "Debit/Credit Card" && isCardValid && (
+              <Text style={styles.paymentSubtext} testID="checkout-card-saved-indicator">
+                Card: **** **** **** {cardDetails.card_number.slice(-4)}
+              </Text>
+            )}
+            {paymentType === "Debit/Credit Card" && !isCardValid && (
+              <Text style={[styles.paymentSubtext, { color: "red" }]} testID="checkout-card-invalid-indicator">
+                Tap to complete card details
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Wallet Tab */}
+          <TouchableOpacity
+            testID="checkout-payment-wallet"
+            style={[
+              styles.paymentTab,
+              paymentType === "EasyBuy Wallet" && styles.paymentTabSelected,
+            ]}
+            onPress={() => {
+              setPaymentType("EasyBuy Wallet");
+            }}
+          >
+            <View style={styles.paymentTabRow}>
+              <Ionicons
+                name={paymentType === "EasyBuy Wallet" ? "radio-button-on" : "radio-button-off"}
+                size={20}
+                color={paymentType === "EasyBuy Wallet" ? colors.primary : colors.muted}
+              />
+              <Text style={styles.paymentTabText}>EasyBuy Wallet</Text>
+            </View>
+          </TouchableOpacity>
         </View>
+
+        {/* EasyBuy Wallet Widget */}
+        {paymentType === "EasyBuy Wallet" && (
+          <View style={styles.walletWidgetContainer} testID="checkout-wallet-widget">
+            <Text style={styles.walletBalanceText} testID="checkout-wallet-balance">
+              Wallet Balance: {walletVerified ? `${walletBalance}$` : "Not verified"}
+            </Text>
+            {walletVerified ? (
+              <View style={styles.walletVerifiedRow} testID="checkout-wallet-verified-indicator">
+                <Ionicons name="checkmark-circle" size={24} color="green" />
+                <Text style={styles.walletVerifiedText}>Wallet Pre-Authorized</Text>
+              </View>
+            ) : (
+              <TouchableOpacity
+                testID="wallet-verify-btn"
+                style={styles.walletVerifyBtn}
+                onPress={handleWalletVerify}
+                disabled={walletLoading}
+              >
+                {walletLoading ? (
+                  <ActivityIndicator color={colors.white} testID="wallet-loading-spinner" />
+                ) : (
+                  <Text style={styles.walletVerifyBtnText}>Verify & Pre-Authorize Wallet</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
 
         <View style={styles.emptyView}></View>
       </ScrollView>
       <View style={styles.buttomContainer}>
-        {country && city && streetAddress != "" ? (
+        {canSubmit ? (
           <CustomButton
             testID="checkout-submit-btn"
             text={"Submit Order"}
-            // onPress={() => navigation.replace("orderconfirm")}
             onPress={() => {
               handleCheckout();
             }}
@@ -265,6 +423,98 @@ const CheckoutScreen = ({ navigation, route }) => {
                 text={"close"}
               />
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Credit Card Modal Form */}
+      <Modal
+        testID="checkout-card-modal"
+        animationType="slide"
+        transparent={true}
+        visible={cardModalVisible}
+        onRequestClose={() => {
+          setCardModalVisible(false);
+        }}
+      >
+        <View style={styles.modelBody}>
+          <View style={styles.modelCardContainer}>
+            {/* Bold red warning banner */}
+            <View style={styles.warningBanner} testID="checkout-card-warning-banner">
+              <Text style={styles.warningText}>
+                THIS IS A SECURE DEMO ENVIRONMENT. Please DO NOT enter real credit card details. Use fake numbers for testing.
+              </Text>
+            </View>
+            <CustomInput
+              testID="checkout-card-name-input"
+              value={cardholderNameInput}
+              setValue={setCardholderNameInput}
+              placeholder={"Cardholder Name"}
+            />
+            <CustomInput
+              testID="checkout-card-number-input"
+              value={cardNumberInput}
+              setValue={setCardNumberInput}
+              placeholder={"Card Number (16 digits)"}
+              keyboardType={"number-pad"}
+            />
+            <CustomInput
+              testID="checkout-card-expiry-input"
+              value={cardExpiryInput}
+              setValue={setCardExpiryInput}
+              placeholder={"Expiry (MM/YY)"}
+            />
+            <CustomInput
+              testID="checkout-card-cvv-input"
+              value={cardCvvInput}
+              setValue={setCardCvvInput}
+              placeholder={"CVV (3 digits)"}
+              keyboardType={"number-pad"}
+            />
+            <View style={styles.modalButtonRow}>
+              <TouchableOpacity
+                testID="checkout-save-card-btn"
+                style={styles.modalSaveBtn}
+                onPress={() => {
+                  // Validate format
+                  const expiryRegex = /^(0[1-9]|1[0-2])\/[0-9]{2}$/;
+                  if (!cardholderNameInput.trim()) {
+                    alert("Please enter cardholder name.");
+                    return;
+                  }
+                  if (!/^\d{16}$/.test(cardNumberInput)) {
+                    alert("Card number must be exactly 16 digits.");
+                    return;
+                  }
+                  if (!expiryRegex.test(cardExpiryInput)) {
+                    alert("Expiry must be in MM/YY format.");
+                    return;
+                  }
+                  if (!/^\d{3}$/.test(cardCvvInput)) {
+                    alert("CVV must be exactly 3 digits.");
+                    return;
+                  }
+                  setCardDetails({
+                    card_number: cardNumberInput,
+                    cardholder_name: cardholderNameInput,
+                    expiry: cardExpiryInput,
+                    cvv: cardCvvInput,
+                  });
+                  setCardModalVisible(false);
+                }}
+              >
+                <Text style={styles.modalBtnText}>Save</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                testID="checkout-close-card-btn"
+                style={styles.modalCloseBtn}
+                onPress={() => {
+                  setCardModalVisible(false);
+                }}
+              >
+                <Text style={styles.modalBtnText}>Cancel</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -372,5 +622,120 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 20,
     elevation: 3,
+  },
+  paymentSelectionContainer: {
+    marginVertical: 10,
+  },
+  paymentTab: {
+    backgroundColor: colors.white,
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 10,
+    borderWidth: 2,
+    borderColor: colors.light,
+  },
+  paymentTabSelected: {
+    borderColor: colors.primary,
+  },
+  paymentTabRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  paymentTabText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    marginLeft: 10,
+    color: colors.dark,
+  },
+  paymentSubtext: {
+    fontSize: 13,
+    color: colors.muted,
+    marginTop: 5,
+    marginLeft: 30,
+  },
+  walletWidgetContainer: {
+    backgroundColor: colors.white,
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: colors.light,
+  },
+  walletBalanceText: {
+    fontSize: 15,
+    fontWeight: "bold",
+    marginBottom: 10,
+    color: colors.dark,
+  },
+  walletVerifiedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  walletVerifiedText: {
+    fontSize: 14,
+    fontWeight: "bold",
+    color: "green",
+    marginLeft: 5,
+  },
+  walletVerifyBtn: {
+    backgroundColor: colors.primary,
+    padding: 10,
+    borderRadius: 5,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  walletVerifyBtnText: {
+    color: colors.white,
+    fontWeight: "bold",
+    fontSize: 14,
+  },
+  modelCardContainer: {
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+    width: 320,
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    elevation: 3,
+  },
+  warningBanner: {
+    backgroundColor: "#ffebee",
+    borderColor: "#ef5350",
+    borderWidth: 1,
+    borderRadius: 5,
+    padding: 8,
+    marginBottom: 15,
+  },
+  warningText: {
+    color: "#c62828",
+    fontSize: 12,
+    fontWeight: "bold",
+    textAlign: "center",
+  },
+  modalButtonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    marginTop: 15,
+  },
+  modalSaveBtn: {
+    backgroundColor: colors.primary,
+    padding: 10,
+    borderRadius: 5,
+    width: "48%",
+    alignItems: "center",
+  },
+  modalCloseBtn: {
+    backgroundColor: colors.muted,
+    padding: 10,
+    borderRadius: 5,
+    width: "48%",
+    alignItems: "center",
+  },
+  modalBtnText: {
+    color: colors.white,
+    fontWeight: "bold",
   },
 });
