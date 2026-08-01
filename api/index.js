@@ -46,6 +46,20 @@ export const addToWishlist = (productId, quantity = 1) =>
 export const removeFromWishlist = (productId) =>
   get(`/remove-from-wishlist?id=${q(productId)}`);
 
+// ---- Reviews ----
+export const getReviews = (productId, star, sort) => {
+  let url = `/reviews?productId=${q(productId)}`;
+  if (star) url += `&star=${q(star)}`;
+  if (sort) url += `&sort=${q(sort)}`;
+  return get(url);
+};
+export const submitReview = (productId, payload) =>
+  post(`/reviews?productId=${q(productId)}`, payload);
+export const getAdminReviews = () => get("/admin/reviews");
+export const toggleReviewVisibility = (reviewId, visible) =>
+  post("/admin/reviews/visibility", { reviewId, visible });
+export const deleteReview = (id) => get(`/admin/reviews/delete?id=${q(id)}`);
+
 // ---- Admin ----
 export const getDashboard = () => get("/dashboard");
 export const getUsers = () => get("/admin/users");
