@@ -282,6 +282,135 @@ let orders = [
   },
 ];
 
+// ─── In-memory reviews store & helper functions ──────────────────────────────
+let reviews = [
+  {
+    _id: "rev001",
+    productId: "prod001",
+    user: {
+      _id: "user002",
+      name: "Jane Smith",
+      email: "jane@easybuy.com",
+    },
+    rating: 5,
+    comment: "Amazing quality, highly recommend!",
+    verified: true,
+    visible: true,
+    createdAt: "2026-07-30T10:00:00.000Z",
+    updatedAt: "2026-07-30T10:00:00.000Z",
+  },
+  {
+    _id: "rev002",
+    productId: "prod003",
+    user: {
+      _id: "user002",
+      name: "Jane Smith",
+      email: "jane@easybuy.com",
+    },
+    rating: 4,
+    comment: "Sound quality is top-notch, though the bass is a bit heavy.",
+    verified: true,
+    visible: true,
+    createdAt: "2026-07-31T11:00:00.000Z",
+    updatedAt: "2026-07-31T11:00:00.000Z",
+  },
+  {
+    _id: "rev003",
+    productId: "prod005",
+    user: {
+      _id: "user001",
+      name: "John Doe",
+      email: "user@easybuy.com",
+    },
+    rating: 3,
+    comment: "Good moisturizer, but a bit greasy for my skin type.",
+    verified: false,
+    visible: true,
+    createdAt: "2026-07-28T09:00:00.000Z",
+    updatedAt: "2026-07-28T09:00:00.000Z",
+  },
+  {
+    _id: "rev004",
+    productId: "prod001",
+    user: {
+      _id: "user001",
+      name: "John Doe",
+      email: "user@easybuy.com",
+    },
+    rating: 2,
+    comment: "The shirt shrunk after the first wash. Disappointed.",
+    verified: false,
+    visible: true,
+    createdAt: "2026-07-29T14:30:00.000Z",
+    updatedAt: "2026-07-29T14:30:00.000Z",
+  },
+  {
+    _id: "rev005",
+    productId: "prod001",
+    user: {
+      _id: "user001",
+      name: "John Doe",
+      email: "spam@bot.com",
+    },
+    rating: 1,
+    comment: "BUY CHEAP PHONES HERE!!! SPAM SPAM SPAM",
+    verified: false,
+    visible: false,
+    createdAt: "2026-07-31T15:00:00.000Z",
+    updatedAt: "2026-07-31T15:00:00.000Z",
+  },
+];
+
+const checkPurchaseVerification = (userId, productId) => {
+  return orders.some((order) => {
+    if (order.user._id !== userId) return false;
+    if (order.status !== "shipped" && order.status !== "delivered") return false;
+    return order.items.some((item) => {
+      if (item.productId && typeof item.productId === "object") {
+        return item.productId._id === productId;
+      }
+      return item.productId === productId;
+    });
+  });
+};
+
+const calculateRatingStats = (productId) => {
+  const visibleReviews = reviews.filter((r) => r.productId === productId && r.visible === true);
+  const totalReviews = visibleReviews.length;
+
+  const ratingDistribution = {
+    1: 0,
+    2: 0,
+    3: 0,
+    4: 0,
+    5: 0,
+  };
+
+  if (totalReviews === 0) {
+    return {
+      averageRating: 0.0,
+      totalReviews: 0,
+      ratingDistribution,
+    };
+  }
+
+  let sum = 0;
+  visibleReviews.forEach((r) => {
+    sum += r.rating;
+    if (ratingDistribution[r.rating] !== undefined) {
+      ratingDistribution[r.rating]++;
+    }
+  });
+
+  const averageRating = parseFloat((sum / totalReviews).toFixed(1));
+
+  return {
+    averageRating,
+    totalReviews,
+    ratingDistribution,
+  };
+};
+
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
 const authMiddleware = (req, res, next) => {
   const token = req.headers["x-auth-token"];
@@ -490,6 +619,170 @@ app.get("/admin/order-status", adminMiddleware, (req, res) => {
   res.json({ success: true, message: `Order status updated to ${status}`, data: order });
 });
 
+// GET /reviews
+app.get("/reviews", (req, res) => {
+  const { productId, star, sort } = req.query;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "Product ID is required" });
+  }
+
+  // Calculate stats first
+  const ratingStats = calculateRatingStats(productId);
+
+  // Get visible reviews for this product
+  let productReviews = reviews.filter((r) => r.productId === productId && r.visible === true);
+
+  // Apply star filter
+  if (star) {
+    const starNum = parseInt(star);
+    productReviews = productReviews.filter((r) => r.rating === starNum);
+  }
+
+  // Apply sorting
+  if (sort === "highest") {
+    productReviews.sort((a, b) => b.rating - a.rating);
+  } else if (sort === "lowest") {
+    productReviews.sort((a, b) => a.rating - b.rating);
+  } else {
+    // Default: newest first
+    productReviews.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  }
+
+  // Optional user verification
+  const token = req.headers["x-auth-token"];
+  let userHasPurchased = false;
+  let userReview = null;
+
+  if (token) {
+    const user = users.find((u) => u.token === token);
+    if (user) {
+      userHasPurchased = checkPurchaseVerification(user._id, productId);
+      const existingRev = reviews.find((r) => r.productId === productId && r.user._id === user._id);
+      if (existingRev) {
+        userReview = {
+          _id: existingRev._id,
+          productId: existingRev.productId,
+          rating: existingRev.rating,
+          comment: existingRev.comment,
+        };
+      }
+    }
+  }
+
+  res.json({
+    success: true,
+    ratingStats,
+    reviews: productReviews,
+    userHasPurchased,
+    userReview,
+  });
+});
+
+// POST /reviews
+app.post("/reviews", authMiddleware, (req, res) => {
+  const { productId } = req.query;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "Product ID is required" });
+  }
+
+  const { rating, comment } = req.body;
+  const ratingVal = parseInt(rating);
+  if (isNaN(ratingVal) || ratingVal < 1 || ratingVal > 5) {
+    return res.status(400).json({ success: false, message: "Rating must be an integer between 1 and 5" });
+  }
+
+  const commentStr = comment ? comment.toString().trim() : "";
+  if (commentStr.length > 1000) {
+    return res.status(400).json({ success: false, message: "Comment exceeds 1000 characters limit" });
+  }
+
+  const userHasPurchased = checkPurchaseVerification(req.user._id, productId);
+  if (!userHasPurchased) {
+    return res.status(403).json({ success: false, message: "Only verified purchasers of this product may submit a review." });
+  }
+
+  const existingIdx = reviews.findIndex((r) => r.productId === productId && r.user._id === req.user._id);
+  if (existingIdx !== -1) {
+    reviews[existingIdx].rating = ratingVal;
+    reviews[existingIdx].comment = commentStr;
+    reviews[existingIdx].updatedAt = new Date().toISOString();
+    console.log(`[INFO] Review updated for product ${productId} by user ${req.user._id} (Rating: ${ratingVal})`);
+    return res.json({
+      success: true,
+      message: "Review updated successfully",
+      data: reviews[existingIdx],
+    });
+  }
+
+  const newReview = {
+    _id: uuidv4(),
+    productId,
+    user: {
+      _id: req.user._id,
+      name: req.user.name,
+      email: req.user.email,
+    },
+    rating: ratingVal,
+    comment: commentStr,
+    verified: true,
+    visible: true,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+
+  reviews.push(newReview);
+  console.log(`[INFO] Review submitted for product ${productId} by user ${req.user._id} (Rating: ${ratingVal})`);
+  res.json({
+    success: true,
+    message: "Review submitted successfully",
+    data: newReview,
+  });
+});
+
+// GET /admin/reviews
+app.get("/admin/reviews", adminMiddleware, (req, res) => {
+  const adminReviews = reviews.map((review) => {
+    const product = products.find((p) => p._id === review.productId);
+    return {
+      ...review,
+      productTitle: product ? product.title : "Unknown Product",
+    };
+  });
+  res.json({ success: true, data: adminReviews });
+});
+
+// POST /admin/reviews/visibility
+app.post("/admin/reviews/visibility", adminMiddleware, (req, res) => {
+  const { reviewId, visible } = req.body;
+  const review = reviews.find((r) => r._id === reviewId);
+  if (!review) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+  review.visible = !!visible;
+  review.updatedAt = new Date().toISOString();
+  console.warn(`[WARN] Review visibility set to ${review.visible} for review ${reviewId} by admin ${req.user._id}`);
+  res.json({
+    success: true,
+    message: "Review visibility updated successfully",
+    data: {
+      _id: review._id,
+      visible: review.visible,
+    },
+  });
+});
+
+// GET /admin/reviews/delete
+app.get("/admin/reviews/delete", adminMiddleware, (req, res) => {
+  const { id } = req.query;
+  const idx = reviews.findIndex((r) => r._id === id);
+  if (idx === -1) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+  reviews.splice(idx, 1);
+  console.warn(`[WARN] Review deleted: ${id} by admin ${req.user._id}`);
+  res.json({ success: true, message: "Review deleted successfully" });
+});
+
 // GET /orders  (user: their own orders)
 app.get("/orders", authMiddleware, (req, res) => {
   const userOrders = orders.filter((o) => o.user._id === req.user._id);
@@ -612,8 +905,13 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   GET    /admin/orders         (admin)`);
   console.log(`   GET    /admin/users          (admin)`);
   console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
+  console.log(`   GET    /admin/reviews        (admin)`);
+  console.log(`   POST   /admin/reviews/visibility (admin)`);
+  console.log(`   GET    /admin/reviews/delete (admin)`);
   console.log(`   GET    /orders               (user)`);
   console.log(`   POST   /checkout             (user)`);
+  console.log(`   GET    /reviews`);
+  console.log(`   POST   /reviews              (user)`);
   console.log(`   GET    /delete-user?id=`);
   console.log(`   POST   /reset-password?id=`);
   console.log(`   POST   /photos/upload`);
