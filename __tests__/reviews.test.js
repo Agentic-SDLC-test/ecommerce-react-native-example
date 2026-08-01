@@ -19,7 +19,7 @@ describe("Verified Purchaser Ratings and Reviews Unit Tests", () => {
     });
 
     it("submitReview returns a function that takes productId and body", () => {
-      expect(typeof api.submitReview).toBe("test");
+      expect(typeof api.submitReview).toBe("function");
     });
 
     it("getAdminReviews returns a function", () => {

@@ -58,7 +58,7 @@ export const submitReview = (productId, payload) =>
 export const getAdminReviews = () => get("/admin/reviews");
 export const toggleReviewVisibility = (reviewId, visible) =>
   post("/admin/reviews/visibility", { reviewId, visible });
-const deleteReview = (id) => get(`/admin/reviews/delete?id=${q(id)}`);
+export const deleteReview = (id) => get(`/admin/reviews/delete?id=${q(id)}`);
 
 // ---- Admin ----
 export const getDashboard = () => get("/dashboard");
