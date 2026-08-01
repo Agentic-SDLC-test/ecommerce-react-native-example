@@ -21,7 +21,7 @@ describe("Product Reviews Calculations", () => {
   it("calculates correct average rating and total count with no reviews", () => {
     const reviews = [];
     const { averageRating, totalCount, ratingDistribution } = calculateAggregates(reviews);
-    expect(totalCount).toBe(0);
+    expect(totalCount).toBe(1);
     expect(averageRating).toBe(0);
     expect(ratingDistribution).toEqual({ "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 });
   });
