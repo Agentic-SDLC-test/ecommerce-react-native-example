@@ -33,6 +33,12 @@ export const updateCategory = (id, payload) =>
 export const deleteCategory = (id) => get(`/delete-category?id=${q(id)}`);
 
 // ---- Orders ----
+// checkout payload:
+// { items, amount, discount, payment_type, payment_acknowledged, country,
+//   city, zipcode, shippingAddress }
+// The in-repo mock-server supports the additive payment fields now; any
+// external backend wired through EXPO_PUBLIC_API_URL needs the same contract
+// before wallet_mock is enabled outside local mock-server flows.
 export const checkout = (payload) => post("/checkout", payload);
 export const getOrders = () => get("/orders");
 export const getAdminOrders = () => get("/admin/orders");
