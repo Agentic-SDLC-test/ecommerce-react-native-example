@@ -6,7 +6,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from "react-native";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { colors } from "../../constants";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
@@ -18,6 +18,14 @@ import {
   getPaymentStatusLabel,
   getPaymentTypeLabel,
 } from "../../utils/payment";
+import * as api from "../../api";
+
+export const canReviewOrderItem = (orderDetail, productId) => {
+  return (
+    orderDetail?.status === "delivered" &&
+    orderDetail?.items?.some((item) => item?.productId?._id === productId)
+  );
+};
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -28,6 +36,7 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
   const [totalCost, setTotalCost] = useState(0);
   const [address, setAddress] = useState("");
   const [value, setValue] = useState(null);
+  const [reviewStateByProduct, setReviewStateByProduct] = useState({});
   const labels = ["Processing", "Shipping", "Delivery"];
   const [trackingState, setTrackingState] = useState(1);
   const customStyles = {
@@ -80,6 +89,40 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
     return newDate;
   };
 
+  const fetchReviewStates = () => {
+    if (orderDetail?.status !== "delivered") {
+      setReviewStateByProduct({});
+      return;
+    }
+
+    Promise.all(
+      orderDetail?.items?.map((item) => api.getProductReviews(item?.productId?._id)) || []
+    )
+      .then((results) => {
+        const nextReviewState = {};
+        results.forEach((result, index) => {
+          if (result.success) {
+            const productId = orderDetail?.items?.[index]?.productId?._id;
+            nextReviewState[productId] = result.data?.viewer || {};
+          }
+        });
+        setReviewStateByProduct(nextReviewState);
+      })
+      .catch(() => {});
+  };
+
+  const handleReviewItem = (product) => {
+    const viewer = reviewStateByProduct[product?._id] || {};
+
+    navigation.navigate("revieweditor", {
+      product,
+      source: "myorderdetail",
+      existingReview: viewer.review || null,
+      reviewId: viewer.reviewId || null,
+      eligibleOrderId: viewer.eligibleOrderId || orderDetail?._id,
+    });
+  };
+
   useEffect(() => {
     setError("");
     setAlertType("error");
@@ -103,7 +146,14 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
     } else {
       setTrackingState(3);
     }
-  }, [orderDetail]);
+    fetchReviewStates();
+
+    const unsubscribe = navigation.addListener("focus", () => {
+      fetchReviewStates();
+    });
+
+    return unsubscribe;
+  }, [navigation, orderDetail]);
 
   return (
     <View style={styles.container} testID="my-order-detail-screen">
@@ -125,7 +175,9 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
       </View>
       <View style={styles.screenNameContainer}>
         <View>
-          <Text style={styles.screenNameText} testID="my-order-detail-heading">Order Detials</Text>
+          <Text style={styles.screenNameText} testID="my-order-detail-heading">
+            Order Detials
+          </Text>
         </View>
         <View>
           <Text style={styles.screenNameParagraph} testID="my-order-detail-subtitle">
@@ -141,30 +193,53 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
       >
         <View style={styles.containerNameContainer}>
           <View>
-            <Text style={styles.containerNameText} testID="my-order-detail-shipping-heading">Shipping Address</Text>
+            <Text
+              style={styles.containerNameText}
+              testID="my-order-detail-shipping-heading"
+            >
+              Shipping Address
+            </Text>
           </View>
         </View>
         <View style={styles.ShipingInfoContainer}>
-          <Text style={styles.secondarytextSm} testID="my-order-detail-address">{address}</Text>
-          <Text style={styles.secondarytextSm} testID="my-order-detail-zipcode">{orderDetail?.zipcode}</Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-address">
+            {address}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-zipcode">
+            {orderDetail?.zipcode}
+          </Text>
         </View>
         <View>
-          <Text style={styles.containerNameText} testID="my-order-detail-order-info-heading">Order Info</Text>
+          <Text
+            style={styles.containerNameText}
+            testID="my-order-detail-order-info-heading"
+          >
+            Order Info
+          </Text>
         </View>
         <View style={styles.orderInfoContainer}>
           <Text style={styles.secondarytextMedian} testID="my-order-detail-order-id">
             Order # {orderDetail?.orderId}
           </Text>
-          <Text style={styles.secondarytextSm} testID="my-order-detail-ordered-date">
+          <Text
+            style={styles.secondarytextSm}
+            testID="my-order-detail-ordered-date"
+          >
             Ordered on {dateFormat(orderDetail?.updatedAt)}
           </Text>
           {orderDetail?.shippedOn && (
-            <Text style={styles.secondarytextSm} testID="my-order-detail-shipped-date">
+            <Text
+              style={styles.secondarytextSm}
+              testID="my-order-detail-shipped-date"
+            >
               Shipped on {orderDetail?.shippedOn}
             </Text>
           )}
           {orderDetail?.deliveredOn && (
-            <Text style={styles.secondarytextSm} testID="my-order-detail-delivered-date">
+            <Text
+              style={styles.secondarytextSm}
+              testID="my-order-detail-delivered-date"
+            >
               Delivered on {orderDetail?.deliveredOn}
             </Text>
           )}
@@ -180,28 +255,50 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
         </View>
         <View style={styles.containerNameContainer}>
           <View>
-            <Text style={styles.containerNameText} testID="my-order-detail-payment-heading">Payment Info</Text>
+            <Text
+              style={styles.containerNameText}
+              testID="my-order-detail-payment-heading"
+            >
+              Payment Info
+            </Text>
           </View>
         </View>
         <View style={styles.paymentInfoContainer} testID="my-order-detail-payment-card">
-          <Text style={styles.secondarytextMedian} testID="my-order-detail-payment-type">
+          <Text
+            style={styles.secondarytextMedian}
+            testID="my-order-detail-payment-type"
+          >
             Method: {getPaymentTypeLabel(orderDetail?.payment_type)}
           </Text>
-          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-status">
+          <Text
+            style={styles.secondarytextSm}
+            testID="my-order-detail-payment-status"
+          >
             Payment: {getPaymentStatusLabel(orderDetail?.payment_status)}
           </Text>
           {orderDetail?.payment_reference ? (
-            <Text style={styles.secondarytextSm} testID="my-order-detail-payment-reference">
+            <Text
+              style={styles.secondarytextSm}
+              testID="my-order-detail-payment-reference"
+            >
               Reference: {orderDetail?.payment_reference}
             </Text>
           ) : null}
-          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-message">
+          <Text
+            style={styles.secondarytextSm}
+            testID="my-order-detail-payment-message"
+          >
             {getPaymentMessage(orderDetail)}
           </Text>
         </View>
         <View style={styles.containerNameContainer}>
           <View>
-            <Text style={styles.containerNameText} testID="my-order-detail-package-heading">Package Details</Text>
+            <Text
+              style={styles.containerNameText}
+              testID="my-order-detail-package-heading"
+            >
+              Package Details
+            </Text>
           </View>
         </View>
         <View style={styles.orderItemsContainer}>
@@ -210,7 +307,10 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
             <Text testID="my-order-detail-package-status">{value}</Text>
           </View>
           <View style={styles.orderItemContainer}>
-            <Text style={styles.orderItemText} testID="my-order-detail-package-date">
+            <Text
+              style={styles.orderItemText}
+              testID="my-order-detail-package-date"
+            >
               Order on : {orderDetail?.updatedAt}
             </Text>
           </View>
@@ -219,19 +319,40 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
             style={styles.orderSummaryContainer}
             nestedScrollEnabled={true}
           >
-            {orderDetail?.items.map((product, index) => (
-              <View key={index}>
-                <BasicProductList
-                  testID={`my-order-detail-product-${index}`}
-                  title={product?.productId?.title}
-                  price={product?.price}
-                  quantity={product?.quantity}
-                />
-              </View>
-            ))}
+            {orderDetail?.items.map((product, index) => {
+              const viewer = reviewStateByProduct[product?.productId?._id] || {};
+              const shouldShowReviewCta = canReviewOrderItem(
+                orderDetail,
+                product?.productId?._id
+              );
+
+              return (
+                <View key={index} style={styles.orderProductCard}>
+                  <BasicProductList
+                    testID={`my-order-detail-product-${index}`}
+                    title={product?.productId?.title}
+                    price={product?.price}
+                    quantity={product?.quantity}
+                  />
+                  {shouldShowReviewCta ? (
+                    <TouchableOpacity
+                      style={styles.reviewButton}
+                      onPress={() => handleReviewItem(product?.productId)}
+                      testID={`my-order-detail-review-btn-${index}`}
+                    >
+                      <Text style={styles.reviewButtonText}>
+                        {viewer?.hasExistingReview ? "Edit Review" : "Leave Review"}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              );
+            })}
           </ScrollView>
           <View style={styles.orderItemContainer}>
-            <Text style={styles.orderItemText} testID="my-order-detail-total-label">Total</Text>
+            <Text style={styles.orderItemText} testID="my-order-detail-total-label">
+              Total
+            </Text>
             <Text testID="my-order-detail-total-value">{totalCost}$</Text>
           </View>
         </View>
@@ -336,9 +457,25 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 10,
     padding: 10,
-    maxHeight: 220,
+    maxHeight: 280,
     width: "100%",
     marginBottom: 5,
+  },
+  orderProductCard: {
+    marginBottom: 10,
+  },
+  reviewButton: {
+    alignSelf: "flex-end",
+    marginTop: 6,
+    backgroundColor: colors.primary_light,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  reviewButtonText: {
+    color: colors.primary_shadow,
+    fontWeight: "bold",
+    fontSize: 12,
   },
   orderInfoContainer: {
     marginTop: 5,

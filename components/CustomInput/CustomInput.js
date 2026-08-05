@@ -13,6 +13,9 @@ const CustomInput = ({
   width = "100%",
   keyboardType,
   maxLength,
+  multiline = false,
+  numberOfLines,
+  textAlignVertical,
   testID,
 }) => {
   return (
@@ -28,6 +31,9 @@ const CustomInput = ({
         borderRadius={radius}
         maxLength={maxLength}
         keyboardType={keyboardType}
+        multiline={multiline}
+        numberOfLines={numberOfLines}
+        textAlignVertical={textAlignVertical}
         testID={testID}
       />
     </View>
@@ -38,7 +44,7 @@ export default CustomInput;
 
 const styles = StyleSheet.create({
   CustomInput: {
-    height: 40,
+    minHeight: 40,
     marginBottom: 10,
     marginTop: 10,
     width: "100%",

@@ -5,8 +5,9 @@ import {
   View,
   StatusBar,
   Text,
+  ScrollView,
 } from "react-native";
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import cartIcon from "../../assets/icons/cart_beg.png";
 import { colors, network } from "../../constants";
@@ -16,73 +17,123 @@ import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import * as api from "../../api";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import ReviewList from "../../components/ReviewList/ReviewList";
+import RatingBreakdown from "../../components/RatingBreakdown/RatingBreakdown";
+
+const EMPTY_SUMMARY = {
+  averageRating: 0,
+  totalReviewCount: 0,
+  ratingDistribution: {
+    1: 0,
+    2: 0,
+    3: 0,
+    4: 0,
+    5: 0,
+  },
+};
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
   const cartproduct = useSelector((state) => state.product);
   const dispatch = useDispatch();
-
   const { addCartItem } = bindActionCreators(actionCreaters, dispatch);
-
-  //method to add item to cart(redux)
-  const handleAddToCat = (item) => {
-    addCartItem(item);
-  };
 
   const [onWishlist, setOnWishlist] = useState(false);
   const [avaiableQuantity, setAvaiableQuantity] = useState(0);
   const [quantity, setQuantity] = useState(0);
-  const [productImage, SetProductImage] = useState(" ");
-  const [wishlistItems, setWishlistItems] = useState([]);
+  const [productImage, setProductImage] = useState(" ");
   const [error, setError] = useState("");
   const [isDisable, setIsDisbale] = useState(true);
   const [alertType, setAlertType] = useState("error");
+  const [reviewSummary, setReviewSummary] = useState(EMPTY_SUMMARY);
+  const [recentReviews, setRecentReviews] = useState([]);
+  const [viewer, setViewer] = useState({
+    canSubmit: false,
+    hasExistingReview: false,
+    reviewId: null,
+    eligibleOrderId: null,
+    reason: "login_required",
+    review: null,
+  });
+  const [reviewLoading, setReviewLoading] = useState(false);
 
-  //method to fetch wishlist from server using API call
+  const handleAddToCat = (item) => {
+    addCartItem(item);
+  };
+
   const fetchWishlist = async () => {
     api
       .getWishlist()
       .then((result) => {
         if (result.success) {
-          setWishlistItems(result.data[0].wishlist);
           setIsDisbale(false);
+          let foundOnWishlist = false;
 
-          //check if the current active product is already in wishlish or not
-          result.data[0].wishlist.map((item) => {
+          result.data[0].wishlist.forEach((item) => {
             if (item?.productId?._id === product?._id) {
-              setOnWishlist(true);
+              foundOnWishlist = true;
             }
           });
 
+          setOnWishlist(foundOnWishlist);
           setError("");
         }
       })
-      .catch((error) => {
-        setError(error.message);
-        console.log("error", error);
+      .catch((requestError) => {
+        setError(requestError.message);
       });
   };
 
-  //method to increase the product quantity
-  const handleIncreaseButton = (quantity) => {
-    if (avaiableQuantity > quantity) {
-      setQuantity(quantity + 1);
+  const fetchProductReviews = () => {
+    setReviewLoading(true);
+
+    api
+      .getProductReviews(product?._id)
+      .then((result) => {
+        if (result.success) {
+          setReviewSummary(result.data?.summary || EMPTY_SUMMARY);
+          setRecentReviews(result.data?.recentReviews || []);
+          setViewer(
+            result.data?.viewer || {
+              canSubmit: false,
+              hasExistingReview: false,
+              reviewId: null,
+              eligibleOrderId: null,
+              reason: "login_required",
+              review: null,
+            }
+          );
+          return;
+        }
+
+        setAlertType("error");
+        setError(result.message || "Unable to load reviews");
+      })
+      .catch((requestError) => {
+        setAlertType("error");
+        setError(requestError.message);
+      })
+      .finally(() => {
+        setReviewLoading(false);
+      });
+  };
+
+  const handleIncreaseButton = (currentQuantity) => {
+    if (avaiableQuantity > currentQuantity) {
+      setQuantity(currentQuantity + 1);
     }
   };
 
-  //method to decrease the product quantity
-  const handleDecreaseButton = (quantity) => {
-    if (quantity > 0) {
-      setQuantity(quantity - 1);
+  const handleDecreaseButton = (currentQuantity) => {
+    if (currentQuantity > 0) {
+      setQuantity(currentQuantity - 1);
     }
   };
 
-  //method to add or remove item from wishlist
   const handleWishlistBtn = async () => {
     setIsDisbale(true);
 
     if (onWishlist) {
-      //API call to remove a item in wishlish
       api
         .removeFromWishlist(product?._id)
         .then((result) => {
@@ -94,48 +145,71 @@ const ProductDetailScreen = ({ navigation, route }) => {
             setError(result.message);
             setAlertType("error");
           }
-          setOnWishlist(!onWishlist);
         })
-        .catch((error) => {
+        .catch((requestError) => {
           setAlertType("error");
-          console.log("error", error);
-        });
-      setIsDisbale(false);
-    } else {
-      //API call to add a item in wishlish
-      api
-        .addToWishlist(product?._id, 1)
-        .then((result) => {
-          console.log(result);
-          if (result.success) {
-            setError(result.message);
-            setAlertType("success");
-            setOnWishlist(true);
-          } else {
-            setError(result.message);
-            setAlertType("error");
-          }
-          setOnWishlist(!onWishlist);
+          setError(requestError.message);
         })
-        .catch((error) => {
-          setAlertType("error");
-          console.log("error", error);
+        .finally(() => {
+          setIsDisbale(false);
         });
-      setIsDisbale(false);
+      return;
     }
+
+    api
+      .addToWishlist(product?._id, 1)
+      .then((result) => {
+        if (result.success) {
+          setError(result.message);
+          setAlertType("success");
+          setOnWishlist(true);
+        } else {
+          setError(result.message);
+          setAlertType("error");
+        }
+      })
+      .catch((requestError) => {
+        setAlertType("error");
+        setError(requestError.message);
+      })
+      .finally(() => {
+        setIsDisbale(false);
+      });
   };
 
-  //set quantity, avaiableQuantity, product image and fetch wishlist on initial render
+  const handleReviewPress = () => {
+    navigation.navigate("revieweditor", {
+      product,
+      existingReview: viewer?.review || null,
+      reviewId: viewer?.reviewId || null,
+      eligibleOrderId: viewer?.eligibleOrderId || null,
+    });
+  };
+
+  const reviewActionLabel = viewer?.hasExistingReview ? "Edit Review" : "Write Review";
+  const reviewDisabledMessage = useMemo(() => {
+    if (viewer?.reason === "delivery_required") {
+      return "Reviews unlock after this product is delivered.";
+    }
+    if (viewer?.reason === "login_required") {
+      return "Sign in to write a review.";
+    }
+    return "";
+  }, [viewer]);
+
   useEffect(() => {
     setQuantity(0);
     setAvaiableQuantity(product.quantity);
-    SetProductImage(`${network.serverip}/uploads/${product?.image}`);
+    setProductImage(`${network.serverip}/uploads/${product?.image}`);
     fetchWishlist();
-  }, []);
+    fetchProductReviews();
 
-  //render whenever the value of wishlistItems change
-  useEffect(() => {}, [wishlistItems]);
+    const unsubscribe = navigation.addListener("focus", () => {
+      fetchProductReviews();
+    });
 
+    return unsubscribe;
+  }, [navigation, product?._id]);
   return (
     <View style={styles.container} testID="product-detail-screen">
       <StatusBar testID="product-detail-status-bar"></StatusBar>
@@ -160,24 +234,44 @@ const ProductDetailScreen = ({ navigation, route }) => {
           onPress={() => navigation.navigate("cart")}
         >
           {cartproduct.length > 0 ? (
-            <View style={styles.cartItemCountContainer} testID="product-detail-cart-badge">
-              <Text style={styles.cartItemCountText} testID="product-detail-cart-count">{cartproduct.length}</Text>
+            <View
+              style={styles.cartItemCountContainer}
+              testID="product-detail-cart-badge"
+            >
+              <Text
+                style={styles.cartItemCountText}
+                testID="product-detail-cart-count"
+              >
+                {cartproduct.length}
+              </Text>
             </View>
-          ) : (
-            <></>
-          )}
+          ) : null}
           <Image source={cartIcon} testID="product-detail-cart-icon" />
         </TouchableOpacity>
       </View>
       <View style={styles.bodyContainer}>
         <View style={styles.productImageContainer}>
-          <Image source={{ uri: productImage }} style={styles.productImage} testID="product-detail-image" />
+          <Image
+            source={{ uri: productImage }}
+            style={styles.productImage}
+            testID="product-detail-image"
+          />
         </View>
-        <CustomAlert message={error} type={alertType} testID="product-detail-alert" />
+        <CustomAlert
+          message={error}
+          type={alertType}
+          testID="product-detail-alert"
+        />
         <View style={styles.productInfoContainer}>
-          <View style={styles.productInfoTopContainer}>
+          <ScrollView
+            style={styles.productInfoScroll}
+            showsVerticalScrollIndicator={false}
+            testID="product-detail-scroll"
+          >
             <View style={styles.productNameContaier}>
-              <Text style={styles.productNameText} testID="product-detail-title">{product?.title}</Text>
+              <Text style={styles.productNameText} testID="product-detail-title">
+                {product?.title}
+              </Text>
             </View>
             <View style={styles.infoButtonContainer}>
               <View style={styles.wishlistButtonContainer}>
@@ -187,7 +281,7 @@ const ProductDetailScreen = ({ navigation, route }) => {
                   style={styles.iconContainer}
                   onPress={() => handleWishlistBtn()}
                 >
-                  {onWishlist == false ? (
+                  {onWishlist === false ? (
                     <Ionicons name="heart" size={25} color={colors.muted} />
                   ) : (
                     <Ionicons name="heart" size={25} color={colors.danger} />
@@ -196,19 +290,92 @@ const ProductDetailScreen = ({ navigation, route }) => {
               </View>
             </View>
             <View style={styles.productDetailContainer}>
-              <View style={styles.productSizeOptionContainer}>
-                {/* <Text style={styles.secondaryTextSm}>Size:</Text> */}
-              </View>
               <View style={styles.productPriceContainer}>
-                <Text style={styles.secondaryTextSm} testID="product-detail-price-label">Price:</Text>
-                <Text style={styles.primaryTextSm} testID="product-detail-price">{product?.price}$</Text>
+                <Text
+                  style={styles.secondaryTextSm}
+                  testID="product-detail-price-label"
+                >
+                  Price:
+                </Text>
+                <Text style={styles.primaryTextSm} testID="product-detail-price">
+                  {product?.price}$
+                </Text>
               </View>
             </View>
             <View style={styles.productDescriptionContainer}>
-              <Text style={styles.secondaryTextSm} testID="product-detail-description-label">Description:</Text>
+              <Text
+                style={styles.secondaryTextSm}
+                testID="product-detail-description-label"
+              >
+                Description:
+              </Text>
               <Text testID="product-detail-description">{product?.description}</Text>
             </View>
-          </View>
+            <View style={styles.reviewSection} testID="product-detail-review-section">
+              <Text style={styles.reviewHeading}>Ratings & Reviews</Text>
+              <View style={styles.reviewSummaryCard}>
+                <Text
+                  style={styles.averageRating}
+                  testID="product-detail-average-rating"
+                >
+                  {reviewSummary.averageRating.toFixed(1)}
+                </Text>
+                <Text
+                  style={styles.reviewCountText}
+                  testID="product-detail-review-count"
+                >
+                  {reviewSummary.totalReviewCount} visible review
+                  {reviewSummary.totalReviewCount === 1 ? "" : "s"}
+                </Text>
+                <RatingBreakdown
+                  ratingDistribution={reviewSummary.ratingDistribution}
+                  totalReviewCount={reviewSummary.totalReviewCount}
+                  testID="product-detail-rating-breakdown"
+                />
+              </View>
+              <View style={styles.reviewActionContainer}>
+                {viewer?.canSubmit || viewer?.hasExistingReview ? (
+                  <CustomButton
+                    text={reviewActionLabel}
+                    onPress={handleReviewPress}
+                    testID="product-detail-review-action-btn"
+                  />
+                ) : (
+                  <CustomButton
+                    text={"Write Review"}
+                    disabled={true}
+                    testID="product-detail-review-action-btn"
+                  />
+                )}
+                {reviewDisabledMessage ? (
+                  <Text
+                    style={styles.reviewDisabledMessage}
+                    testID="product-detail-review-disabled-message"
+                  >
+                    {reviewDisabledMessage}
+                  </Text>
+                ) : null}
+              </View>
+              {reviewLoading ? (
+                <Text style={styles.reviewEmptyState}>Loading reviews...</Text>
+              ) : recentReviews.length === 0 ? (
+                <Text
+                  style={styles.reviewEmptyState}
+                  testID="product-detail-review-empty-text"
+                >
+                  No reviews yet
+                </Text>
+              ) : (
+                recentReviews.map((review, index) => (
+                  <ReviewList
+                    key={review._id}
+                    review={review}
+                    testID={`product-detail-review-${index}`}
+                  />
+                ))
+              )}
+            </View>
+          </ScrollView>
           <View style={styles.productInfoBottomContainer}>
             <View style={styles.counterContainer}>
               <View style={styles.counter}>
@@ -219,9 +386,19 @@ const ProductDetailScreen = ({ navigation, route }) => {
                     handleDecreaseButton(quantity);
                   }}
                 >
-                  <Text style={styles.counterButtonText} testID="product-detail-decrease-text">-</Text>
+                  <Text
+                    style={styles.counterButtonText}
+                    testID="product-detail-decrease-text"
+                  >
+                    -
+                  </Text>
                 </TouchableOpacity>
-                <Text style={styles.counterCountText} testID="product-detail-quantity">{quantity}</Text>
+                <Text
+                  style={styles.counterCountText}
+                  testID="product-detail-quantity"
+                >
+                  {quantity}
+                </Text>
                 <TouchableOpacity
                   testID="product-detail-increase-btn"
                   style={styles.counterButtonContainer}
@@ -229,7 +406,12 @@ const ProductDetailScreen = ({ navigation, route }) => {
                     handleIncreaseButton(quantity);
                   }}
                 >
-                  <Text style={styles.counterButtonText} testID="product-detail-increase-text">+</Text>
+                  <Text
+                    style={styles.counterButtonText}
+                    testID="product-detail-increase-text"
+                  >
+                    +
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -243,7 +425,11 @@ const ProductDetailScreen = ({ navigation, route }) => {
                   }}
                 />
               ) : (
-                <CustomButton testID="product-detail-out-of-stock-btn" text={"Out of Stock"} disabled={true} />
+                <CustomButton
+                  testID="product-detail-out-of-stock-btn"
+                  text={"Out of Stock"}
+                  disabled={true}
+                />
               )}
             </View>
           </View>
@@ -272,10 +458,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     padding: 20,
   },
-  toBarText: {
-    fontSize: 15,
-    fontWeight: "600",
-  },
   bodyContainer: {
     width: "100%",
     flexDirecion: "row",
@@ -299,25 +481,19 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
-    flexDirection: "column",
-    justifyContent: "flex-end",
+    justifyContent: "space-between",
     alignItems: "center",
     elevation: 25,
+    overflow: "hidden",
+  },
+  productInfoScroll: {
+    width: "100%",
+    flex: 1,
   },
   productImage: {
     height: 300,
     width: 300,
     resizeMode: "contain",
-  },
-  productInfoTopContainer: {
-    marginTop: 20,
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    justifyContent: "flex-start",
-    height: "100%",
-    width: "100%",
-    flex: 1,
   },
   productInfoBottomContainer: {
     display: "flex",
@@ -326,7 +502,7 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     backgroundColor: colors.light,
     width: "100%",
-    height: 140,
+    minHeight: 140,
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
   },
@@ -336,7 +512,7 @@ const styles = StyleSheet.create({
     paddingRight: 40,
     backgroundColor: colors.white,
     width: "100%",
-    height: 100,
+    minHeight: 100,
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
     display: "flex",
@@ -345,13 +521,9 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   productNameContaier: {
-    padding: 5,
-    paddingLeft: 20,
-    display: "flex",
+    paddingTop: 20,
+    paddingHorizontal: 20,
     width: "100%",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "flex-start",
   },
   productNameText: {
     fontSize: 20,
@@ -377,26 +549,20 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 10,
   },
   productDetailContainer: {
-    padding: 5,
-    paddingLeft: 20,
-    paddingRight: 20,
-    display: "flex",
+    paddingHorizontal: 20,
     width: "100%",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    elevation: 5,
   },
   secondaryTextSm: { fontSize: 15, fontWeight: "bold" },
   primaryTextSm: { color: colors.primary, fontSize: 15, fontWeight: "bold" },
   productDescriptionContainer: {
-    display: "flex",
     width: "100%",
-    flexDirection: "column",
     alignItems: "flex-start",
     justifyContent: "center",
-    paddingLeft: 20,
-    paddingRight: 20,
+    paddingHorizontal: 20,
+    marginTop: 10,
   },
   iconContainer: {
     display: "flex",
@@ -465,5 +631,45 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: "bold",
     fontSize: 10,
+  },
+  reviewSection: {
+    width: "100%",
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+  },
+  reviewHeading: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: colors.dark,
+  },
+  reviewSummaryCard: {
+    width: "100%",
+    backgroundColor: colors.light,
+    borderRadius: 14,
+    padding: 16,
+    marginTop: 12,
+  },
+  averageRating: {
+    fontSize: 32,
+    fontWeight: "bold",
+    color: colors.primary,
+  },
+  reviewCountText: {
+    marginTop: 4,
+    color: colors.muted,
+    fontSize: 13,
+  },
+  reviewActionContainer: {
+    marginTop: 12,
+  },
+  reviewDisabledMessage: {
+    marginTop: 6,
+    color: colors.muted,
+    fontSize: 12,
+  },
+  reviewEmptyState: {
+    marginTop: 12,
+    color: colors.muted,
+    fontStyle: "italic",
   },
 });

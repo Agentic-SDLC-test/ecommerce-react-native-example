@@ -1,0 +1,83 @@
+{
+  "app_type": "monorepo",
+  "ui": "react",
+  "overview": "EasyBuy is an Expo-based React Native ecommerce client with user and admin flows, backed in-repo by an Express mock API that serves catalog, checkout, order, user, category, upload, and dashboard endpoints.",
+  "domain_models": [
+    {
+      "name": "User",
+      "definition": "Authenticated person persisted in secure storage and identified as either USER or ADMIN for route and API authorization."
+    },
+    {
+      "name": "Session",
+      "definition": "Stored auth state containing the signed-in user and x-auth-token, reused by navigation guards and every authenticated API request."
+    },
+    {
+      "name": "Category",
+      "definition": "Top-level merchandising grouping with title, description, and icon metadata used by both the storefront and admin CRUD screens."
+    },
+    {
+      "name": "Product",
+      "definition": "Sellable catalog item with title, SKU, price, quantity, description, image, and category reference."
+    },
+    {
+      "name": "CartItem",
+      "definition": "Redux-managed selected product plus quantity, used to build checkout totals and payloads."
+    },
+    {
+      "name": "Order",
+      "definition": "Placed purchase containing purchaser identity, line items, address fields, delivery status, timestamps, and derived payment metadata."
+    },
+    {
+      "name": "Payment",
+      "definition": "Checkout payment contract encoded by payment_type, payment_status, payment_reference, payment_message, and wallet acknowledgement rules."
+    },
+    {
+      "name": "WishlistEntry",
+      "definition": "Saved product association exposed through wishlist endpoints and profile screens for later purchase consideration."
+    },
+    {
+      "name": "DashboardMetric",
+      "definition": "Admin aggregate count of users, orders, products, and categories used to power the dashboard cards."
+    },
+    {
+      "name": "UploadedPhoto",
+      "definition": "Product or category image uploaded to the mock server and later resolved through the shared image URL seam."
+    }
+  ],
+  "applications": [
+    {
+      "name": "easybuy-mobile-app",
+      "path": ".",
+      "app_type": "mobile",
+      "ui": "react",
+      "runtime": "expo-react-native",
+      "domain_ownership": [
+        "User",
+        "Session",
+        "Category",
+        "Product",
+        "CartItem",
+        "Order",
+        "Payment",
+        "WishlistEntry"
+      ]
+    },
+    {
+      "name": "easybuy-mock-server",
+      "path": "mock-server",
+      "app_type": "api",
+      "ui": null,
+      "runtime": "node-express",
+      "domain_ownership": [
+        "User",
+        "Category",
+        "Product",
+        "Order",
+        "Payment",
+        "DashboardMetric",
+        "UploadedPhoto",
+        "WishlistEntry"
+      ]
+    }
+  ]
+}
