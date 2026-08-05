@@ -15,6 +15,11 @@ import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import CustomButton from "../../components/CustomButton";
 import DropDownPicker from "react-native-dropdown-picker";
+import {
+  formatPaymentMethod,
+  formatPaymentStatus,
+  getPaymentMessage,
+} from "../../utils/payment";
 
 const ViewOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -107,6 +112,40 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
       }, 0) // calculate the total cost
     );
   }, []);
+
+  const renderPaymentBlock = () => {
+    const paymentType = orderDetail?.payment_type || "cod";
+    const paymentStatus = orderDetail?.payment_status || "awaiting_payment";
+
+    return (
+      <View style={styles.paymentContainer} testID="view-order-detail-payment-block">
+        <Text
+          style={styles.containerNameText}
+          testID="view-order-detail-payment-heading"
+        >
+          Payment Summary
+        </Text>
+        <Text
+          style={styles.secondarytextSm}
+          testID="view-order-detail-payment-method"
+        >
+          Method: {formatPaymentMethod(paymentType)}
+        </Text>
+        <Text
+          style={styles.secondarytextSm}
+          testID="view-order-detail-payment-status"
+        >
+          Status: {formatPaymentStatus(paymentType, paymentStatus)}
+        </Text>
+        <Text
+          style={styles.secondarytextSm}
+          testID="view-order-detail-payment-message"
+        >
+          {getPaymentMessage(paymentType, paymentStatus)}
+        </Text>
+      </View>
+    );
+  };
   return (
     <View style={styles.container} testID="view-order-detail-screen">
       <ProgressDialog visible={isloading} label={label} />
@@ -177,6 +216,7 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
             </Text>
           )}
         </View>
+        {renderPaymentBlock()}
         <View style={styles.containerNameContainer}>
           <View>
             <Text style={styles.containerNameText} testID="view-order-detail-package-heading">Package Details</Text>
@@ -331,6 +371,16 @@ const styles = StyleSheet.create({
     borderColor: colors.muted,
     elevation: 3,
     marginBottom: 10,
+  },
+  paymentContainer: {
+    marginTop: 5,
+    backgroundColor: colors.white,
+    padding: 10,
+    borderRadius: 10,
+    borderColor: colors.muted,
+    elevation: 2,
+    marginBottom: 10,
+    width: "100%",
   },
   orderItemContainer: {
     width: "100%",

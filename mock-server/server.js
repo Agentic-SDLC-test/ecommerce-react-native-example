@@ -47,6 +47,64 @@ let users = [
   },
 ];
 
+const VALID_PAYMENT_TYPES = ["cod", "wallet_mock"];
+const VALID_PAYMENT_STATUSES = ["awaiting_payment", "paid", "failed"];
+
+const logPaymentValidationFailure = ({
+  userId,
+  payment_type,
+  payment_status,
+  reason,
+}) => {
+  // metric: checkout_payment_validation_failures_total{reason}
+  console.warn("checkout_payment_validation_failed", {
+    userId,
+    payment_type,
+    payment_status,
+    reason,
+    timestamp: new Date().toISOString(),
+  });
+};
+
+const validatePaymentSelection = (paymentType, paymentStatus, userId) => {
+  if (!VALID_PAYMENT_TYPES.includes(paymentType)) {
+    logPaymentValidationFailure({
+      userId,
+      payment_type: paymentType,
+      payment_status: paymentStatus,
+      reason: "unsupported_payment_type",
+    });
+    throw new Error("Unsupported payment type");
+  }
+
+  if (!VALID_PAYMENT_STATUSES.includes(paymentStatus)) {
+    logPaymentValidationFailure({
+      userId,
+      payment_type: paymentType,
+      payment_status: paymentStatus,
+      reason: "unsupported_payment_status",
+    });
+    throw new Error("Unsupported payment status");
+  }
+
+  if (paymentType === "cod" && paymentStatus !== "awaiting_payment") {
+    logPaymentValidationFailure({
+      userId,
+      payment_type: paymentType,
+      payment_status: paymentStatus,
+      reason: "invalid_cod_payment_status",
+    });
+    throw new Error("Cash on Delivery orders must use awaiting_payment status");
+  }
+};
+
+const buildOrderPaymentFields = (body = {}) => {
+  return {
+    payment_type: body.payment_type || "cod",
+    payment_status: body.payment_status || "awaiting_payment",
+  };
+};
+
 let categories = [
   {
     _id: "62fe244f58f7aa8230817f89",
@@ -211,6 +269,7 @@ let orders = [
     amount: 129.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "awaiting_payment",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -240,6 +299,7 @@ let orders = [
     amount: 24.99,
     discount: 0,
     payment_type: "cod",
+    payment_status: "awaiting_payment",
     country: "Canada",
     city: "Vancouver",
     zipcode: "V6B 1A1",
@@ -270,6 +330,7 @@ let orders = [
     amount: 38.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "awaiting_payment",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -498,9 +559,28 @@ app.get("/orders", authMiddleware, (req, res) => {
 
 // POST /checkout  (user: place order)
 app.post("/checkout", authMiddleware, (req, res) => {
-  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
+  const {
+    items,
+    amount,
+    discount,
+    country,
+    city,
+    zipcode,
+    shippingAddress,
+    status,
+  } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
+  }
+  const paymentFields = buildOrderPaymentFields(req.body);
+  try {
+    validatePaymentSelection(
+      paymentFields.payment_type,
+      paymentFields.payment_status,
+      req.user._id
+    );
+  } catch (error) {
+    return res.status(400).json({ success: false, message: error.message });
   }
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
@@ -523,7 +603,8 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
+    payment_type: paymentFields.payment_type,
+    payment_status: paymentFields.payment_status,
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",
@@ -533,6 +614,15 @@ app.post("/checkout", authMiddleware, (req, res) => {
     updatedAt: new Date().toISOString(),
   };
   orders.push(newOrder);
+  // metric: checkout_orders_total{payment_type,payment_status}
+  console.info("checkout_order_created", {
+    orderId: newOrder.orderId,
+    userId: req.user._id,
+    payment_type: newOrder.payment_type,
+    payment_status: newOrder.payment_status,
+    shipping_status: newOrder.status,
+    createdAt: newOrder.createdAt,
+  });
   res.json({ success: true, message: "Order placed successfully", data: newOrder });
 });
 
@@ -594,36 +684,49 @@ app.get("/uploads/:filename", (req, res) => {
   res.send(svg);
 });
 
-// ─── Start server ─────────────────────────────────────────────────────────────
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`\n🚀 EasyBuy Mock Server running at http://localhost:${PORT}`);
-  console.log(`\n📋 Available endpoints:`);
-  console.log(`   POST   /register`);
-  console.log(`   POST   /login`);
-  console.log(`   GET    /products`);
-  console.log(`   POST   /product              (admin)`);
-  console.log(`   POST   /update-product?id=   (admin)`);
-  console.log(`   GET    /delete-product?id=   (admin)`);
-  console.log(`   GET    /categories`);
-  console.log(`   POST   /category             (admin)`);
-  console.log(`   POST   /update-category?id=  (admin)`);
-  console.log(`   GET    /delete-category?id=  (admin)`);
-  console.log(`   GET    /dashboard            (admin)`);
-  console.log(`   GET    /admin/orders         (admin)`);
-  console.log(`   GET    /admin/users          (admin)`);
-  console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
-  console.log(`   GET    /orders               (user)`);
-  console.log(`   POST   /checkout             (user)`);
-  console.log(`   GET    /delete-user?id=`);
-  console.log(`   POST   /reset-password?id=`);
-  console.log(`   POST   /photos/upload`);
-  console.log(`   GET    /uploads/:filename`);
-  console.log(`\n🔑 Test tokens:`);
-  console.log(`   Admin token : mock-admin-token-001`);
-  console.log(`   User token  : mock-user-token-001`);
-  console.log(`\n👤 Test credentials:`);
-  console.log(`   Admin  → email: admin@easybuy.com  | password: admin123`);
-  console.log(`   User   → email: user@easybuy.com   | password: user123\n`);
-});
+const startServer = (port = PORT) =>
+  app.listen(port, "0.0.0.0", () => {
+    console.log(`\n🚀 EasyBuy Mock Server running at http://localhost:${port}`);
+    console.log(`\n📋 Available endpoints:`);
+    console.log(`   POST   /register`);
+    console.log(`   POST   /login`);
+    console.log(`   GET    /products`);
+    console.log(`   POST   /product              (admin)`);
+    console.log(`   POST   /update-product?id=   (admin)`);
+    console.log(`   GET    /delete-product?id=   (admin)`);
+    console.log(`   GET    /categories`);
+    console.log(`   POST   /category             (admin)`);
+    console.log(`   POST   /update-category?id=  (admin)`);
+    console.log(`   GET    /delete-category?id=  (admin)`);
+    console.log(`   GET    /dashboard            (admin)`);
+    console.log(`   GET    /admin/orders         (admin)`);
+    console.log(`   GET    /admin/users          (admin)`);
+    console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
+    console.log(`   GET    /orders               (user)`);
+    console.log(`   POST   /checkout             (user)`);
+    console.log(`   GET    /delete-user?id=`);
+    console.log(`   POST   /reset-password?id=`);
+    console.log(`   POST   /photos/upload`);
+    console.log(`   GET    /uploads/:filename`);
+    console.log(`\n🔑 Test tokens:`);
+    console.log(`   Admin token : mock-admin-token-001`);
+    console.log(`   User token  : mock-user-token-001`);
+    console.log(`\n👤 Test credentials:`);
+    console.log(`   Admin  → email: admin@easybuy.com  | password: admin123`);
+    console.log(`   User   → email: user@easybuy.com   | password: user123\n`);
+  });
+
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = {
+  app,
+  buildOrderPaymentFields,
+  startServer,
+  validatePaymentSelection,
+  VALID_PAYMENT_STATUSES,
+  VALID_PAYMENT_TYPES,
+};
 
 // Made with Bob
