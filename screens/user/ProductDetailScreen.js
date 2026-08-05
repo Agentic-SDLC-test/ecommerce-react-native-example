@@ -5,6 +5,7 @@ import {
   View,
   StatusBar,
   Text,
+  ScrollView,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,7 +16,13 @@ import { useSelector, useDispatch } from "react-redux";
 import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import * as api from "../../api";
+import * as session from "../../utils/session";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import {
+  ReviewSummary,
+  ReviewForm,
+  REVIEWS_ENABLED,
+} from "../../components/Reviews";
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -24,7 +31,6 @@ const ProductDetailScreen = ({ navigation, route }) => {
 
   const { addCartItem } = bindActionCreators(actionCreaters, dispatch);
 
-  //method to add item to cart(redux)
   const handleAddToCat = (item) => {
     addCartItem(item);
   };
@@ -38,7 +44,12 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const [isDisable, setIsDisbale] = useState(true);
   const [alertType, setAlertType] = useState("error");
 
-  //method to fetch wishlist from server using API call
+  const [reviewSummary, setReviewSummary] = useState(null);
+  const [myReview, setMyReview] = useState(null);
+  const [canReview, setCanReview] = useState(false);
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewSubmitting, setReviewSubmitting] = useState(false);
+
   const fetchWishlist = async () => {
     api
       .getWishlist()
@@ -47,7 +58,6 @@ const ProductDetailScreen = ({ navigation, route }) => {
           setWishlistItems(result.data[0].wishlist);
           setIsDisbale(false);
 
-          //check if the current active product is already in wishlish or not
           result.data[0].wishlist.map((item) => {
             if (item?.productId?._id === product?._id) {
               setOnWishlist(true);
@@ -57,32 +67,86 @@ const ProductDetailScreen = ({ navigation, route }) => {
           setError("");
         }
       })
-      .catch((error) => {
-        setError(error.message);
-        console.log("error", error);
+      .catch((err) => {
+        setError(err.message);
+        console.log("error", err);
       });
   };
 
-  //method to increase the product quantity
-  const handleIncreaseButton = (quantity) => {
-    if (avaiableQuantity > quantity) {
-      setQuantity(quantity + 1);
+  const fetchReviewSummary = async () => {
+    if (!REVIEWS_ENABLED) return;
+    setReviewLoading(true);
+    try {
+      const result = await api.getProductReviews(product._id);
+      if (result.success) {
+        setReviewSummary(result.data);
+      } else {
+        console.error("review_summary_failed", { productId: product._id, message: result.message });
+      }
+    } catch (err) {
+      console.error("review_summary_failed", { productId: product._id, message: err.message });
+    } finally {
+      setReviewLoading(false);
     }
   };
 
-  //method to decrease the product quantity
-  const handleDecreaseButton = (quantity) => {
-    if (quantity > 0) {
-      setQuantity(quantity - 1);
+  const fetchMyReviewEligibility = async () => {
+    if (!REVIEWS_ENABLED) return;
+    const user = await session.getUser();
+    if (!user || user.userType === "ADMIN") {
+      setCanReview(false);
+      setMyReview(null);
+      return;
+    }
+    try {
+      const result = await api.getMyReview(product._id);
+      if (result.success) {
+        setCanReview(result.data.canReview);
+        setMyReview(result.data.review);
+      }
+    } catch (err) {
+      console.error("review_eligibility_failed", { productId: product._id, message: err.message });
     }
   };
 
-  //method to add or remove item from wishlist
+  const handleSubmitReview = async (rating, body) => {
+    setReviewSubmitting(true);
+    try {
+      const result = await api.upsertReview(product._id, { rating, body });
+      if (result.success) {
+        setError(result.message);
+        setAlertType("success");
+        setMyReview(result.data);
+        await fetchReviewSummary();
+      } else {
+        setError(result.message);
+        setAlertType("error");
+      }
+    } catch (err) {
+      console.error("review_submit_failed", { productId: product._id, message: err.message });
+      setError(err.message);
+      setAlertType("error");
+    } finally {
+      setReviewSubmitting(false);
+    }
+  };
+
+  const handleIncreaseButton = (qty) => {
+    if (avaiableQuantity > qty) {
+      setQuantity(qty + 1);
+    }
+  };
+
+  const handleDecreaseButton = (qty) => {
+    if (qty > 0) {
+      setQuantity(qty - 1);
+    }
+  };
+
   const handleWishlistBtn = async () => {
     setIsDisbale(true);
 
     if (onWishlist) {
-      //API call to remove a item in wishlish
       api
         .removeFromWishlist(product?._id)
         .then((result) => {
@@ -96,17 +160,15 @@ const ProductDetailScreen = ({ navigation, route }) => {
           }
           setOnWishlist(!onWishlist);
         })
-        .catch((error) => {
+        .catch((err) => {
           setAlertType("error");
-          console.log("error", error);
+          console.log("error", err);
         });
       setIsDisbale(false);
     } else {
-      //API call to add a item in wishlish
       api
         .addToWishlist(product?._id, 1)
         .then((result) => {
-          console.log(result);
           if (result.success) {
             setError(result.message);
             setAlertType("success");
@@ -117,23 +179,23 @@ const ProductDetailScreen = ({ navigation, route }) => {
           }
           setOnWishlist(!onWishlist);
         })
-        .catch((error) => {
+        .catch((err) => {
           setAlertType("error");
-          console.log("error", error);
+          console.log("error", err);
         });
       setIsDisbale(false);
     }
   };
 
-  //set quantity, avaiableQuantity, product image and fetch wishlist on initial render
   useEffect(() => {
     setQuantity(0);
     setAvaiableQuantity(product.quantity);
     SetProductImage(`${network.serverip}/uploads/${product?.image}`);
     fetchWishlist();
+    fetchReviewSummary();
+    fetchMyReviewEligibility();
   }, []);
 
-  //render whenever the value of wishlistItems change
   useEffect(() => {}, [wishlistItems]);
 
   return (
@@ -169,86 +231,99 @@ const ProductDetailScreen = ({ navigation, route }) => {
           <Image source={cartIcon} testID="product-detail-cart-icon" />
         </TouchableOpacity>
       </View>
-      <View style={styles.bodyContainer}>
-        <View style={styles.productImageContainer}>
-          <Image source={{ uri: productImage }} style={styles.productImage} testID="product-detail-image" />
-        </View>
-        <CustomAlert message={error} type={alertType} testID="product-detail-alert" />
-        <View style={styles.productInfoContainer}>
-          <View style={styles.productInfoTopContainer}>
-            <View style={styles.productNameContaier}>
-              <Text style={styles.productNameText} testID="product-detail-title">{product?.title}</Text>
-            </View>
-            <View style={styles.infoButtonContainer}>
-              <View style={styles.wishlistButtonContainer}>
-                <TouchableOpacity
-                  testID="product-detail-wishlist-btn"
-                  disabled={isDisable}
-                  style={styles.iconContainer}
-                  onPress={() => handleWishlistBtn()}
-                >
-                  {onWishlist == false ? (
-                    <Ionicons name="heart" size={25} color={colors.muted} />
-                  ) : (
-                    <Ionicons name="heart" size={25} color={colors.danger} />
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-            <View style={styles.productDetailContainer}>
-              <View style={styles.productSizeOptionContainer}>
-                {/* <Text style={styles.secondaryTextSm}>Size:</Text> */}
-              </View>
-              <View style={styles.productPriceContainer}>
-                <Text style={styles.secondaryTextSm} testID="product-detail-price-label">Price:</Text>
-                <Text style={styles.primaryTextSm} testID="product-detail-price">{product?.price}$</Text>
-              </View>
-            </View>
-            <View style={styles.productDescriptionContainer}>
-              <Text style={styles.secondaryTextSm} testID="product-detail-description-label">Description:</Text>
-              <Text testID="product-detail-description">{product?.description}</Text>
-            </View>
+      <ScrollView style={styles.scrollContainer} testID="product-detail-scroll">
+        <View style={styles.bodyContainer}>
+          <View style={styles.productImageContainer}>
+            <Image source={{ uri: productImage }} style={styles.productImage} testID="product-detail-image" />
           </View>
-          <View style={styles.productInfoBottomContainer}>
-            <View style={styles.counterContainer}>
-              <View style={styles.counter}>
-                <TouchableOpacity
-                  testID="product-detail-decrease-btn"
-                  style={styles.counterButtonContainer}
-                  onPress={() => {
-                    handleDecreaseButton(quantity);
-                  }}
-                >
-                  <Text style={styles.counterButtonText} testID="product-detail-decrease-text">-</Text>
-                </TouchableOpacity>
-                <Text style={styles.counterCountText} testID="product-detail-quantity">{quantity}</Text>
-                <TouchableOpacity
-                  testID="product-detail-increase-btn"
-                  style={styles.counterButtonContainer}
-                  onPress={() => {
-                    handleIncreaseButton(quantity);
-                  }}
-                >
-                  <Text style={styles.counterButtonText} testID="product-detail-increase-text">+</Text>
-                </TouchableOpacity>
+          <CustomAlert message={error} type={alertType} testID="product-detail-alert" />
+          <View style={styles.productInfoContainer}>
+            <View style={styles.productInfoTopContainer}>
+              <View style={styles.productNameContaier}>
+                <Text style={styles.productNameText} testID="product-detail-title">{product?.title}</Text>
               </View>
-            </View>
-            <View style={styles.productButtonContainer}>
-              {avaiableQuantity > 0 ? (
-                <CustomButton
-                  testID="product-detail-add-to-cart-btn"
-                  text={"Add to Cart"}
-                  onPress={() => {
-                    handleAddToCat(product);
-                  }}
+              <View style={styles.infoButtonContainer}>
+                <View style={styles.wishlistButtonContainer}>
+                  <TouchableOpacity
+                    testID="product-detail-wishlist-btn"
+                    disabled={isDisable}
+                    style={styles.iconContainer}
+                    onPress={() => handleWishlistBtn()}
+                  >
+                    {onWishlist == false ? (
+                      <Ionicons name="heart" size={25} color={colors.muted} />
+                    ) : (
+                      <Ionicons name="heart" size={25} color={colors.danger} />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View style={styles.productDetailContainer}>
+                <View style={styles.productSizeOptionContainer}>
+                </View>
+                <View style={styles.productPriceContainer}>
+                  <Text style={styles.secondaryTextSm} testID="product-detail-price-label">Price:</Text>
+                  <Text style={styles.primaryTextSm} testID="product-detail-price">{product?.price}$</Text>
+                </View>
+              </View>
+              <View style={styles.productDescriptionContainer}>
+                <Text style={styles.secondaryTextSm} testID="product-detail-description-label">Description:</Text>
+                <Text testID="product-detail-description">{product?.description}</Text>
+              </View>
+              {REVIEWS_ENABLED && !reviewLoading && reviewSummary && (
+                <ReviewSummary summary={reviewSummary} testID="product-detail-review-summary" />
+              )}
+              {REVIEWS_ENABLED && (
+                <ReviewForm
+                  canReview={canReview}
+                  initialReview={myReview}
+                  onSubmit={handleSubmitReview}
+                  submitting={reviewSubmitting}
+                  testID="product-detail-review-form"
                 />
-              ) : (
-                <CustomButton testID="product-detail-out-of-stock-btn" text={"Out of Stock"} disabled={true} />
               )}
             </View>
+            <View style={styles.productInfoBottomContainer}>
+              <View style={styles.counterContainer}>
+                <View style={styles.counter}>
+                  <TouchableOpacity
+                    testID="product-detail-decrease-btn"
+                    style={styles.counterButtonContainer}
+                    onPress={() => {
+                      handleDecreaseButton(quantity);
+                    }}
+                  >
+                    <Text style={styles.counterButtonText} testID="product-detail-decrease-text">-</Text>
+                  </TouchableOpacity>
+                  <Text style={styles.counterCountText} testID="product-detail-quantity">{quantity}</Text>
+                  <TouchableOpacity
+                    testID="product-detail-increase-btn"
+                    style={styles.counterButtonContainer}
+                    onPress={() => {
+                      handleIncreaseButton(quantity);
+                    }}
+                  >
+                    <Text style={styles.counterButtonText} testID="product-detail-increase-text">+</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View style={styles.productButtonContainer}>
+                {avaiableQuantity > 0 ? (
+                  <CustomButton
+                    testID="product-detail-add-to-cart-btn"
+                    text={"Add to Cart"}
+                    onPress={() => {
+                      handleAddToCat(product);
+                    }}
+                  />
+                ) : (
+                  <CustomButton testID="product-detail-out-of-stock-btn" text={"Out of Stock"} disabled={true} />
+                )}
+              </View>
+            </View>
           </View>
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 };
@@ -264,6 +339,10 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     flex: 1,
   },
+  scrollContainer: {
+    flex: 1,
+    width: "100%",
+  },
   topBarContainer: {
     width: "100%",
     display: "flex",
@@ -278,15 +357,12 @@ const styles = StyleSheet.create({
   },
   bodyContainer: {
     width: "100%",
-    flexDirecion: "row",
     backgroundColor: colors.light,
     alignItems: "center",
     justifyContent: "flex-start",
-    flex: 1,
   },
   productImageContainer: {
     width: "100%",
-    flex: 2,
     backgroundColor: colors.light,
     flexDirecion: "row",
     alignItems: "center",
@@ -295,7 +371,6 @@ const styles = StyleSheet.create({
   },
   productInfoContainer: {
     width: "100%",
-    flex: 3,
     backgroundColor: colors.white,
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
@@ -315,9 +390,7 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "flex-start",
-    height: "100%",
     width: "100%",
-    flex: 1,
   },
   productInfoBottomContainer: {
     display: "flex",

@@ -1,0 +1,22 @@
+{
+  "merged_nodes": 453,
+  "merged_edges": 1158,
+  "hyperedges": 4,
+  "graph_nodes": 453,
+  "graph_edges": 861,
+  "communities": 49,
+  "health_flags": [
+    "275 dangling-endpoint edges",
+    "22 collapsed directed edges",
+    "22 collapsed undirected edges"
+  ],
+  "outputs": [
+    ".alora/graph.json",
+    ".alora/graph.html",
+    ".alora/GRAPH_REPORT.md",
+    ".alora/.graphify_analysis.json",
+    ".alora/.graphify_labels.json",
+    ".alora/manifest.json",
+    ".alora/cost.json"
+  ]
+}

@@ -18,6 +18,7 @@ import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
 import * as api from "../../api";
 import * as session from "../../utils/session";
 import ProgressDialog from "react-native-progress-dialog";
+import { REVIEWS_ENABLED } from "../../components/Reviews";
 
 const DashboardScreen = ({ navigation, route }) => {
   const { authUser } = route.params;
@@ -74,6 +75,18 @@ const DashboardScreen = ({ navigation, route }) => {
               type: "muted",
               screenName: "viewcategories",
             },
+            ...(REVIEWS_ENABLED
+              ? [
+                  {
+                    id: 5,
+                    title: "Reviews",
+                    value: result.data?.reviewsCount,
+                    iconName: "star",
+                    type: "secondary",
+                    screenName: "viewreviews",
+                  },
+                ]
+              : []),
           ]);
           setError("");
           setIsloading(false);
@@ -209,6 +222,18 @@ const DashboardScreen = ({ navigation, route }) => {
               }
               type="morden"
             />
+            {REVIEWS_ENABLED && (
+              <OptionList
+                testID="dashboard-reviews-option"
+                text={"Reviews"}
+                Icon={Ionicons}
+                iconName={"star"}
+                onPress={() =>
+                  navigation.navigate("viewreviews", { authUser: user })
+                }
+                type="morden"
+              />
+            )}
 
             <View style={{ height: 20 }}></View>
           </ScrollView>

@@ -50,6 +50,26 @@ export const removeFromWishlist = (productId) =>
 export const getDashboard = () => get("/dashboard");
 export const getUsers = () => get("/admin/users");
 
+// ---- Reviews ----
+export const getProductReviews = (productId) =>
+  get(`/products/${q(productId)}/reviews`);
+export const getMyReview = (productId) =>
+  get(`/reviews/me?productId=${q(productId)}`);
+export const upsertReview = (productId, payload) =>
+  post(`/reviews?productId=${q(productId)}`, payload);
+export const getAdminReviews = (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.productId) params.set("productId", filters.productId);
+  if (filters.visibility) params.set("visibility", filters.visibility);
+  if (filters.search) params.set("search", filters.search);
+  const query = params.toString();
+  return get(`/admin/reviews${query ? `?${query}` : ""}`);
+};
+export const setReviewVisibility = (reviewId, visible) =>
+  post(`/admin/review-visibility?id=${q(reviewId)}`, { visible });
+export const deleteReview = (reviewId) =>
+  get(`/admin/delete-review?id=${q(reviewId)}`);
+
 // ---- Uploads ----
 export const uploadPhoto = (formData) => post("/photos/upload", formData);
 

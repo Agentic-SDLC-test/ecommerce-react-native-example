@@ -1,0 +1,85 @@
+{
+  "app_type": "mobile",
+  "ui": "react",
+  "overview": "EasyBuy is an Expo React Native ecommerce app with shopper and admin flows. The mobile app uses React Navigation for auth, tab, shopper, profile, and admin screens; Redux stores the cart; a centralized API layer targets either the real Node backend or the local Express mock server.",
+  "domain_models": [
+    {
+      "name": "User",
+      "definition": "Authenticated account returned by login or registration, carrying identity, email, token, and userType values that drive shopper versus admin navigation."
+    },
+    {
+      "name": "Admin",
+      "definition": "Privileged userType that can view dashboard statistics and manage users, products, categories, and order status."
+    },
+    {
+      "name": "Customer",
+      "definition": "Regular shopper userType that browses products and categories, manages profile and wishlist, places orders, and reviews order history."
+    },
+    {
+      "name": "Product",
+      "definition": "Sellable catalog item with title, SKU, price, quantity, description, image, and category information."
+    },
+    {
+      "name": "Category",
+      "definition": "Catalog grouping for products, represented by an id, title, description, and icon/image assets."
+    },
+    {
+      "name": "CartItem",
+      "definition": "Client-side Redux representation of a selected product, preserving product metadata plus available quantity and selected quantity."
+    },
+    {
+      "name": "Order",
+      "definition": "Checkout result containing line items, amount, discount, cash-on-delivery payment type, shipping address fields, status, and timestamps."
+    },
+    {
+      "name": "WishlistItem",
+      "definition": "Saved product reference for a customer wishlist, managed through dedicated backend operations."
+    },
+    {
+      "name": "Session",
+      "definition": "Persisted authenticated user and token stored through SecureStore on native platforms and AsyncStorage on web."
+    },
+    {
+      "name": "Upload",
+      "definition": "Product or category image asset submitted as multipart form data and served back through the backend uploads endpoint."
+    }
+  ],
+  "applications": [
+    {
+      "name": "easybuy-mobile",
+      "path": ".",
+      "app_type": "mobile",
+      "ui": "react",
+      "runtime": "expo-react-native",
+      "domain_ownership": [
+        "User",
+        "Admin",
+        "Customer",
+        "Product",
+        "Category",
+        "CartItem",
+        "Order",
+        "WishlistItem",
+        "Session",
+        "Upload"
+      ]
+    },
+    {
+      "name": "easybuy-mock-server",
+      "path": "mock-server",
+      "app_type": "service",
+      "ui": null,
+      "runtime": "node-express",
+      "domain_ownership": [
+        "User",
+        "Admin",
+        "Customer",
+        "Product",
+        "Category",
+        "Order",
+        "WishlistItem",
+        "Upload"
+      ]
+    }
+  ]
+}

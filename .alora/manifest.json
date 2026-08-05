@@ -1,0 +1,452 @@
+{
+  ".expo-shared/assets.json": {
+    "mtime": 1785887006.7204063,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "App.js": {
+    "mtime": 1785887006.7207227,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "__tests__/colors.test.js": {
+    "mtime": 1785887006.720963,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "api/client.js": {
+    "mtime": 1785887006.7210703,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "api/config.js": {
+    "mtime": 1785887006.7212145,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "api/index.js": {
+    "mtime": 1785887006.7212956,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "app.json": {
+    "mtime": 1785887006.721369,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "babel.config.js": {
+    "mtime": 1785887006.727982,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/BasicProductList/BasicProductList.js": {
+    "mtime": 1785887006.7281764,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/BasicProductList/index.js": {
+    "mtime": 1785887006.7282445,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/CartProductList/CartProductList.js": {
+    "mtime": 1785887006.728382,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/CartProductList/index.js": {
+    "mtime": 1785887006.728454,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/CategoryList/CategoryList.js": {
+    "mtime": 1785887006.7285695,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/CategoryList/index.js": {
+    "mtime": 1785887006.7286448,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/ConnectionAlert/ConnectionAlert.js": {
+    "mtime": 1785887006.728845,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/CustomAlert/CustomAlert.js": {
+    "mtime": 1785887006.7289526,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/CustomButton/CustomButton.js": {
+    "mtime": 1785887006.7291746,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/CustomButton/index.js": {
+    "mtime": 1785887006.729366,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/CustomCard/CustomCard.js": {
+    "mtime": 1785887006.7295077,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/CustomCard/index.js": {
+    "mtime": 1785887006.7295806,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/CustomIconButton/CustomIconButton.js": {
+    "mtime": 1785887006.7297115,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/CustomIconButton/index.js": {
+    "mtime": 1785887006.729786,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/CustomInput/CustomInput.js": {
+    "mtime": 1785887006.7300794,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/CustomInput/index.js": {
+    "mtime": 1785887006.7301698,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/HomeScreen/CategoryList.js": {
+    "mtime": 1785887006.7303796,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/HomeScreen/HomeHeader.js": {
+    "mtime": 1785887006.7308285,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/HomeScreen/NewArrivals.js": {
+    "mtime": 1785887006.7312353,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/HomeScreen/PromotionSlider.js": {
+    "mtime": 1785887006.7317283,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/HomeScreen/SearchBar.js": {
+    "mtime": 1785887006.7318227,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/OptionList/OptionList.js": {
+    "mtime": 1785887006.7319577,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/OptionList/index.js": {
+    "mtime": 1785887006.7320294,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/OrderList/OrderList.js": {
+    "mtime": 1785887006.7321432,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/OrderList/index.js": {
+    "mtime": 1785887006.7322059,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/ProductCard/ProductCard.js": {
+    "mtime": 1785887006.7323542,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/ProductCard/index.js": {
+    "mtime": 1785887006.732417,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/ProductList/ProductList.js": {
+    "mtime": 1785887006.7325358,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/ProductList/index.js": {
+    "mtime": 1785887006.732612,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/UserList/UserList.js": {
+    "mtime": 1785887006.7327182,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/UserList/index.js": {
+    "mtime": 1785887006.732782,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/UserProfileCard/UserProfileCard.js": {
+    "mtime": 1785887006.732896,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/UserProfileCard/index.js": {
+    "mtime": 1785887006.7329574,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/WishList/WishList.js": {
+    "mtime": 1785887006.7330706,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "components/WishList/index.js": {
+    "mtime": 1785887006.7331429,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "constants/AppData.js": {
+    "mtime": 1785887006.7332654,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "constants/Colors.js": {
+    "mtime": 1785887006.7333517,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "constants/Network.js": {
+    "mtime": 1785887006.7334163,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "constants/index.js": {
+    "mtime": 1785887006.7334812,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "eas.json": {
+    "mtime": 1785887006.7335508,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "eslint.config.js": {
+    "mtime": 1785887006.733616,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "metro.config.js": {
+    "mtime": 1785887006.7366943,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "mock-server/download-images.js": {
+    "mtime": 1785887006.7369182,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "mock-server/package.json": {
+    "mtime": 1785887006.7375853,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "mock-server/server.js": {
+    "mtime": 1785887006.7376873,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "package.json": {
+    "mtime": 1785887006.7400837,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "routes/Routes.js": {
+    "mtime": 1785887006.7402048,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "routes/navigationRef.js": {
+    "mtime": 1785887006.74027,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "routes/tabs/Tabs.js": {
+    "mtime": 1785887006.74038,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/admin/AddCategoryScreen.js": {
+    "mtime": 1785887006.7406263,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/admin/AddProductScreen.js": {
+    "mtime": 1785887006.740726,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/admin/DashboardScreen.js": {
+    "mtime": 1785887006.7408085,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/admin/EditCategoryScreen.js": {
+    "mtime": 1785887006.7408772,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/admin/EditProductScreen.js": {
+    "mtime": 1785887006.7409635,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/admin/ViewCategoryScreen.js": {
+    "mtime": 1785887006.7410324,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/admin/ViewOrderDetailScreen.js": {
+    "mtime": 1785887006.741426,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/admin/ViewOrdersScreen.js": {
+    "mtime": 1785887006.741531,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/admin/ViewProductScreen.js": {
+    "mtime": 1785887006.7416174,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/admin/ViewUsersScreen.js": {
+    "mtime": 1785887006.741719,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/auth/ForgetPasswordScreen.js": {
+    "mtime": 1785887006.741891,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/auth/LoginScreen.js": {
+    "mtime": 1785887006.7419772,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/auth/SignupScreen.js": {
+    "mtime": 1785887006.7420495,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/auth/Splash.js": {
+    "mtime": 1785887006.7421372,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/profile/MyAccountScreen.js": {
+    "mtime": 1785887006.742303,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/profile/MyWishlistScreen.js": {
+    "mtime": 1785887006.742402,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/profile/UpdatePasswordScreen.js": {
+    "mtime": 1785887006.742471,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/profile/UserProfileScreen.js": {
+    "mtime": 1785887006.7425423,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/user/CartScreen.js": {
+    "mtime": 1785887006.7426596,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/user/CategoriesScreen.js": {
+    "mtime": 1785887006.7428029,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/user/CheckoutScreen.js": {
+    "mtime": 1785887006.742892,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/user/HomeScreen.js": {
+    "mtime": 1785887006.7429729,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/user/MyOrderDetailScreen.js": {
+    "mtime": 1785887006.7430727,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/user/MyOrderScreen.js": {
+    "mtime": 1785887006.7431533,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/user/OrderConfirmScreen.js": {
+    "mtime": 1785887006.7432308,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "screens/user/ProductDetailScreen.js": {
+    "mtime": 1785887006.7433228,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "states/actionCreaters/actionCreaters.js": {
+    "mtime": 1785887006.7580578,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "states/actionTypes/actionTypes.js": {
+    "mtime": 1785887006.7583296,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "states/reducers/cartReducer.js": {
+    "mtime": 1785887006.7584567,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "states/reducers/index.js": {
+    "mtime": 1785887006.7585578,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "states/store.js": {
+    "mtime": 1785887006.7588348,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "utils/authStorage.js": {
+    "mtime": 1785887006.7593627,
+    "ast_hash": "",
+    "semantic_hash": ""
+  },
+  "utils/session.js": {
+    "mtime": 1785887006.7595596,
+    "ast_hash": "",
+    "semantic_hash": ""
+  }
+}

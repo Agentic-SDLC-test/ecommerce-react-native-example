@@ -1,0 +1,41 @@
+[graphify] MultiDiGraph edge-collapse diagnostic
+input: <in-memory>
+input_stage: provided JSON (normal graph.json is post-build)
+effective_directed: <direct-call>
+nodes: 453
+unverified_code_nodes: 0
+raw_edges: 1158
+valid_candidate_edges: 883
+missing_endpoint_edges: 0
+dangling_endpoint_edges: 275
+self_loop_edges: 0
+exact_duplicate_edges: 0
+directed_unique_endpoint_pairs: 861
+directed_same_endpoint_collapsed_edges: 22
+undirected_unique_endpoint_pairs: 861
+undirected_same_endpoint_collapsed_edges: 22
+same_endpoint_group_count: 22
+relation_variant_groups: 22
+source_file_variant_groups: 0
+source_location_variant_groups: 0
+context_variant_groups: 0
+post_build_graph_type: Graph
+post_build_edges: 861
+producer_suppression_sites: 10
+producer_suppression_examples:
+  - L1099 seen_ids arity=unknown
+  - L1253 seen_ids arity=unknown
+  - L1255 seen_doc_refs arity=unknown
+  - L1600 seen_ids arity=unknown
+  - L2069 seen_keys arity=unknown
+  - L3104 seen_ids arity=unknown
+  - L3212 seen_ids arity=unknown
+  - L3291 seen_ids arity=unknown
+examples:
+  - api_index -> api_config edges=2 relations=['imports_from', 're_exports'] locations=['L58'] contexts=['export', 're-export']
+  - components_basicproductlist_index -> components_basicproductlist_basicproductlist edges=2 relations=['imports_from', 're_exports'] locations=['L1'] contexts=['export', 're-export']
+  - components_cartproductlist_index -> components_cartproductlist_cartproductlist edges=2 relations=['imports_from', 're_exports'] locations=['L1'] contexts=['export', 're-export']
+  - components_categorylist_index -> components_categorylist_categorylist edges=2 relations=['imports_from', 're_exports'] locations=['L1'] contexts=['export', 're-export']
+  - components_custombutton_index -> components_custombutton_custombutton edges=2 relations=['imports_from', 're_exports'] locations=['L1'] contexts=['export', 're-export']
+note: normal graph.json is post-build; raw producer loss must be measured earlier.
+GRAPH HEALTH WARNING: 275 dangling-endpoint edges; 22 collapsed directed edges; 22 collapsed undirected edges
