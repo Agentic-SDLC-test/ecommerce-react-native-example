@@ -1,0 +1,997 @@
+{
+  "nodes": [
+    {
+      "id": "app_application_shell_provider",
+      "label": "Application Shell Provider",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/App.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "routes_routes_stack_navigation_registry",
+      "label": "Stack Navigation Registry",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/routes/Routes.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "routes_tabs_tabs_customer_tab_shell",
+      "label": "Customer Tab Shell",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/routes/tabs/Tabs.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_index_backend_api_facade",
+      "label": "Backend API Facade",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/index.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_client_authenticated_request_pipeline",
+      "label": "Authenticated Request Pipeline",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/client.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_client_token_expiry_redirect_protocol",
+      "label": "Token Expiry Redirect Protocol",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/client.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "api_config_platform_base_url_resolver",
+      "label": "Platform Base URL Resolver",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/config.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utils_session_session_lifecycle",
+      "label": "Session Lifecycle",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/utils/session.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "utils_authstorage_platform_storage_adapter",
+      "label": "Platform Storage Adapter",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/utils/authStorage.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "states_reducers_cartreducer_cart_state_machine",
+      "label": "Cart State Machine",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/states/reducers/cartReducer.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "states_actioncreaters_actioncreaters_cart_command_api",
+      "label": "Cart Command API",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/states/actionCreaters/actionCreaters.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "screens_auth_splash_auth_gate",
+      "label": "Startup Auth Gate",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/auth/Splash.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "screens_auth_loginscreen_login_session_flow",
+      "label": "Login Session Flow",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/auth/LoginScreen.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "screens_user_homescreen_product_discovery_flow",
+      "label": "Product Discovery Flow",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/HomeScreen.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "screens_user_productdetailscreen_cart_wishlist_flow",
+      "label": "Cart And Wishlist Detail Flow",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/ProductDetailScreen.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "screens_user_cartscreen_cart_mutation_flow",
+      "label": "Cart Mutation Flow",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/CartScreen.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "screens_user_checkoutscreen_checkout_order_flow",
+      "label": "Checkout Order Flow",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/CheckoutScreen.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "screens_admin_dashboardscreen_admin_workflow_hub",
+      "label": "Admin Workflow Hub",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/admin/DashboardScreen.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "mock_server_server_mock_backend_contract",
+      "label": "Mock Backend Contract",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/mock-server/server.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "mock_server_server_admin_authorization_protocol",
+      "label": "Admin Authorization Protocol",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/mock-server/server.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "mock_server_server_in_memory_domain_store",
+      "label": "In Memory Domain Store",
+      "file_type": "concept",
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/mock-server/server.js",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "app_app",
+      "target": "app_application_shell_provider",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/App.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "app_application_shell_provider",
+      "target": "states_store_store",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/App.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "app_application_shell_provider",
+      "target": "routes_routes_routes",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/App.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "routes_routes_routes",
+      "target": "routes_routes_stack_navigation_registry",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/routes/Routes.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "routes_tabs_tabs_tabs",
+      "target": "routes_tabs_tabs_customer_tab_shell",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/routes/tabs/Tabs.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "routes_tabs_tabs_customer_tab_shell",
+      "target": "screens_user_homescreen_homescreen",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/routes/tabs/Tabs.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "routes_tabs_tabs_customer_tab_shell",
+      "target": "screens_user_categoriesscreen_categoriesscreen",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/routes/tabs/Tabs.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "routes_tabs_tabs_customer_tab_shell",
+      "target": "screens_user_myorderscreen_myorderscreen",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/routes/tabs/Tabs.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "routes_tabs_tabs_customer_tab_shell",
+      "target": "screens_profile_userprofilescreen_userprofilescreen",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/routes/tabs/Tabs.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_index",
+      "target": "api_index_backend_api_facade",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/index.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_index_backend_api_facade",
+      "target": "api_client_get",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/index.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_index_backend_api_facade",
+      "target": "api_client_post",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/index.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_client_request",
+      "target": "api_client_authenticated_request_pipeline",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/client.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_client_authenticated_request_pipeline",
+      "target": "utils_session_gettoken",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/client.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_client_authenticated_request_pipeline",
+      "target": "api_config_getbaseurl",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/client.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_client_token_expiry_redirect_protocol",
+      "target": "utils_session_clearsession",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/client.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_client_token_expiry_redirect_protocol",
+      "target": "routes_navigationref_resettologin",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/client.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_client_request",
+      "target": "api_client_token_expiry_redirect_protocol",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/client.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_config_getbaseurl",
+      "target": "api_config_platform_base_url_resolver",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/config.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_config_platform_base_url_resolver",
+      "target": "api_config_forplatform",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/config.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_config_platform_base_url_resolver",
+      "target": "api_config_defaulthost",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/config.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "utils_session",
+      "target": "utils_session_session_lifecycle",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/utils/session.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "utils_session_session_lifecycle",
+      "target": "utils_authstorage_platform_storage_adapter",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/utils/session.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "utils_authstorage",
+      "target": "utils_authstorage_platform_storage_adapter",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/utils/authStorage.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "utils_authstorage_platform_storage_adapter",
+      "target": "utils_authstorage_getitem",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/utils/authStorage.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "utils_authstorage_platform_storage_adapter",
+      "target": "utils_authstorage_setitem",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/utils/authStorage.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "utils_authstorage_platform_storage_adapter",
+      "target": "utils_authstorage_deleteitem",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/utils/authStorage.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "states_reducers_cartreducer_reducer",
+      "target": "states_reducers_cartreducer_cart_state_machine",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/states/reducers/cartReducer.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "states_actioncreaters_actioncreaters_cart_command_api",
+      "target": "states_reducers_cartreducer_cart_state_machine",
+      "relation": "shares_data_with",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/states/actionCreaters/actionCreaters.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "states_actioncreaters_actioncreaters_cart_command_api",
+      "target": "states_actiontypes_actiontypes_cart_add",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/states/actionCreaters/actionCreaters.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_auth_splash_splash",
+      "target": "screens_auth_splash_auth_gate",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/auth/Splash.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_auth_splash_auth_gate",
+      "target": "utils_session_getuser",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/auth/Splash.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_auth_loginscreen_loginscreen",
+      "target": "screens_auth_loginscreen_login_session_flow",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/auth/LoginScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_auth_loginscreen_login_session_flow",
+      "target": "api_index_login",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/auth/LoginScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_auth_loginscreen_login_session_flow",
+      "target": "utils_session_setsession",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/auth/LoginScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_user_homescreen_homescreen",
+      "target": "screens_user_homescreen_product_discovery_flow",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/HomeScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_user_homescreen_product_discovery_flow",
+      "target": "api_index_getproducts",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/HomeScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_user_homescreen_product_discovery_flow",
+      "target": "states_actioncreaters_actioncreaters_addcartitem",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/HomeScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_user_productdetailscreen_productdetailscreen",
+      "target": "screens_user_productdetailscreen_cart_wishlist_flow",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/ProductDetailScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_user_productdetailscreen_cart_wishlist_flow",
+      "target": "api_index_getwishlist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/ProductDetailScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_user_productdetailscreen_cart_wishlist_flow",
+      "target": "api_index_addtowishlist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/ProductDetailScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_user_productdetailscreen_cart_wishlist_flow",
+      "target": "api_index_removefromwishlist",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/ProductDetailScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_user_productdetailscreen_cart_wishlist_flow",
+      "target": "states_actioncreaters_actioncreaters_addcartitem",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/ProductDetailScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_user_cartscreen_cartscreen",
+      "target": "screens_user_cartscreen_cart_mutation_flow",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/CartScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_user_cartscreen_cart_mutation_flow",
+      "target": "states_actioncreaters_actioncreaters_removecartitem",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/CartScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_user_cartscreen_cart_mutation_flow",
+      "target": "states_actioncreaters_actioncreaters_increasecartitemquantity",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/CartScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_user_cartscreen_cart_mutation_flow",
+      "target": "states_actioncreaters_actioncreaters_decreasecartitemquantity",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/CartScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_user_checkoutscreen_checkoutscreen",
+      "target": "screens_user_checkoutscreen_checkout_order_flow",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/CheckoutScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_user_checkoutscreen_checkout_order_flow",
+      "target": "api_index_checkout",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/CheckoutScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_user_checkoutscreen_checkout_order_flow",
+      "target": "states_actioncreaters_actioncreaters_emptycart",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/CheckoutScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_admin_dashboardscreen_dashboardscreen",
+      "target": "screens_admin_dashboardscreen_admin_workflow_hub",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/admin/DashboardScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_admin_dashboardscreen_admin_workflow_hub",
+      "target": "api_index_getdashboard",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/admin/DashboardScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_admin_addproductscreen_addproductscreen",
+      "target": "api_index_createproduct",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/admin/AddProductScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_admin_addproductscreen_addproductscreen",
+      "target": "api_index_uploadphoto",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/admin/AddProductScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_admin_editproductscreen_editproductscreen",
+      "target": "api_index_updateproduct",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/admin/EditProductScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_admin_viewproductscreen_viewproductscreen",
+      "target": "api_index_deleteproduct",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/admin/ViewProductScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_admin_viewcategoryscreen_viewcategoryscreen",
+      "target": "api_index_getcategories",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/admin/ViewCategoryScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_admin_vieworderdetailscreen_vieworderdetailscreen",
+      "target": "api_index_updateorderstatus",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/admin/ViewOrderDetailScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "mock_server_server",
+      "target": "mock_server_server_mock_backend_contract",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/mock-server/server.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "mock_server_server_mock_backend_contract",
+      "target": "api_index_backend_api_facade",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/mock-server/server.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "mock_server_server_adminmiddleware",
+      "target": "mock_server_server_admin_authorization_protocol",
+      "relation": "implements",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/mock-server/server.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "mock_server_server_authmiddleware",
+      "target": "api_client_authenticated_request_pipeline",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/mock-server/server.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "mock_server_server_in_memory_domain_store",
+      "target": "mock_server_server_users",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/mock-server/server.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "mock_server_server_in_memory_domain_store",
+      "target": "mock_server_server_products",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/mock-server/server.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "mock_server_server_in_memory_domain_store",
+      "target": "mock_server_server_categories",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/mock-server/server.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "mock_server_server_in_memory_domain_store",
+      "target": "mock_server_server_orders",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/mock-server/server.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "api_index_updateorderstatus",
+      "target": "screens_user_myorderdetailscreen_myorderdetailscreen",
+      "relation": "conceptually_related_to",
+      "confidence": "AMBIGUOUS",
+      "confidence_score": 0.25,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/index.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "screens_profile_mywishlistscreen_mywishlistscreen",
+      "target": "screens_user_productdetailscreen_cart_wishlist_flow",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/profile/MyWishlistScreen.js",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "constants_network_network",
+      "target": "api_config_platform_base_url_resolver",
+      "relation": "conceptually_related_to",
+      "confidence": "AMBIGUOUS",
+      "confidence_score": 0.3,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/constants/Network.js",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "auth_session_lifecycle_flow",
+      "label": "Auth Session Lifecycle Flow",
+      "nodes": [
+        "screens_auth_splash_auth_gate",
+        "screens_auth_loginscreen_login_session_flow",
+        "utils_session_session_lifecycle",
+        "utils_authstorage_platform_storage_adapter",
+        "api_client_token_expiry_redirect_protocol",
+        "routes_navigationref_resettologin"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/utils/session.js"
+    },
+    {
+      "id": "cart_checkout_state_flow",
+      "label": "Cart Checkout State Flow",
+      "nodes": [
+        "screens_user_homescreen_product_discovery_flow",
+        "screens_user_productdetailscreen_cart_wishlist_flow",
+        "screens_user_cartscreen_cart_mutation_flow",
+        "screens_user_checkoutscreen_checkout_order_flow",
+        "states_actioncreaters_actioncreaters_cart_command_api",
+        "states_reducers_cartreducer_cart_state_machine",
+        "api_index_checkout"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/user/CheckoutScreen.js"
+    },
+    {
+      "id": "admin_catalog_order_management_flow",
+      "label": "Admin Catalog Order Management Flow",
+      "nodes": [
+        "screens_admin_dashboardscreen_admin_workflow_hub",
+        "screens_admin_addproductscreen_addproductscreen",
+        "screens_admin_editproductscreen_editproductscreen",
+        "screens_admin_viewproductscreen_viewproductscreen",
+        "screens_admin_viewcategoryscreen_viewcategoryscreen",
+        "screens_admin_vieworderdetailscreen_vieworderdetailscreen",
+        "api_index_backend_api_facade",
+        "mock_server_server_admin_authorization_protocol"
+      ],
+      "relation": "participate_in",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/screens/admin/DashboardScreen.js"
+    },
+    {
+      "id": "frontend_mock_backend_contract",
+      "label": "Frontend Mock Backend Contract",
+      "nodes": [
+        "api_index_backend_api_facade",
+        "api_client_authenticated_request_pipeline",
+        "api_config_platform_base_url_resolver",
+        "mock_server_server_mock_backend_contract",
+        "mock_server_server_in_memory_domain_store"
+      ],
+      "relation": "form",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/Users/hharis/tmp/alora-data/workspaces/a374b97e-307a-47a0-a095-21488e3f56c7/_setup/ecommerce-react-native-example/api/index.js"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

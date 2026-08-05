@@ -1,0 +1,97 @@
+{
+  "app_type": "monorepo",
+  "ui": "react",
+  "overview": "EasyBuy is an Expo React Native ecommerce app for browsing products, managing a cart and wishlist, placing cash-on-delivery orders, and administering users, products, categories, and order status. The repository also includes a local Express mock API that mirrors the backend contract used by the mobile app.",
+  "domain_models": [
+    {
+      "name": "User",
+      "definition": "Authenticated account returned from login or registration, carrying identity, userType, and token data for app navigation and API authorization."
+    },
+    {
+      "name": "Admin",
+      "definition": "Privileged userType that can access the dashboard and manage products, categories, users, and orders."
+    },
+    {
+      "name": "Product",
+      "definition": "Catalog item with title, SKU, price, stock quantity, description, image, and category metadata."
+    },
+    {
+      "name": "Category",
+      "definition": "Product grouping used for catalog browsing and admin product classification."
+    },
+    {
+      "name": "CartItem",
+      "definition": "Redux-managed product snapshot with selected quantity used to build checkout payloads."
+    },
+    {
+      "name": "Order",
+      "definition": "Checkout result containing order id, user, line items, amount, payment type, shipping address, status, and timestamps."
+    },
+    {
+      "name": "OrderItem",
+      "definition": "Line item in an order or checkout payload tying a product id to price and quantity."
+    },
+    {
+      "name": "Wishlist",
+      "definition": "Authenticated user's saved product list for later purchase, managed through add and remove API operations."
+    },
+    {
+      "name": "Session",
+      "definition": "Persisted auth user and token stored via SecureStore on native platforms and AsyncStorage on web."
+    },
+    {
+      "name": "DashboardMetric",
+      "definition": "Admin summary counts for users, orders, products, and categories shown on dashboard cards."
+    },
+    {
+      "name": "UploadedImage",
+      "definition": "Product image file uploaded through multipart form data and served from the backend uploads path."
+    },
+    {
+      "name": "ShippingAddress",
+      "definition": "Checkout delivery location made from country, city, street address, and zipcode fields."
+    }
+  ],
+  "applications": [
+    {
+      "name": "easybuy-mobile",
+      "path": ".",
+      "app_type": "mobile",
+      "ui": "react",
+      "runtime": "expo-react-native",
+      "domain_ownership": [
+        "User",
+        "Admin",
+        "Product",
+        "Category",
+        "CartItem",
+        "Order",
+        "OrderItem",
+        "Wishlist",
+        "Session",
+        "DashboardMetric",
+        "UploadedImage",
+        "ShippingAddress"
+      ]
+    },
+    {
+      "name": "easybuy-mock-server",
+      "path": "mock-server",
+      "app_type": "api",
+      "ui": null,
+      "runtime": "node-express",
+      "domain_ownership": [
+        "User",
+        "Admin",
+        "Product",
+        "Category",
+        "Order",
+        "OrderItem",
+        "Wishlist",
+        "DashboardMetric",
+        "UploadedImage",
+        "ShippingAddress"
+      ]
+    }
+  ]
+}
