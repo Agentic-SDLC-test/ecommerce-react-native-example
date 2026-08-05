@@ -3,6 +3,7 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
+const { derivePaymentFields, serializeOrder } = require("./orderPayment");
 
 const app = express();
 const PORT = 3002;
@@ -211,6 +212,9 @@ let orders = [
     amount: 129.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "pending",
+    payment_reference: null,
+    payment_message: "Pay on delivery",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -240,6 +244,9 @@ let orders = [
     amount: 24.99,
     discount: 0,
     payment_type: "cod",
+    payment_status: "pending",
+    payment_reference: null,
+    payment_message: "Pay on delivery",
     country: "Canada",
     city: "Vancouver",
     zipcode: "V6B 1A1",
@@ -270,6 +277,9 @@ let orders = [
     amount: 38.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "pending",
+    payment_reference: null,
+    payment_message: "Pay on delivery",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -463,7 +473,7 @@ app.get("/dashboard", adminMiddleware, (req, res) => {
 
 // GET /admin/orders  (admin: all orders)
 app.get("/admin/orders", adminMiddleware, (req, res) => {
-  res.json({ success: true, data: orders });
+  res.json({ success: true, data: orders.map(serializeOrder) });
 });
 
 // GET /admin/users  (admin: all users)
@@ -487,21 +497,71 @@ app.get("/admin/order-status", adminMiddleware, (req, res) => {
   order.updatedAt = new Date().toISOString();
   if (status === "shipped") order.shippedOn = new Date().toISOString().split("T")[0];
   if (status === "delivered") order.deliveredOn = new Date().toISOString().split("T")[0];
-  res.json({ success: true, message: `Order status updated to ${status}`, data: order });
+  const serializedOrder = serializeOrder(order);
+  console.info("admin_order_status_updated", {
+    orderId: serializedOrder.orderId,
+    delivery_status: serializedOrder.status,
+    payment_status: serializedOrder.payment_status,
+    timestamp: new Date().toISOString(),
+  });
+  res.json({
+    success: true,
+    message: `Order status updated to ${status}`,
+    data: serializedOrder,
+  });
 });
 
 // GET /orders  (user: their own orders)
 app.get("/orders", authMiddleware, (req, res) => {
   const userOrders = orders.filter((o) => o.user._id === req.user._id);
-  res.json({ success: true, data: userOrders });
+  res.json({ success: true, data: userOrders.map(serializeOrder) });
 });
 
 // POST /checkout  (user: place order)
 app.post("/checkout", authMiddleware, (req, res) => {
-  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
+  const {
+    items,
+    amount,
+    discount,
+    payment_type,
+    payment_acknowledged,
+    country,
+    city,
+    zipcode,
+    shippingAddress,
+  } = req.body;
   if (!items || items.length === 0) {
+    console.warn("checkout_validation_failed", {
+      userId: req.user._id,
+      reason: "Cart is empty",
+      payment_type,
+      timestamp: new Date().toISOString(),
+    });
     return res.status(400).json({ success: false, message: "Cart is empty" });
   }
+
+  const orderId = `ORD-${Date.now()}`;
+  console.info("checkout_submitted", {
+    orderId,
+    userId: req.user._id,
+    payment_type,
+    amount,
+    timestamp: new Date().toISOString(),
+  });
+
+  let paymentFields;
+  try {
+    paymentFields = derivePaymentFields({ payment_type, payment_acknowledged });
+  } catch (error) {
+    console.warn("checkout_validation_failed", {
+      userId: req.user._id,
+      reason: error.message,
+      payment_type,
+      timestamp: new Date().toISOString(),
+    });
+    return res.status(error.status || 400).json({ success: false, message: error.message });
+  }
+
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
     return {
@@ -514,7 +574,7 @@ app.post("/checkout", authMiddleware, (req, res) => {
   });
   const newOrder = {
     _id: uuidv4(),
-    orderId: `ORD-${Date.now()}`,
+    orderId,
     user: {
       _id: req.user._id,
       name: req.user.name,
@@ -523,17 +583,24 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
+    ...paymentFields,
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",
     shippingAddress: shippingAddress || "",
-    status: status || "pending",
+    status: "pending",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
   orders.push(newOrder);
-  res.json({ success: true, message: "Order placed successfully", data: newOrder });
+  const serializedOrder = serializeOrder(newOrder);
+  console.info("checkout_payment_derived", {
+    orderId: serializedOrder.orderId,
+    payment_status: serializedOrder.payment_status,
+    payment_reference: serializedOrder.payment_reference,
+    timestamp: new Date().toISOString(),
+  });
+  res.json({ success: true, message: "Order placed successfully", data: serializedOrder });
 });
 
 // GET /delete-user?id=

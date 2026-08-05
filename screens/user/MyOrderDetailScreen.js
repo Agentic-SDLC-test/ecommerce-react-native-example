@@ -7,23 +7,27 @@ import {
   TouchableOpacity,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import StepIndicator from "react-native-step-indicator";
+import {
+  getPaymentMessage,
+  getPaymentStatusLabel,
+  getPaymentTypeLabel,
+} from "../../utils/payment";
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
-  const [isloading, setIsloading] = useState(false);
-  const [label, setLabel] = useState("Loading..");
+  const isloading = false;
+  const label = "Loading..";
   const [error, setError] = useState("");
   const [alertType, setAlertType] = useState("error");
   const [totalCost, setTotalCost] = useState(0);
   const [address, setAddress] = useState("");
   const [value, setValue] = useState(null);
-  const [statusDisable, setStatusDisable] = useState(false);
   const labels = ["Processing", "Shipping", "Delivery"];
   const [trackingState, setTrackingState] = useState(1);
   const customStyles = {
@@ -50,20 +54,18 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
     currentStepLabelColor: "#fe7013",
   };
 
-  //method to convert time to AM PM format
   function tConvert(time) {
     time = time
       .toString()
       .match(/^([01]\d|2[0-3])(:)([0-5]\d)(:[0-5]\d)?$/) || [time];
     if (time.length > 1) {
-      time = time.slice(1); // Remove full string match value
-      time[5] = +time[0] < 12 ? "AM" : "PM"; // Set AM/PM
-      time[0] = +time[0] % 12 || 12; // Adjust hours
+      time = time.slice(1);
+      time[5] = +time[0] < 12 ? "AM" : "PM";
+      time[0] = +time[0] % 12 || 12;
     }
     return time.join("");
   }
 
-  //method to convert data to dd-mm-yyyy  format
   const dateFormat = (datex) => {
     let t = new Date(datex);
     const date = ("0" + t.getDate()).slice(-2);
@@ -78,15 +80,9 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
     return newDate;
   };
 
-  // set total cost, order detail, order status on initial render
   useEffect(() => {
     setError("");
     setAlertType("error");
-    if (orderDetail?.status == "delivered") {
-      setStatusDisable(true);
-    } else {
-      setStatusDisable(false);
-    }
     setValue(orderDetail?.status);
     setAddress(
       orderDetail?.country +
@@ -97,7 +93,7 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
     );
     setTotalCost(
       orderDetail?.items.reduce((accumulator, object) => {
-        return (accumulator + object.price) * object.quantity;
+        return accumulator + object.price * object.quantity;
       }, 0)
     );
     if (orderDetail?.status === "pending") {
@@ -107,7 +103,7 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
     } else {
       setTrackingState(3);
     }
-  }, []);
+  }, [orderDetail]);
 
   return (
     <View style={styles.container} testID="my-order-detail-screen">
@@ -182,7 +178,27 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
             />
           </View>
         </View>
-
+        <View style={styles.containerNameContainer}>
+          <View>
+            <Text style={styles.containerNameText} testID="my-order-detail-payment-heading">Payment Info</Text>
+          </View>
+        </View>
+        <View style={styles.paymentInfoContainer} testID="my-order-detail-payment-card">
+          <Text style={styles.secondarytextMedian} testID="my-order-detail-payment-type">
+            Method: {getPaymentTypeLabel(orderDetail?.payment_type)}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-status">
+            Payment: {getPaymentStatusLabel(orderDetail?.payment_status)}
+          </Text>
+          {orderDetail?.payment_reference ? (
+            <Text style={styles.secondarytextSm} testID="my-order-detail-payment-reference">
+              Reference: {orderDetail?.payment_reference}
+            </Text>
+          ) : null}
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-message">
+            {getPaymentMessage(orderDetail)}
+          </Text>
+        </View>
         <View style={styles.containerNameContainer}>
           <View>
             <Text style={styles.containerNameText} testID="my-order-detail-package-heading">Package Details</Text>
@@ -244,7 +260,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
   },
-
   screenNameContainer: {
     marginTop: 10,
     width: "100%",
@@ -302,7 +317,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     padding: 10,
     borderRadius: 10,
-
     borderColor: colors.muted,
     elevation: 3,
     marginBottom: 10,
@@ -326,21 +340,6 @@ const styles = StyleSheet.create({
     width: "100%",
     marginBottom: 5,
   },
-  bottomContainer: {
-    backgroundColor: colors.white,
-    width: "110%",
-    height: 70,
-    borderTopLeftRadius: 10,
-    borderTopEndRadius: 10,
-    elevation: 5,
-    display: "flex",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-
-    paddingLeft: 10,
-    paddingRight: 10,
-  },
   orderInfoContainer: {
     marginTop: 5,
     display: "flex",
@@ -350,15 +349,23 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     padding: 10,
     borderRadius: 10,
-
     borderColor: colors.muted,
     elevation: 1,
     marginBottom: 10,
   },
-  primarytextMedian: {
-    color: colors.primary,
-    fontSize: 15,
-    fontWeight: "bold",
+  paymentInfoContainer: {
+    marginTop: 5,
+    display: "flex",
+    flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "flex-start",
+    backgroundColor: colors.white,
+    padding: 10,
+    borderRadius: 10,
+    borderColor: colors.muted,
+    elevation: 1,
+    marginBottom: 10,
+    width: "100%",
   },
   secondarytextMedian: {
     color: colors.muted,

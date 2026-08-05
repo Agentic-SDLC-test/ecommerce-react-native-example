@@ -8,6 +8,13 @@
 
 ### `Backend on NodeJs` ➡️ [https://github.com/abidrazaa/backend-node](https://github.com/abidrazaa/backend-node)
 
+This repository also ships an in-repo mock server on `:3002`, which is the
+default target for `EXPO_PUBLIC_API_URL`. The new `wallet_mock` checkout path
+and `payment_status` order fields are implemented in that mock server first.
+If you point the app at the external Node backend, add the same `/checkout`,
+`/orders`, and `/admin/orders` payment contract there before enabling
+`EXPO_PUBLIC_ENABLE_MOCK_WALLET_PAYMENT=true`.
+
 Open-Source React Native Ecommerce Cross Platform Mobile App :iphone:
 
 ## Mockups

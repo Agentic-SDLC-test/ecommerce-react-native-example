@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants";
+import { getPaymentStatusLabel, getPaymentTypeLabel } from "../../utils/payment";
 
 function getTime(date) {
   let t = new Date(date);
@@ -27,9 +28,6 @@ const dateFormat = (datex) => {
   const date = ("0" + t.getDate()).slice(-2);
   const month = ("0" + (t.getMonth() + 1)).slice(-2);
   const year = t.getFullYear();
-  const hours = ("0" + t.getHours()).slice(-2);
-  const minutes = ("0" + t.getMinutes()).slice(-2);
-  const seconds = ("0" + t.getSeconds()).slice(-2);
   const newDate = `${date}-${month}-${year}`;
 
   return newDate;
@@ -47,10 +45,10 @@ const OrderList = ({ item, onPress, testID }) => {
     setQuantity(packageItems);
     setTotalCost(
       item?.items.reduce((accumulator, object) => {
-        return (accumulator + object.price) * object.quantity;
+        return accumulator + object.price * object.quantity;
       }, 0)
     );
-  }, []);
+  }, [item]);
 
   return (
     <View style={styles.container} testID={testID}>
@@ -83,7 +81,17 @@ const OrderList = ({ item, onPress, testID }) => {
         <TouchableOpacity style={styles.detailButton} onPress={onPress} testID={testID ? `${testID}-details-btn` : undefined}>
           <Text>Details</Text>
         </TouchableOpacity>
-        <Text style={styles.secondaryText} testID={testID ? `${testID}-status` : undefined}>{item?.status}</Text>
+        <Text style={styles.secondaryText} testID={testID ? `${testID}-status` : undefined}>
+          Delivery: {item?.status}
+        </Text>
+      </View>
+      <View style={styles.innerRow}>
+        <Text style={styles.secondaryText} testID={testID ? `${testID}-payment-type` : undefined}>
+          Method: {getPaymentTypeLabel(item?.payment_type)}
+        </Text>
+        <Text style={styles.secondaryText} testID={testID ? `${testID}-payment-status` : undefined}>
+          Payment: {getPaymentStatusLabel(item?.payment_status)}
+        </Text>
       </View>
     </View>
   );
@@ -111,6 +119,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     width: "100%",
+    gap: 10,
   },
   primaryText: {
     fontSize: 15,
