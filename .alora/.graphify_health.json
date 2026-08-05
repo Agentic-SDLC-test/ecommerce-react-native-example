@@ -1,0 +1,188 @@
+{
+  "node_count": 459,
+  "unverified_node_count": 0,
+  "raw_edge_count": 1147,
+  "non_object_edges": 0,
+  "missing_endpoint_edges": 0,
+  "dangling_endpoint_edges": 275,
+  "self_loop_edges": 0,
+  "valid_candidate_edges": 872,
+  "exact_duplicate_edges": 0,
+  "directed_unique_endpoint_pairs": 853,
+  "directed_same_endpoint_collapsed_edges": 19,
+  "undirected_unique_endpoint_pairs": 853,
+  "undirected_same_endpoint_collapsed_edges": 19,
+  "same_endpoint_group_count": 19,
+  "relation_variant_groups": 19,
+  "source_file_variant_groups": 0,
+  "source_location_variant_groups": 0,
+  "context_variant_groups": 0,
+  "post_build_graph_type": "Graph",
+  "post_build_node_count": 459,
+  "post_build_edge_count": 853,
+  "post_build_error": "",
+  "producer_suppression": {
+    "path": "/Users/hharis/.local/share/uv/tools/graphifyy/lib/python3.13/site-packages/graphify/extract.py",
+    "total_sites": 10,
+    "sites": [
+      {
+        "line": 1099,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids = {n[\"id\"] for n in nodes}"
+      },
+      {
+        "line": 1253,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids = {n[\"id\"] for n in nodes}"
+      },
+      {
+        "line": 1255,
+        "name": "seen_doc_refs",
+        "tuple_arity": 0,
+        "sample": "seen_doc_refs: set[str] = set()"
+      },
+      {
+        "line": 1600,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = {n[\"id\"] for n in nodes}"
+      },
+      {
+        "line": 2069,
+        "name": "seen_keys",
+        "tuple_arity": 0,
+        "sample": "seen_keys: set[tuple] = set()"
+      },
+      {
+        "line": 3104,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 3212,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 3291,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 3806,
+        "name": "seen_ids",
+        "tuple_arity": 0,
+        "sample": "seen_ids: set[str] = set()"
+      },
+      {
+        "line": 3807,
+        "name": "seen_edges",
+        "tuple_arity": 4,
+        "sample": "seen_edges: set[tuple[str, str, str, str | None]] = set()"
+      }
+    ],
+    "error": ""
+  },
+  "examples": [
+    {
+      "source": "api_index",
+      "target": "api_config",
+      "edge_count": 2,
+      "relations": [
+        "imports_from",
+        "re_exports"
+      ],
+      "source_files": [
+        "api/index.js"
+      ],
+      "source_locations": [
+        "L58"
+      ],
+      "contexts": [
+        "export",
+        "re-export"
+      ]
+    },
+    {
+      "source": "components_basicproductlist_index",
+      "target": "components_basicproductlist_basicproductlist",
+      "edge_count": 2,
+      "relations": [
+        "imports_from",
+        "re_exports"
+      ],
+      "source_files": [
+        "components/BasicProductList/index.js"
+      ],
+      "source_locations": [
+        "L1"
+      ],
+      "contexts": [
+        "export",
+        "re-export"
+      ]
+    },
+    {
+      "source": "components_cartproductlist_index",
+      "target": "components_cartproductlist_cartproductlist",
+      "edge_count": 2,
+      "relations": [
+        "imports_from",
+        "re_exports"
+      ],
+      "source_files": [
+        "components/CartProductList/index.js"
+      ],
+      "source_locations": [
+        "L1"
+      ],
+      "contexts": [
+        "export",
+        "re-export"
+      ]
+    },
+    {
+      "source": "components_categorylist_index",
+      "target": "components_categorylist_categorylist",
+      "edge_count": 2,
+      "relations": [
+        "imports_from",
+        "re_exports"
+      ],
+      "source_files": [
+        "components/CategoryList/index.js"
+      ],
+      "source_locations": [
+        "L1"
+      ],
+      "contexts": [
+        "export",
+        "re-export"
+      ]
+    },
+    {
+      "source": "components_custombutton_index",
+      "target": "components_custombutton_custombutton",
+      "edge_count": 2,
+      "relations": [
+        "imports_from",
+        "re_exports"
+      ],
+      "source_files": [
+        "components/CustomButton/index.js"
+      ],
+      "source_locations": [
+        "L1"
+      ],
+      "contexts": [
+        "export",
+        "re-export"
+      ]
+    }
+  ]
+}

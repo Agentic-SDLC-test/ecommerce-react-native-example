@@ -3,6 +3,15 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
+const {
+  getCurrentUserFromRequest,
+  hasVerifiedPurchase,
+  findReview,
+  validateReviewPayload,
+  buildReviewSummary,
+  serializeReview,
+  getDeliveredOrderIds,
+} = require("./reviewHelpers");
 
 const app = express();
 const PORT = 3002;
@@ -280,6 +289,97 @@ let orders = [
     createdAt: new Date("2024-01-09T08:00:00Z").toISOString(),
     updatedAt: new Date("2024-01-12T16:00:00Z").toISOString(),
   },
+  {
+    _id: "order004",
+    orderId: "ORD-2024-004",
+    user: {
+      _id: "user002",
+      name: "Jane Smith",
+      email: "jane@easybuy.com",
+    },
+    items: [
+      {
+        productId: {
+          _id: "prod007",
+          title: "Organic Basmati Rice (5kg)",
+        },
+        price: 12.99,
+        quantity: 1,
+      },
+    ],
+    amount: 12.99,
+    discount: 0,
+    payment_type: "cod",
+    country: "Canada",
+    city: "Vancouver",
+    zipcode: "V6B 1A1",
+    shippingAddress: "456 Oak Avenue",
+    status: "delivered",
+    shippedOn: "2024-02-01",
+    deliveredOn: "2024-02-03",
+    createdAt: new Date("2024-01-30T10:00:00Z").toISOString(),
+    updatedAt: new Date("2024-02-03T14:00:00Z").toISOString(),
+  },
+];
+
+let reviews = [
+  {
+    _id: "review001",
+    productId: "prod007",
+    productTitle: "Organic Basmati Rice (5kg)",
+    user: {
+      _id: "user001",
+      name: "John Doe",
+      email: "user@easybuy.com",
+    },
+    rating: 5,
+    reviewText: "Excellent quality rice, very aromatic and cooks perfectly.",
+    verifiedPurchase: true,
+    sourceOrderIds: ["order003"],
+    visible: true,
+    hiddenAt: null,
+    hiddenBy: null,
+    createdAt: new Date("2024-01-20T12:00:00Z").toISOString(),
+    updatedAt: new Date("2024-01-20T12:00:00Z").toISOString(),
+  },
+  {
+    _id: "review002",
+    productId: "prod007",
+    productTitle: "Organic Basmati Rice (5kg)",
+    user: {
+      _id: "user002",
+      name: "Jane Smith",
+      email: "jane@easybuy.com",
+    },
+    rating: 4,
+    reviewText: "Good value for money. Would buy again.",
+    verifiedPurchase: true,
+    sourceOrderIds: ["order004"],
+    visible: true,
+    hiddenAt: null,
+    hiddenBy: null,
+    createdAt: new Date("2024-02-05T09:00:00Z").toISOString(),
+    updatedAt: new Date("2024-02-05T09:00:00Z").toISOString(),
+  },
+  {
+    _id: "review003",
+    productId: "prod007",
+    productTitle: "Organic Basmati Rice (5kg)",
+    user: {
+      _id: "user002",
+      name: "Jane Smith",
+      email: "jane@easybuy.com",
+    },
+    rating: 1,
+    reviewText: "Hidden review used for moderation testing.",
+    verifiedPurchase: true,
+    sourceOrderIds: ["order004"],
+    visible: false,
+    hiddenAt: new Date("2024-02-06T10:00:00Z").toISOString(),
+    hiddenBy: "admin001",
+    createdAt: new Date("2024-02-06T08:00:00Z").toISOString(),
+    updatedAt: new Date("2024-02-06T10:00:00Z").toISOString(),
+  },
 ];
 
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
@@ -450,6 +550,8 @@ app.get("/delete-category", adminMiddleware, (req, res) => {
 
 // GET /dashboard  (admin)
 app.get("/dashboard", adminMiddleware, (req, res) => {
+  const visibleReviews = reviews.filter((r) => r.visible === true);
+  const hiddenReviews = reviews.filter((r) => r.visible === false);
   res.json({
     success: true,
     data: {
@@ -457,6 +559,9 @@ app.get("/dashboard", adminMiddleware, (req, res) => {
       ordersCount: orders.length,
       productsCount: products.length,
       categoriesCount: categories.length,
+      reviewsCount: reviews.length,
+      visibleReviewsCount: visibleReviews.length,
+      hiddenReviewsCount: hiddenReviews.length,
     },
   });
 });
@@ -576,6 +681,214 @@ app.post("/photos/upload", upload.single("photos"), (req, res) => {
   });
 });
 
+// GET /product-reviews?productId=
+app.get("/product-reviews", (req, res) => {
+  const { productId } = req.query;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "productId is required" });
+  }
+  const product = products.find((p) => p._id === productId);
+  if (!product) {
+    return res.status(404).json({ success: false, message: "Product not found" });
+  }
+
+  const token = req.headers["x-auth-token"];
+  let viewerUser = null;
+  if (token) {
+    viewerUser = getCurrentUserFromRequest(req, users);
+    if (!viewerUser) {
+      return res.status(401).json({ success: false, err: "jwt expired", message: "Invalid or expired token" });
+    }
+  }
+
+  const summary = buildReviewSummary(productId, reviews);
+  const viewer = {
+    authenticated: !!viewerUser,
+    canReview: false,
+    hasReview: false,
+    review: null,
+  };
+
+  if (viewerUser) {
+    const existingReview = findReview(productId, viewerUser._id, reviews);
+    const canReview = hasVerifiedPurchase(viewerUser._id, productId, orders);
+    viewer.canReview = canReview;
+    viewer.hasReview = !!existingReview;
+    viewer.review = existingReview ? serializeReview(existingReview) : null;
+  }
+
+  res.json({
+    success: true,
+    data: {
+      productId,
+      summary,
+      viewer,
+    },
+  });
+});
+
+// POST /review?productId=
+app.post("/review", authMiddleware, (req, res) => {
+  const { productId } = req.query;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "productId is required" });
+  }
+  const product = products.find((p) => p._id === productId);
+  if (!product) {
+    return res.status(404).json({ success: false, message: "Product not found" });
+  }
+
+  if (!hasVerifiedPurchase(req.user._id, productId, orders)) {
+    return res.status(403).json({
+      success: false,
+      message: "Only verified purchasers can review this product",
+    });
+  }
+
+  const validation = validateReviewPayload(req.body);
+  if (!validation.valid) {
+    return res.status(400).json({ success: false, message: validation.message });
+  }
+
+  const existingReview = findReview(productId, req.user._id, reviews);
+  const now = new Date().toISOString();
+  const sourceOrderIds = getDeliveredOrderIds(req.user._id, productId, orders);
+
+  let savedReview;
+  let statusCode = 201;
+  let message = "Review submitted successfully";
+
+  if (existingReview) {
+    existingReview.rating = validation.rating;
+    existingReview.reviewText = validation.reviewText;
+    existingReview.updatedAt = now;
+    existingReview.sourceOrderIds = sourceOrderIds;
+    savedReview = existingReview;
+    statusCode = 200;
+    message = "Review updated successfully";
+    console.log(
+      `review update reviewId=${savedReview._id} productId=${productId} userId=${req.user._id}`
+    );
+  } else {
+    savedReview = {
+      _id: uuidv4(),
+      productId,
+      productTitle: product.title,
+      user: {
+        _id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+      },
+      rating: validation.rating,
+      reviewText: validation.reviewText,
+      verifiedPurchase: true,
+      sourceOrderIds,
+      visible: true,
+      hiddenAt: null,
+      hiddenBy: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    reviews.push(savedReview);
+    console.log(
+      `review create reviewId=${savedReview._id} productId=${productId} userId=${req.user._id}`
+    );
+  }
+
+  const summary = buildReviewSummary(productId, reviews);
+  res.status(statusCode).json({
+    success: true,
+    message,
+    data: {
+      review: serializeReview(savedReview),
+      summary,
+    },
+  });
+});
+
+// GET /admin/reviews?visibility=all|visible|hidden&productId=
+app.get("/admin/reviews", adminMiddleware, (req, res) => {
+  const { visibility = "all", productId } = req.query;
+  let filtered = [...reviews];
+
+  if (productId) {
+    filtered = filtered.filter((r) => r.productId === productId);
+  }
+
+  if (visibility === "visible") {
+    filtered = filtered.filter((r) => r.visible === true);
+  } else if (visibility === "hidden") {
+    filtered = filtered.filter((r) => r.visible === false);
+  }
+
+  filtered.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
+
+  const visibleCount = reviews.filter((r) => r.visible === true).length;
+  const hiddenCount = reviews.filter((r) => r.visible === false).length;
+
+  res.json({
+    success: true,
+    data: {
+      reviews: filtered.map((r) => serializeReview(r, true)),
+      totalCount: reviews.length,
+      visibleCount,
+      hiddenCount,
+    },
+  });
+});
+
+// GET /admin/review-visibility?id=&visible=
+app.get("/admin/review-visibility", adminMiddleware, (req, res) => {
+  const { id, visible } = req.query;
+  if (!id || visible === undefined) {
+    return res.status(400).json({ success: false, message: "id and visible are required" });
+  }
+  if (visible !== "true" && visible !== "false") {
+    return res.status(400).json({ success: false, message: "visible must be true or false" });
+  }
+
+  const review = reviews.find((r) => r._id === id);
+  if (!review) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+
+  const isVisible = visible === "true";
+  review.visible = isVisible;
+  if (isVisible) {
+    review.hiddenAt = null;
+    review.hiddenBy = null;
+    console.log(`review show reviewId=${id} productId=${review.productId} userId=${review.user._id}`);
+  } else {
+    review.hiddenAt = new Date().toISOString();
+    review.hiddenBy = req.user._id;
+    console.log(`review hide reviewId=${id} productId=${review.productId} userId=${review.user._id}`);
+  }
+  review.updatedAt = new Date().toISOString();
+
+  res.json({
+    success: true,
+    message: isVisible ? "Review is now visible" : "Review is now hidden",
+    data: serializeReview(review, true),
+  });
+});
+
+// GET /admin/delete-review?id=
+app.get("/admin/delete-review", adminMiddleware, (req, res) => {
+  const { id } = req.query;
+  if (!id) {
+    return res.status(400).json({ success: false, message: "id is required" });
+  }
+  const idx = reviews.findIndex((r) => r._id === id);
+  if (idx === -1) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+  const removed = reviews.splice(idx, 1)[0];
+  console.log(
+    `review remove reviewId=${id} productId=${removed.productId} userId=${removed.user._id}`
+  );
+  res.json({ success: true, message: "Review deleted successfully" });
+});
+
 // ─── Fallback placeholder image for /uploads/* ────────────────────────────────
 // Returns a simple SVG placeholder when the requested image doesn't exist
 app.get("/uploads/:filename", (req, res) => {
@@ -617,6 +930,11 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   GET    /delete-user?id=`);
   console.log(`   POST   /reset-password?id=`);
   console.log(`   POST   /photos/upload`);
+  console.log(`   GET    /product-reviews?productId=`);
+  console.log(`   POST   /review?productId=          (user)`);
+  console.log(`   GET    /admin/reviews            (admin)`);
+  console.log(`   GET    /admin/review-visibility?id=&visible=  (admin)`);
+  console.log(`   GET    /admin/delete-review?id=  (admin)`);
   console.log(`   GET    /uploads/:filename`);
   console.log(`\n🔑 Test tokens:`);
   console.log(`   Admin token : mock-admin-token-001`);
