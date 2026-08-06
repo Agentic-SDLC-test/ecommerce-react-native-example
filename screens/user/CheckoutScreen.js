@@ -8,16 +8,22 @@ import {
   Modal,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
-import { colors } from "../../constants";
+import { colors, payment } from "../../constants";
 import CustomButton from "../../components/CustomButton";
 import { useSelector, useDispatch } from "react-redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import { bindActionCreators } from "redux";
 import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
+import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
+import PaymentMethodSelector from "../../components/PaymentMethodSelector";
+import {
+  buildCheckoutPayload,
+  getPaymentMethodOptions,
+} from "../../utils/payment";
 
 const CheckoutScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -34,51 +40,154 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
 
+  // Cash on delivery is pre-selected, so a shopper who reads nothing and taps
+  // Submit gets exactly the pre-change behaviour.
+  const [paymentMethod, setPaymentMethod] = useState(
+    payment.PAYMENT_METHODS.COD
+  );
+  const [paymentOptions] = useState(getPaymentMethodOptions);
+  const [error, setError] = useState("");
+  const [alertType, setAlertType] = useState("error");
+
+  // Together these guarantee at most one POST /checkout per approved payment:
+  // one blocks a concurrent submit, the other blocks a replayed route param.
+  const isSubmittingRef = useRef(false);
+  const processedReferenceRef = useRef(null);
+
+  const selectedMethodLabel =
+    payment.PAYMENT_METHOD_LABELS[paymentMethod] ?? paymentMethod;
+
+  // The card path adds a screen, so say so rather than surprising the shopper.
+  // Cash on delivery keeps the original label and the original single tap.
+  const submitButtonText =
+    paymentMethod === payment.PAYMENT_METHODS.CARD
+      ? "Continue to Payment"
+      : "Submit Order";
+
+  //method to handle the payment method selection
+  const handlePaymentMethodChange = (method) => {
+    setPaymentMethod(method);
+    setError("");
+    console.log("[payment] method_selected", JSON.stringify({ method: method }));
+  };
+
   //method to handle checkout
-  const handleCheckout = async () => {
+  const handleCheckout = (paymentResult = null) => {
+    if (isSubmittingRef.current) {
+      return;
+    }
+
+    // The card path needs an outcome before an order can exist, so hand off to
+    // the payment screen and come back through the route param.
+    if (paymentMethod === payment.PAYMENT_METHODS.CARD && !paymentResult) {
+      navigation.navigate("cardpayment", {
+        amount: totalCost + deliveryCost,
+        returnTo: "checkout",
+      });
+      return;
+    }
+
+    if (
+      paymentMethod === payment.PAYMENT_METHODS.CARD &&
+      paymentResult.result !== "approved"
+    ) {
+      setError(paymentResult.message || "Payment was not completed.");
+      setAlertType("error");
+      return;
+    }
+
+    isSubmittingRef.current = true;
     setIsloading(true);
-
-    var payload = [];
-    var totalamount = 0;
-
-    // fetch the cart items from redux and set the total cost
-    cartproduct.forEach((product) => {
-      let obj = {
-        productId: product._id,
-        price: product.price,
-        quantity: product.quantity,
-      };
-      totalamount += parseInt(product.price) * parseInt(product.quantity);
-      payload.push(obj);
-    });
+    setError("");
 
     api
-      .checkout({
-        items: payload,
-        amount: totalamount,
-        discount: 0,
-        payment_type: "cod",
-        country: country,
-        status: "pending",
-        city: city,
-        zipcode: zipcode,
-        shippingAddress: streetAddress,
-      }) //API call
+      .checkout(
+        buildCheckoutPayload({
+          cartItems: cartproduct,
+          address: {
+            country: country,
+            city: city,
+            zipcode: zipcode,
+            streetAddress: streetAddress,
+          },
+          paymentMethod: paymentMethod,
+          paymentResult: paymentResult,
+        })
+      ) //API call
       .then((result) => {
         console.log("Checkout=>", result);
         if (result.success == true) {
+          console.log(
+            "[payment] order_placed",
+            JSON.stringify({
+              orderId: result.data?.orderId,
+              payment_type: result.data?.payment_type,
+              payment_status: result.data?.payment_status,
+              payment_reference: result.data?.payment_reference,
+            })
+          );
           setIsloading(false);
           emptyCart("empty");
-          navigation.replace("orderconfirm");
+          navigation.replace("orderconfirm", { order: result.data });
         } else {
+          console.log(
+            "[payment] order_rejected",
+            JSON.stringify({
+              payment_type: paymentMethod,
+              reason: result.message,
+            })
+          );
           setIsloading(false);
+          isSubmittingRef.current = false;
+          setError(
+            result.message || "We could not place your order. Please try again."
+          );
+          setAlertType("error");
         }
       })
       .catch((error) => {
         setIsloading(false);
+        isSubmittingRef.current = false;
+        setError("We could not place your order. Please try again.");
+        setAlertType("error");
         console.log("error", error);
       });
   };
+
+  // consume the outcome the card payment screen navigated back with
+  useEffect(() => {
+    const paymentResult = route.params?.paymentResult;
+    const switchToCod = route.params?.paymentSwitchToCod;
+
+    if (switchToCod) {
+      setPaymentMethod(payment.PAYMENT_METHODS.COD);
+      setError("Card payment cancelled — your order will be Cash on Delivery.");
+      setAlertType("info");
+      navigation.setParams({ paymentSwitchToCod: undefined });
+      return;
+    }
+
+    if (!paymentResult) {
+      return;
+    }
+
+    if (paymentResult.result === "approved") {
+      // The reference is the idempotency key: a re-render or a replayed param
+      // cannot place the same order twice.
+      if (paymentResult.reference !== processedReferenceRef.current) {
+        processedReferenceRef.current = paymentResult.reference;
+        handleCheckout(paymentResult);
+      }
+    } else {
+      setError(paymentResult.message || "Payment was not completed.");
+      setAlertType(
+        paymentResult.result === "declined" ? "error" : "info"
+      );
+    }
+
+    navigation.setParams({ paymentResult: undefined });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [route.params?.paymentResult, route.params?.paymentSwitchToCod]);
 
   // set the address and total cost on initital render
   useEffect(() => {
@@ -114,6 +223,7 @@ const CheckoutScreen = ({ navigation, route }) => {
         <View></View>
         <View></View>
       </View>
+      <CustomAlert message={error} type={alertType} testID="checkout-alert" />
       <ScrollView style={styles.bodyContainer} nestedScrollEnabled={true} testID="checkout-scroll">
         <Text style={styles.primaryText} testID="checkout-summary-heading">Order Summary</Text>
         <ScrollView
@@ -188,10 +298,16 @@ const CheckoutScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
+        <PaymentMethodSelector
+          testID="checkout-payment"
+          options={paymentOptions}
+          value={paymentMethod}
+          onChange={handlePaymentMethodChange}
+        />
         <View style={styles.listContainer}>
           <View style={styles.list}>
             <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
+            <Text style={styles.primaryTextSm} testID="checkout-method-value">{selectedMethodLabel}</Text>
           </View>
         </View>
 
@@ -201,14 +317,14 @@ const CheckoutScreen = ({ navigation, route }) => {
         {country && city && streetAddress != "" ? (
           <CustomButton
             testID="checkout-submit-btn"
-            text={"Submit Order"}
+            text={submitButtonText}
             // onPress={() => navigation.replace("orderconfirm")}
             onPress={() => {
               handleCheckout();
             }}
           />
         ) : (
-          <CustomButton testID="checkout-submit-btn" text={"Submit Order"} disabled />
+          <CustomButton testID="checkout-submit-btn" text={submitButtonText} disabled />
         )}
       </View>
       <Modal

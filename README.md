@@ -35,6 +35,46 @@ Open-Source React Native Ecommerce Cross Platform Mobile App :iphone:
 - [x] Cart Screen
 - [x] Checkout Screen
 
+## Payments :credit_card:
+
+Checkout offers the shopper a choice of payment method:
+
+- **Cash on Delivery** — the default, and unchanged from before. Selected on
+  first render, so a shopper who makes no active choice still checks out in one
+  tap.
+- **Card (simulated)** — a card placeholder screen that produces a payment
+  outcome and hands it back to checkout.
+
+**All payment in this app is simulated. No real money moves, and no card data is
+ever collected.** The card number, expiry and CVC on the card screen are static
+display text, not input fields — there is no field capable of accepting a real
+card number, and the `/checkout` request body carries no card fields at all.
+
+Every order records two payment facts, kept separate from the fulfilment
+`status` (pending / shipped / delivered):
+
+| `payment_status` | Shown to the shopper as | Meaning |
+| ---------------- | ----------------------- | ------- |
+| `due_on_delivery` | Pay on delivery | Cash order, or an order with no recorded payment |
+| `paid` | Paid | A card payment was approved |
+| `failed` | Payment failed | A card payment was declined |
+| `not_completed` | Payment not completed | The shopper did not finish paying |
+
+Advancing an order's fulfilment never changes its payment state, and payment
+state is read-only in the staff views. Orders that predate this feature — and
+orders from a backend that does not yet store these fields — display as Cash on
+Delivery / Pay on delivery, never as paid.
+
+### Payment feature flags
+
+Both are build-time flags (Expo inlines `EXPO_PUBLIC_*` into the bundle, so a
+change needs a rebuild). Neither is a secret. See `.env.example`.
+
+| Flag | Default | Effect |
+| ---- | ------- | ------ |
+| `EXPO_PUBLIC_ENABLE_DIGITAL_PAYMENT` | on when unset | Set to `false` to offer cash on delivery only |
+| `EXPO_PUBLIC_PAYMENT_SIM_CONTROLS` | on in dev only | Set to `true` to expose the Approve/Decline switch in a preview build |
+
 ## How to Run App :white_check_mark:
 
 ### `Clone the repo`

@@ -3,6 +3,7 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
+const { withPaymentDefaults, validatePaymentFields } = require("./payment");
 
 const app = express();
 const PORT = 3002;
@@ -211,6 +212,9 @@ let orders = [
     amount: 129.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "due_on_delivery",
+    payment_reference: null,
+    payment_status_updated_at: new Date("2024-01-15T10:30:00Z").toISOString(),
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -240,6 +244,9 @@ let orders = [
     amount: 24.99,
     discount: 0,
     payment_type: "cod",
+    payment_status: "due_on_delivery",
+    payment_reference: null,
+    payment_status_updated_at: new Date("2024-01-16T14:00:00Z").toISOString(),
     country: "Canada",
     city: "Vancouver",
     zipcode: "V6B 1A1",
@@ -270,6 +277,9 @@ let orders = [
     amount: 38.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "due_on_delivery",
+    payment_reference: null,
+    payment_status_updated_at: new Date("2024-01-09T08:00:00Z").toISOString(),
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -279,6 +289,40 @@ let orders = [
     deliveredOn: "2024-01-12",
     createdAt: new Date("2024-01-09T08:00:00Z").toISOString(),
     updatedAt: new Date("2024-01-12T16:00:00Z").toISOString(),
+  },
+  // A paid card order, so a preview shows both payment states without having to
+  // place one first. Fulfilment is still pending — paid does not mean shipped.
+  {
+    _id: "order004",
+    orderId: "ORD-2024-004",
+    user: {
+      _id: "user001",
+      name: "John Doe",
+      email: "user@easybuy.com",
+    },
+    items: [
+      {
+        productId: {
+          _id: "prod004",
+          title: "Smartphone Stand",
+        },
+        price: 14.99,
+        quantity: 1,
+      },
+    ],
+    amount: 14.99,
+    discount: 0,
+    payment_type: "card",
+    payment_status: "paid",
+    payment_reference: "SIMPAY-1705400000000-DEMO",
+    payment_status_updated_at: new Date("2024-01-16T11:15:00Z").toISOString(),
+    country: "Canada",
+    city: "Toronto",
+    zipcode: "M5V 3A8",
+    shippingAddress: "123 Main Street",
+    status: "pending",
+    createdAt: new Date("2024-01-16T11:15:00Z").toISOString(),
+    updatedAt: new Date("2024-01-16T11:15:00Z").toISOString(),
   },
 ];
 
@@ -463,7 +507,7 @@ app.get("/dashboard", adminMiddleware, (req, res) => {
 
 // GET /admin/orders  (admin: all orders)
 app.get("/admin/orders", adminMiddleware, (req, res) => {
-  res.json({ success: true, data: orders });
+  res.json({ success: true, data: orders.map(withPaymentDefaults) });
 });
 
 // GET /admin/users  (admin: all users)
@@ -483,24 +527,51 @@ app.get("/admin/order-status", adminMiddleware, (req, res) => {
   if (!order) {
     return res.status(404).json({ success: false, message: "Order not found" });
   }
+  // Fulfilment only. Payment fields are intentionally untouched here — advancing
+  // an order to shipped must never make it paid, and paid is set only at checkout.
   order.status = status;
   order.updatedAt = new Date().toISOString();
   if (status === "shipped") order.shippedOn = new Date().toISOString().split("T")[0];
   if (status === "delivered") order.deliveredOn = new Date().toISOString().split("T")[0];
-  res.json({ success: true, message: `Order status updated to ${status}`, data: order });
+  res.json({
+    success: true,
+    message: `Order status updated to ${status}`,
+    data: withPaymentDefaults(order),
+  });
 });
 
 // GET /orders  (user: their own orders)
 app.get("/orders", authMiddleware, (req, res) => {
   const userOrders = orders.filter((o) => o.user._id === req.user._id);
-  res.json({ success: true, data: userOrders });
+  res.json({ success: true, data: userOrders.map(withPaymentDefaults) });
 });
 
 // POST /checkout  (user: place order)
 app.post("/checkout", authMiddleware, (req, res) => {
-  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
+  const { items, amount, discount, payment_type, payment_status, payment_reference, country, city, zipcode, shippingAddress, status } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
+  }
+  // Omitting the payment fields keeps the pre-change behaviour: cash on delivery,
+  // due on delivery.
+  const paymentType = payment_type || "cod";
+  const paymentStatus = payment_status || "due_on_delivery";
+  const paymentReference = payment_reference || null;
+  const paymentCheck = validatePaymentFields({
+    payment_type: paymentType,
+    payment_status: paymentStatus,
+    payment_reference: paymentReference,
+  });
+  if (!paymentCheck.valid) {
+    console.log(
+      "[payment] checkout_rejected",
+      JSON.stringify({
+        payment_type: paymentType,
+        payment_status: paymentStatus,
+        message: paymentCheck.message,
+      })
+    );
+    return res.status(400).json({ success: false, message: paymentCheck.message });
   }
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
@@ -523,7 +594,10 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
+    payment_type: paymentType,
+    payment_status: paymentStatus,
+    payment_reference: paymentReference,
+    payment_status_updated_at: new Date().toISOString(),
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",
@@ -533,7 +607,20 @@ app.post("/checkout", authMiddleware, (req, res) => {
     updatedAt: new Date().toISOString(),
   };
   orders.push(newOrder);
-  res.json({ success: true, message: "Order placed successfully", data: newOrder });
+  console.log(
+    "[payment] checkout",
+    JSON.stringify({
+      orderId: newOrder.orderId,
+      payment_type: newOrder.payment_type,
+      payment_status: newOrder.payment_status,
+      has_reference: Boolean(newOrder.payment_reference),
+    })
+  );
+  res.json({
+    success: true,
+    message: "Order placed successfully",
+    data: withPaymentDefaults(newOrder),
+  });
 });
 
 // GET /delete-user?id=
@@ -618,6 +705,11 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   POST   /reset-password?id=`);
   console.log(`   POST   /photos/upload`);
   console.log(`   GET    /uploads/:filename`);
+  console.log(`\n💳 Order payment contract:`);
+  console.log(`   payment_type              cod | card`);
+  console.log(`   payment_status            due_on_delivery | paid | failed | not_completed`);
+  console.log(`   payment_reference         SIMPAY-<epochMs>-<4 chars> or null`);
+  console.log(`   payment_status_updated_at ISO-8601 or null`);
   console.log(`\n🔑 Test tokens:`);
   console.log(`   Admin token : mock-admin-token-001`);
   console.log(`   User token  : mock-user-token-001`);
