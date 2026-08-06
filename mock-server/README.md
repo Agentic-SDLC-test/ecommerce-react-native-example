@@ -32,6 +32,11 @@ npm run dev       # starts with nodemon (auto-restart on file changes)
 | GET | `/admin/order-status?orderId=&status=` | Admin | Update order status |
 | GET | `/orders` | User | Current user's orders |
 | POST | `/checkout` | User | Place an order |
+| GET | `/reviews?productId=` | — | Aggregate, visible reviews and viewer context for a product |
+| POST | `/review` | User | Submit or update the caller's review (verified purchasers only) |
+| GET | `/delete-review?id=` | User | Remove the caller's own review |
+| GET | `/admin/reviews` | Admin | All reviews, newest first, with visibility state |
+| GET | `/admin/review-visibility?reviewId=&visible=` | Admin | Hide or unhide a review |
 | GET | `/delete-user?id=` | — | Delete a user account |
 | POST | `/reset-password?id=` | — | Update password |
 | POST | `/photos/upload` | — | Upload an image |
@@ -76,5 +81,13 @@ The server starts with pre-seeded data:
 - **8 products**: 2 per category
 - **3 users**: 1 admin + 2 regular users
 - **3 orders**: in various statuses (pending, shipped, delivered)
+- **10 reviews**: across 4 products (one hidden), leaving 4 products with none
 
 All data is stored in-memory and resets when the server restarts.
+
+## Verifying the review endpoints
+
+With the server running, `./verify-reviews.sh` walks the whole review contract
+(read, gated write, non-purchaser rejection, bad rating, hide, aggregate
+re-check, unhide, author delete) and exits non-zero on the first failure. It is
+not part of CI because it needs a live server, and Jest excludes `mock-server/`.

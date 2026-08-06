@@ -5,6 +5,7 @@ import {
   View,
   StatusBar,
   Text,
+  ScrollView,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -15,7 +16,25 @@ import { useSelector, useDispatch } from "react-redux";
 import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import * as api from "../../api";
+import * as session from "../../utils/session";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import ReviewSummary from "../../components/ReviewSummary";
+import ReviewCard from "../../components/ReviewCard";
+import ReviewForm from "../../components/ReviewForm";
+import {
+  REVIEW_PAGE_SIZE,
+  areReviewsEnabled,
+  clampComment,
+  isValidRating,
+} from "../../utils/reviews";
+
+//viewer context before the server has answered: read-only, no contribution
+const defaultViewer = {
+  isAuthenticated: false,
+  hasPurchased: false,
+  canReview: false,
+  myReview: null,
+};
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -37,6 +56,112 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const [error, setError] = useState("");
   const [isDisable, setIsDisbale] = useState(true);
   const [alertType, setAlertType] = useState("error");
+  const [reviews, setReviews] = useState([]);
+  const [aggregate, setAggregate] = useState({ average: null, count: 0 });
+  const [viewer, setViewer] = useState(defaultViewer);
+  const [reviewsLoading, setReviewsLoading] = useState(true);
+  const [reviewsError, setReviewsError] = useState("");
+  const [authUser, setAuthUser] = useState(null);
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState("");
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const [reviewsShown, setReviewsShown] = useState(REVIEW_PAGE_SIZE);
+
+  //method to fetch the aggregate, visible reviews and viewer context for this
+  //product; never awaited before the product body renders
+  const fetchReviews = () => {
+    setReviewsLoading(true);
+    api
+      .getProductReviews(product?._id)
+      .then((result) => {
+        if (result.success) {
+          setReviews(result.data?.reviews ?? []);
+          setAggregate({
+            average: result.data?.average ?? null,
+            count: result.data?.count ?? 0,
+          });
+          setViewer(result.data?.viewer ?? defaultViewer);
+          setReviewsError("");
+        } else {
+          setReviewsError(result.message);
+        }
+        setReviewsLoading(false);
+      })
+      .catch((error) => {
+        setReviewsLoading(false);
+        setReviewsError("Could not load reviews.");
+        console.log("reviews:fetch error", error);
+      });
+  };
+
+  //the session seam is the authority for sign-in state, not route params
+  const loadAuthUser = () => {
+    session
+      .getUser()
+      .then(setAuthUser)
+      .catch((error) => {
+        console.log("reviews:fetch error", error);
+      });
+  };
+
+  //method to submit or update the shopper's own review for this product
+  const handleSubmitReview = () => {
+    if (!isValidRating(rating)) {
+      return;
+    }
+    setReviewBusy(true);
+    api
+      .submitReview(product?._id, rating, clampComment(comment))
+      .then((result) => {
+        if (result.success) {
+          setAlertType("success");
+          setError(result.message);
+          fetchReviews();
+        } else {
+          //keep the typed comment so the shopper can retry without rewriting it
+          setAlertType("error");
+          setError(result.message);
+        }
+        setReviewBusy(false);
+      })
+      .catch((error) => {
+        setReviewBusy(false);
+        setAlertType("error");
+        setError("Could not submit your review. Please try again.");
+        console.log("reviews:submit error", error);
+      });
+  };
+
+  //method to remove the shopper's own review
+  const handleRemoveReview = () => {
+    setReviewBusy(true);
+    api
+      .deleteReview(viewer?.myReview?._id)
+      .then((result) => {
+        if (result.success) {
+          setAlertType("success");
+          setError(result.message);
+          setRating(0);
+          setComment("");
+          fetchReviews();
+        } else {
+          setAlertType("error");
+          setError(result.message);
+        }
+        setReviewBusy(false);
+      })
+      .catch((error) => {
+        setReviewBusy(false);
+        setAlertType("error");
+        setError("Could not remove your review. Please try again.");
+        console.log("reviews:delete error", error);
+      });
+  };
+
+  //method to reveal the next page of reviews
+  const handleShowMoreReviews = () => {
+    setReviewsShown(reviewsShown + REVIEW_PAGE_SIZE);
+  };
 
   //method to fetch wishlist from server using API call
   const fetchWishlist = async () => {
@@ -131,10 +256,20 @@ const ProductDetailScreen = ({ navigation, route }) => {
     setAvaiableQuantity(product.quantity);
     SetProductImage(`${network.serverip}/uploads/${product?.image}`);
     fetchWishlist();
+    fetchReviews();
+    loadAuthUser();
   }, []);
 
   //render whenever the value of wishlistItems change
   useEffect(() => {}, [wishlistItems]);
+
+  //prefill the form so a returning author sees their existing review
+  useEffect(() => {
+    if (viewer?.myReview) {
+      setRating(viewer.myReview.rating);
+      setComment(viewer.myReview.comment ?? "");
+    }
+  }, [viewer]);
 
   return (
     <View style={styles.container} testID="product-detail-screen">
@@ -176,6 +311,11 @@ const ProductDetailScreen = ({ navigation, route }) => {
         <CustomAlert message={error} type={alertType} testID="product-detail-alert" />
         <View style={styles.productInfoContainer}>
           <View style={styles.productInfoTopContainer}>
+            <ScrollView
+              testID="product-detail-scroll"
+              style={styles.productInfoScroll}
+              showsVerticalScrollIndicator={false}
+            >
             <View style={styles.productNameContaier}>
               <Text style={styles.productNameText} testID="product-detail-title">{product?.title}</Text>
             </View>
@@ -208,6 +348,86 @@ const ProductDetailScreen = ({ navigation, route }) => {
               <Text style={styles.secondaryTextSm} testID="product-detail-description-label">Description:</Text>
               <Text testID="product-detail-description">{product?.description}</Text>
             </View>
+            {areReviewsEnabled() ? (
+              <View style={styles.reviewsContainer} testID="product-detail-reviews-section">
+                <Text style={styles.secondaryTextSm} testID="product-detail-reviews-label">Reviews:</Text>
+                <ReviewSummary
+                  average={aggregate.average}
+                  count={aggregate.count}
+                  testID="product-detail-reviews-summary"
+                />
+                {reviewsLoading && reviews.length === 0 ? (
+                  <Text style={styles.reviewsMutedText} testID="product-detail-reviews-loading">
+                    Loading reviews...
+                  </Text>
+                ) : (
+                  <></>
+                )}
+                {reviewsError !== "" ? (
+                  <View style={styles.reviewsErrorContainer}>
+                    <Text style={styles.reviewsMutedText} testID="product-detail-reviews-error">
+                      {reviewsError}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => fetchReviews()}
+                      testID="product-detail-reviews-retry-btn"
+                    >
+                      <Text style={styles.reviewsLinkText}>Retry</Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <></>
+                )}
+                {reviews.slice(0, reviewsShown).map((review, index) => (
+                  <ReviewCard
+                    key={review?._id ?? index}
+                    item={review}
+                    testID={`product-detail-review-item-${index}`}
+                  />
+                ))}
+                {reviews.length > reviewsShown ? (
+                  <TouchableOpacity
+                    onPress={handleShowMoreReviews}
+                    testID="product-detail-reviews-show-more-btn"
+                  >
+                    <Text style={styles.reviewsLinkText}>Show more reviews</Text>
+                  </TouchableOpacity>
+                ) : (
+                  <></>
+                )}
+                {/* the contribution area waits for the server's viewer answer so
+                    a purchaser never sees a sign-in prompt while it loads */}
+                {reviewsLoading ? (
+                  <></>
+                ) : viewer?.canReview ? (
+                  <ReviewForm
+                    mode={viewer?.myReview ? "edit" : "create"}
+                    rating={rating}
+                    setRating={setRating}
+                    comment={comment}
+                    setComment={setComment}
+                    onSubmit={handleSubmitReview}
+                    onDelete={handleRemoveReview}
+                    isBusy={reviewBusy}
+                    hiddenNotice={viewer?.myReview?.isVisible === false}
+                    testID="product-detail-review-form"
+                  />
+                ) : viewer?.isAuthenticated || authUser ? (
+                  <Text style={styles.reviewsMutedText} testID="product-detail-reviews-gate-text">
+                    Only verified purchasers can review this product.
+                  </Text>
+                ) : (
+                  <CustomButton
+                    text={"Sign in to review"}
+                    onPress={() => navigation.navigate("login")}
+                    testID="product-detail-reviews-signin-btn"
+                  />
+                )}
+              </View>
+            ) : (
+              <></>
+            )}
+            </ScrollView>
           </View>
           <View style={styles.productInfoBottomContainer}>
             <View style={styles.counterContainer}>
@@ -397,6 +617,40 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingLeft: 20,
     paddingRight: 20,
+  },
+  productInfoScroll: {
+    width: "100%",
+    flex: 1,
+  },
+  reviewsContainer: {
+    display: "flex",
+    width: "100%",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    justifyContent: "flex-start",
+    paddingLeft: 20,
+    paddingRight: 20,
+    paddingTop: 15,
+    paddingBottom: 10,
+  },
+  reviewsErrorContainer: {
+    display: "flex",
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  reviewsMutedText: {
+    fontSize: 13,
+    color: colors.muted,
+    marginBottom: 10,
+  },
+  reviewsLinkText: {
+    fontSize: 13,
+    color: colors.primary,
+    fontWeight: "bold",
+    marginBottom: 10,
   },
   iconContainer: {
     display: "flex",
