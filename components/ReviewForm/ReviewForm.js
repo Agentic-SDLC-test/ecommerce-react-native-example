@@ -16,6 +16,7 @@ const ReviewForm = ({
   onDelete,
   isBusy = false,
   hiddenNotice = false,
+  validationMessage = "",
   testID,
 }) => {
   return (
@@ -52,10 +53,22 @@ const ReviewForm = ({
       <Text style={styles.counterText} testID={testID ? `${testID}-counter` : undefined}>
         {`${remainingCommentChars(comment)} characters left`}
       </Text>
+      {validationMessage !== "" ? (
+        <Text
+          style={styles.validationText}
+          testID={testID ? `${testID}-validation` : undefined}
+        >
+          {validationMessage}
+        </Text>
+      ) : (
+        <></>
+      )}
+      {/* enabled unless a request is in flight — a disabled button cannot
+          refuse a submission, and the shopper is owed an explanation */}
       <CustomButton
         text={mode === "edit" ? "Update review" : "Submit review"}
         onPress={onSubmit}
-        disabled={isBusy || !rating}
+        disabled={isBusy}
         testID={testID ? `${testID}-submit-btn` : undefined}
       />
       {mode === "edit" ? (
@@ -116,6 +129,12 @@ const styles = StyleSheet.create({
     marginBottom: 10,
     fontSize: 11,
     color: colors.muted,
+    fontWeight: "bold",
+  },
+  validationText: {
+    marginBottom: 10,
+    fontSize: 12,
+    color: colors.danger,
     fontWeight: "bold",
   },
   removeButton: {

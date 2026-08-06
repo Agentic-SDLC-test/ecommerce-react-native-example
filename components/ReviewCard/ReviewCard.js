@@ -3,7 +3,7 @@ import React from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../constants";
 import StarRating from "../StarRating";
-import { formatReviewDate } from "../../utils/reviews";
+import { formatReviewDate, isVerifiedPurchase } from "../../utils/reviews";
 
 // One review row, used by both the shopper list and the admin list. Only
 // privacy-safe fields are read — display name and date, never contact or
@@ -36,12 +36,18 @@ const ReviewCard = ({
           <></>
         )}
       </View>
-      <View style={styles.badgeRow}>
-        <Ionicons name="checkmark-circle" size={14} color={colors.success} />
-        <Text style={styles.badgeText} testID={testID ? `${testID}-verified` : undefined}>
-          Verified purchase
-        </Text>
-      </View>
+      {/* the badge asserts a real purchase, so it follows the stored flag
+          rather than being assumed for every row */}
+      {isVerifiedPurchase(item) ? (
+        <View style={styles.badgeRow}>
+          <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+          <Text style={styles.badgeText} testID={testID ? `${testID}-verified` : undefined}>
+            Verified purchase
+          </Text>
+        </View>
+      ) : (
+        <></>
+      )}
       {item?.comment ? (
         <View style={styles.commentRow}>
           <Text style={styles.commentText} testID={testID ? `${testID}-comment` : undefined}>

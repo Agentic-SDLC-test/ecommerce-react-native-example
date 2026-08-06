@@ -85,6 +85,31 @@ The server starts with pre-seeded data:
 
 All data is stored in-memory and resets when the server restarts.
 
+## Review rules
+
+Eligibility is configuration, not code. `REVIEWS_VERIFIED_PURCHASE_STATUSES` is
+a comma-separated list of the order statuses that count as a verified purchase:
+
+```bash
+npm start                                              # default: pending,shipped,delivered
+REVIEWS_VERIFIED_PURCHASE_STATUSES=delivered npm start # require delivery first
+```
+
+The resolved list is printed at boot, so the rule actually in force is always
+readable from the server's own output. All review log lines share the
+`[reviews]` prefix and are `key=value` so they can be grepped or shipped:
+
+| Line | When |
+|------|------|
+| `[reviews] event=config verifiedPurchaseStatuses=…` | once at boot |
+| `[reviews] event=upsert mode=created\|updated reviewId=… productId=… rating=… userId=…` | a review is created or replaced |
+| `[reviews] event=upsert-rejected reason=not-verified-purchaser userId=… productId=…` | a non-purchaser tries to post |
+| `[reviews] event=visibility-change reviewId=… from=… to=… adminId=… at=…` | an admin hides or unhides a review |
+
+`verifiedPurchase` is decided by the server from the shopper's order history on
+both the create and the update path — it is never read from the request body,
+so a client cannot claim a badge it has not earned.
+
 ## Verifying the review endpoints
 
 With the server running, `./verify-reviews.sh` walks the whole review contract

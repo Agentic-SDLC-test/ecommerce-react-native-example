@@ -22,6 +22,7 @@ import ReviewSummary from "../../components/ReviewSummary";
 import ReviewCard from "../../components/ReviewCard";
 import ReviewForm from "../../components/ReviewForm";
 import {
+  RATING_REQUIRED_MESSAGE,
   REVIEW_PAGE_SIZE,
   areReviewsEnabled,
   clampComment,
@@ -65,6 +66,7 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const [rating, setRating] = useState(0);
   const [comment, setComment] = useState("");
   const [reviewBusy, setReviewBusy] = useState(false);
+  const [ratingError, setRatingError] = useState("");
   const [reviewsShown, setReviewsShown] = useState(REVIEW_PAGE_SIZE);
 
   //method to fetch the aggregate, visible reviews and viewer context for this
@@ -106,9 +108,13 @@ const ProductDetailScreen = ({ navigation, route }) => {
 
   //method to submit or update the shopper's own review for this product
   const handleSubmitReview = () => {
+    //a rating-less submission is refused in context, not silently ignored
     if (!isValidRating(rating)) {
+      setRatingError(RATING_REQUIRED_MESSAGE);
+      console.log("reviews:submit blocked rating-missing");
       return;
     }
+    setRatingError("");
     setReviewBusy(true);
     api
       .submitReview(product?._id, rating, clampComment(comment))
@@ -143,6 +149,7 @@ const ProductDetailScreen = ({ navigation, route }) => {
           setError(result.message);
           setRating(0);
           setComment("");
+          setRatingError("");
           fetchReviews();
         } else {
           setAlertType("error");
@@ -270,6 +277,13 @@ const ProductDetailScreen = ({ navigation, route }) => {
       setComment(viewer.myReview.comment ?? "");
     }
   }, [viewer]);
+
+  //picking a star answers the complaint, so clear it without a second press
+  useEffect(() => {
+    if (isValidRating(rating)) {
+      setRatingError("");
+    }
+  }, [rating]);
 
   return (
     <View style={styles.container} testID="product-detail-screen">
@@ -410,6 +424,7 @@ const ProductDetailScreen = ({ navigation, route }) => {
                     onDelete={handleRemoveReview}
                     isBusy={reviewBusy}
                     hiddenNotice={viewer?.myReview?.isVisible === false}
+                    validationMessage={ratingError}
                     testID="product-detail-review-form"
                   />
                 ) : viewer?.isAuthenticated || authUser ? (

@@ -15,6 +15,7 @@ import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import CustomInput from "../../components/CustomInput";
 import ProgressDialog from "react-native-progress-dialog";
 import ReviewCard from "../../components/ReviewCard";
+import { areReviewsEnabled } from "../../utils/reviews";
 
 const ViewReviewsScreen = ({ navigation, route }) => {
   const [isloading, setIsloading] = useState(false);
@@ -26,6 +27,7 @@ const ViewReviewsScreen = ({ navigation, route }) => {
   const [foundItems, setFoundItems] = useState([]);
   const [filterItem, setFilterItem] = useState(route.params?.productFilter ?? "");
   const [busyId, setBusyId] = useState("");
+  const reviewsEnabled = areReviewsEnabled();
 
   //method call on pull refresh
   const handleOnRefresh = () => {
@@ -36,6 +38,7 @@ const ViewReviewsScreen = ({ navigation, route }) => {
 
   //method the fetch the review data from server using API call
   const fetchReviews = () => {
+    if (!reviewsEnabled) return;
     setIsloading(true);
     api
       .getAdminReviews()
@@ -109,6 +112,33 @@ const ViewReviewsScreen = ({ navigation, route }) => {
   useEffect(() => {
     fetchReviews();
   }, []);
+
+  //declared below every hook so hook order is identical on both branches; a
+  //stale navigation state must never land on a live moderation console
+  if (!reviewsEnabled) {
+    return (
+      <View style={styles.container} testID="view-reviews-screen">
+        <StatusBar testID="view-reviews-status-bar"></StatusBar>
+        <View style={styles.TopBarContainer}>
+          <TouchableOpacity
+            testID="view-reviews-back-btn"
+            onPress={() => {
+              navigation.goBack();
+            }}
+          >
+            <Ionicons
+              name="arrow-back-circle-outline"
+              size={30}
+              color={colors.muted}
+            />
+          </TouchableOpacity>
+        </View>
+        <Text testID="view-reviews-disabled-text">
+          Reviews are turned off for this release.
+        </Text>
+      </View>
+    );
+  }
 
   return (
     <View style={styles.container} testID="view-reviews-screen">

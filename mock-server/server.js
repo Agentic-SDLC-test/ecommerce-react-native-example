@@ -21,9 +21,25 @@ const upload = multer({ storage });
 // ─── Review rules ─────────────────────────────────────────────────────────────
 // Comments are capped server-side; anything longer is truncated, not rejected.
 const REVIEW_COMMENT_MAX_LENGTH = 500;
-// Which order statuses count as a verified purchase. Narrow this array to
-// ["delivered"] to require delivery before a shopper may review.
-const VERIFIED_PURCHASE_STATUSES = ["pending", "shipped", "delivered"];
+// Which order statuses count as a verified purchase. Override per environment
+// with REVIEWS_VERIFIED_PURCHASE_STATUSES (comma-separated) — e.g. "delivered"
+// to require delivery before a shopper may review.
+const DEFAULT_VERIFIED_PURCHASE_STATUSES = ["pending", "shipped", "delivered"];
+const parseStatuses = (raw) =>
+  String(raw || "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean);
+const configuredStatuses = parseStatuses(
+  process.env.REVIEWS_VERIFIED_PURCHASE_STATUSES
+);
+const VERIFIED_PURCHASE_STATUSES = configuredStatuses.length
+  ? configuredStatuses
+  : DEFAULT_VERIFIED_PURCHASE_STATUSES;
+// Log the rule in force so any environment can be audited from its own output.
+console.log(
+  `[reviews] event=config verifiedPurchaseStatuses=${VERIFIED_PURCHASE_STATUSES.join(",")}`
+);
 
 // ─── In-memory data store ──────────────────────────────────────────────────────
 
@@ -797,7 +813,9 @@ app.post("/review", authMiddleware, (req, res) => {
     return res.status(404).json({ success: false, message: "Product not found" });
   }
   if (!hasPurchased(req.user._id, productId)) {
-    console.log(`[reviews] rejected: not a verified purchaser ${req.user._id} ${productId}`);
+    console.log(
+      `[reviews] event=upsert-rejected reason=not-verified-purchaser userId=${req.user._id} productId=${productId}`
+    );
     return res
       .status(403)
       .json({ success: false, message: "Only verified purchasers can review this product" });
@@ -808,9 +826,10 @@ app.post("/review", authMiddleware, (req, res) => {
     // An author's edit must never un-hide a review an admin has hidden.
     existing.rating = rating;
     existing.comment = sanitizeComment(comment);
+    existing.verifiedPurchase = hasPurchased(req.user._id, productId);
     existing.updatedAt = now;
     console.log(
-      `[reviews] upsert ${existing._id} product=${productId} rating=${rating} mode=updated`
+      `[reviews] event=upsert mode=updated reviewId=${existing._id} productId=${productId} rating=${rating} userId=${req.user._id}`
     );
     return res.json({
       success: true,
@@ -825,13 +844,13 @@ app.post("/review", authMiddleware, (req, res) => {
     rating,
     comment: sanitizeComment(comment),
     isVisible: true,
-    verifiedPurchase: true,
+    verifiedPurchase: hasPurchased(req.user._id, product._id),
     createdAt: now,
     updatedAt: now,
   };
   reviews.push(newReview);
   console.log(
-    `[reviews] upsert ${newReview._id} product=${productId} rating=${rating} mode=created`
+    `[reviews] event=upsert mode=created reviewId=${newReview._id} productId=${productId} rating=${rating} userId=${req.user._id}`
   );
   res.json({
     success: true,
@@ -875,10 +894,13 @@ app.get("/admin/review-visibility", adminMiddleware, (req, res) => {
   if (!review) {
     return res.status(404).json({ success: false, message: "Review not found" });
   }
+  // capture the prior value first so a hide is distinguishable from an unhide
+  // without correlating adjacent lines
+  const previous = review.isVisible;
   review.isVisible = visible === "true";
   review.updatedAt = new Date().toISOString();
   console.log(
-    `[reviews] visibility ${review._id} -> ${review.isVisible} by ${req.user._id}`
+    `[reviews] event=visibility-change reviewId=${review._id} from=${previous} to=${review.isVisible} adminId=${req.user._id} at=${review.updatedAt}`
   );
   res.json({
     success: true,

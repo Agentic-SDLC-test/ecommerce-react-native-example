@@ -27,6 +27,7 @@ import ViewReviewsScreen from "../screens/admin/ViewReviewsScreen";
 import CategoriesScreen from "../screens/user/CategoriesScreen";
 import EditCategoryScreen from "../screens/admin/EditCategoryScreen";
 import MyWishlistScreen from "../screens/profile/MyWishlistScreen";
+import { areReviewsEnabled } from "../utils/reviews";
 
 const Stack = createNativeStackNavigator();
 
@@ -64,7 +65,11 @@ const Routes = () => {
         <Stack.Screen name="addcategories" component={AddCategoryScreen} />
         <Stack.Screen name="editcategories" component={EditCategoryScreen} />
         <Stack.Screen name="viewusers" component={ViewUsersScreen} />
-        <Stack.Screen name="viewreviews" component={ViewReviewsScreen} />
+        {/* with reviews off there is no moderation destination at all, not
+            just no entry point to it */}
+        {areReviewsEnabled() ? (
+          <Stack.Screen name="viewreviews" component={ViewReviewsScreen} />
+        ) : null}
         <Stack.Screen name="categories" component={CategoriesScreen} />
       </Stack.Navigator>
     </NavigationContainer>

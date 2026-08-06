@@ -6,6 +6,8 @@ export const REVIEW_COMMENT_MAX_LENGTH = 500;
 export const REVIEW_PAGE_SIZE = 5;
 export const MIN_RATING = 1;
 export const MAX_RATING = 5;
+export const RATING_REQUIRED_MESSAGE =
+  "Please choose a star rating before submitting.";
 
 // Render the average to one decimal place; "" when there is nothing to show.
 export function formatAverage(average) {
@@ -42,6 +44,12 @@ export function starIconName(state) {
 // A rating is a whole number of stars — 0, 6, 2.5 and "3" are all invalid.
 export function isValidRating(rating) {
   return Number.isInteger(rating) && rating >= MIN_RATING && rating <= MAX_RATING;
+}
+
+// The verified badge is a factual claim, so it renders only on an explicit
+// true — a missing or false flag must never earn one.
+export function isVerifiedPurchase(review) {
+  return review?.verifiedPurchase === true;
 }
 
 // Bound the comment to what the server will store.

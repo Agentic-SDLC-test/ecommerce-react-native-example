@@ -1,4 +1,5 @@
 import {
+  RATING_REQUIRED_MESSAGE,
   REVIEW_COMMENT_MAX_LENGTH,
   REVIEW_PAGE_SIZE,
   areReviewsEnabled,
@@ -6,6 +7,7 @@ import {
   formatAverage,
   formatReviewDate,
   isValidRating,
+  isVerifiedPurchase,
   remainingCommentChars,
   reviewCountLabel,
   starIconName,
@@ -78,6 +80,32 @@ describe("isValidRating", () => {
     [0, 6, 2.5, "3", null, undefined].forEach((rating) => {
       expect(isValidRating(rating)).toBe(false);
     });
+  });
+});
+
+describe("isVerifiedPurchase", () => {
+  it("earns a badge only on an explicit true", () => {
+    expect(isVerifiedPurchase({ verifiedPurchase: true })).toBe(true);
+  });
+
+  it("fails closed for a false, missing or truthy-but-not-true flag", () => {
+    [
+      { verifiedPurchase: false },
+      { verifiedPurchase: "true" },
+      {},
+      null,
+      undefined,
+    ].forEach((review) => {
+      expect(isVerifiedPurchase(review)).toBe(false);
+    });
+  });
+});
+
+describe("RATING_REQUIRED_MESSAGE", () => {
+  it("is a non-empty message that names the missing rating", () => {
+    expect(typeof RATING_REQUIRED_MESSAGE).toBe("string");
+    expect(RATING_REQUIRED_MESSAGE.length).toBeGreaterThan(0);
+    expect(RATING_REQUIRED_MESSAGE.toLowerCase()).toContain("rating");
   });
 });
 
