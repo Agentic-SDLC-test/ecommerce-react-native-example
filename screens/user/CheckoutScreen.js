@@ -33,6 +33,8 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [city, setCity] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
+  const [paymentType, setPaymentType] = useState("cod");
+  const paymentStatus = paymentType === "wallet_mock" ? "paid" : "payment_due";
 
   //method to handle checkout
   const handleCheckout = async () => {
@@ -57,7 +59,8 @@ const CheckoutScreen = ({ navigation, route }) => {
         items: payload,
         amount: totalamount,
         discount: 0,
-        payment_type: "cod",
+        payment_type: paymentType,
+        payment_status: paymentStatus,
         country: country,
         status: "pending",
         city: city,
@@ -69,7 +72,7 @@ const CheckoutScreen = ({ navigation, route }) => {
         if (result.success == true) {
           setIsloading(false);
           emptyCart("empty");
-          navigation.replace("orderconfirm");
+          navigation.replace("orderconfirm", { order: result.data });
         } else {
           setIsloading(false);
         }
@@ -189,10 +192,36 @@ const CheckoutScreen = ({ navigation, route }) => {
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
         <View style={styles.listContainer}>
-          <View style={styles.list}>
-            <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
-          </View>
+          <TouchableOpacity
+            accessibilityLabel="Cash On Delivery payment option"
+            accessibilityState={{ selected: paymentType === "cod" }}
+            onPress={() => setPaymentType("cod")}
+            style={styles.paymentOption}
+            testID="checkout-payment-cod"
+          >
+            <Text style={styles.secondaryTextSm}>Cash On Delivery</Text>
+            <Text style={styles.primaryTextSm} testID="checkout-payment-cod-selected">
+              {paymentType === "cod" ? "Selected" : "Select"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityLabel="EasyBuy Wallet simulated payment option"
+            accessibilityState={{ selected: paymentType === "wallet_mock" }}
+            onPress={() => setPaymentType("wallet_mock")}
+            style={styles.paymentOption}
+            testID="checkout-payment-wallet"
+          >
+            <View>
+              <Text style={styles.secondaryTextSm}>EasyBuy Wallet (simulated)</Text>
+              <Text style={styles.paymentNotice}>No real payment is collected</Text>
+            </View>
+            <Text style={styles.primaryTextSm} testID="checkout-payment-wallet-selected">
+              {paymentType === "wallet_mock" ? "Selected" : "Select"}
+            </Text>
+          </TouchableOpacity>
+          <Text style={styles.paymentStatus} testID="checkout-payment-status">
+            {paymentStatus === "paid" ? "Paid (simulated)" : "Payment due on delivery"}
+          </Text>
         </View>
 
         <View style={styles.emptyView}></View>
@@ -342,6 +371,26 @@ const styles = StyleSheet.create({
   listContainer: {
     backgroundColor: colors.white,
     borderRadius: 10,
+    padding: 10,
+  },
+  paymentOption: {
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: colors.white,
+    minHeight: 50,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.light,
+    padding: 10,
+  },
+  paymentNotice: {
+    color: colors.muted,
+    fontSize: 12,
+  },
+  paymentStatus: {
+    color: colors.muted,
+    fontSize: 13,
     padding: 10,
   },
   buttomContainer: {

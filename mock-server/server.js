@@ -211,6 +211,7 @@ let orders = [
     amount: 129.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "payment_due",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -240,6 +241,7 @@ let orders = [
     amount: 24.99,
     discount: 0,
     payment_type: "cod",
+    payment_status: "payment_due",
     country: "Canada",
     city: "Vancouver",
     zipcode: "V6B 1A1",
@@ -270,6 +272,7 @@ let orders = [
     amount: 38.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "payment_due",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -497,10 +500,23 @@ app.get("/orders", authMiddleware, (req, res) => {
 });
 
 // POST /checkout  (user: place order)
+const PAYMENT_TYPES = ["cod", "wallet_mock"];
+const PAYMENT_STATUS_BY_TYPE = { cod: "payment_due", wallet_mock: "paid" };
+
 app.post("/checkout", authMiddleware, (req, res) => {
-  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
+  const { items, amount, discount, payment_type, payment_status, country, city, zipcode, shippingAddress, status } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
+  }
+  if (!PAYMENT_TYPES.includes(payment_type) || payment_status !== PAYMENT_STATUS_BY_TYPE[payment_type]) {
+    console.log(JSON.stringify({
+      event: "checkout_rejected",
+      payment_type,
+      payment_status,
+      fulfilment_status: status,
+      reason: "invalid_payment_method_or_status",
+    }));
+    return res.status(400).json({ success: false, message: "Invalid payment method or payment status" });
   }
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
@@ -523,7 +539,8 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
+    payment_type,
+    payment_status,
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",
@@ -533,6 +550,13 @@ app.post("/checkout", authMiddleware, (req, res) => {
     updatedAt: new Date().toISOString(),
   };
   orders.push(newOrder);
+  console.log(JSON.stringify({
+    event: "checkout_succeeded",
+    orderId: newOrder.orderId,
+    payment_type,
+    payment_status,
+    fulfilment_status: newOrder.status,
+  }));
   res.json({ success: true, message: "Order placed successfully", data: newOrder });
 });
 
