@@ -6,11 +6,13 @@ on:
       - main
       - temp_main
       - temp_main_2
+      - main-test-alora-miki
   pull_request:
     branches:
       - main
       - temp_main
       - temp_main_2
+      - main-test-alora-miki
 
 jobs:
   lint:
