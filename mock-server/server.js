@@ -181,6 +181,11 @@ let products = [
   },
 ];
 
+const PAYMENT_METHODS = ["cod", "mock_wallet"];
+const PAYMENT_STATUSES = ["pending", "paid", "failed", "awaiting_action"];
+const getDefaultPaymentStatus = (paymentType) =>
+  paymentType === "mock_wallet" ? "paid" : "pending";
+
 let orders = [
   {
     _id: "order001",
@@ -211,6 +216,7 @@ let orders = [
     amount: 129.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "pending",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -239,7 +245,8 @@ let orders = [
     ],
     amount: 24.99,
     discount: 0,
-    payment_type: "cod",
+    payment_type: "mock_wallet",
+    payment_status: "paid",
     country: "Canada",
     city: "Vancouver",
     zipcode: "V6B 1A1",
@@ -270,6 +277,7 @@ let orders = [
     amount: 38.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "pending",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -498,10 +506,16 @@ app.get("/orders", authMiddleware, (req, res) => {
 
 // POST /checkout  (user: place order)
 app.post("/checkout", authMiddleware, (req, res) => {
-  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
+  const { items, amount, discount, payment_type, payment_status, country, city, zipcode, shippingAddress, status } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
   }
+  if (!PAYMENT_METHODS.includes(payment_type)) {
+    return res.status(400).json({ success: false, message: "Invalid payment method" });
+  }
+  const resolvedPaymentStatus = PAYMENT_STATUSES.includes(payment_status)
+    ? payment_status
+    : getDefaultPaymentStatus(payment_type);
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
     return {
@@ -523,7 +537,8 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
+    payment_type,
+    payment_status: resolvedPaymentStatus,
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",
