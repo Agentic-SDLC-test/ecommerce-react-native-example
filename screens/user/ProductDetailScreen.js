@@ -5,6 +5,7 @@ import {
   View,
   StatusBar,
   Text,
+  ScrollView,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,6 +17,22 @@ import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import * as api from "../../api";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import RatingSummary from "../../components/RatingSummary";
+import ReviewList from "../../components/ReviewList";
+import {
+  isReviewsEnabled,
+  summarizeReviews,
+  visibleReviews,
+  resolveEligibility,
+  canSubmitReview,
+  eligibilityMessage,
+} from "../../utils/reviews";
+import {
+  REVIEW_ELIGIBILITY,
+  RECENT_REVIEWS_PAGE_SIZE,
+  RECENT_REVIEWS_MAX_PAGE_SIZE,
+  REVIEWS_UNAVAILABLE_TEXT,
+} from "../../constants/Reviews";
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -37,6 +54,16 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const [error, setError] = useState("");
   const [isDisable, setIsDisbale] = useState(true);
   const [alertType, setAlertType] = useState("error");
+  // Initialised to the empty summary, so the first paint is the neutral empty
+  // state rather than a spinner-shaped hole.
+  const [reviewSummary, setReviewSummary] = useState(summarizeReviews([]));
+  const [reviews, setReviews] = useState([]);
+  const [reviewsTotal, setReviewsTotal] = useState(0);
+  const [eligibility, setEligibility] = useState(
+    REVIEW_ELIGIBILITY.NO_PURCHASE
+  );
+  const [myReview, setMyReview] = useState(null);
+  const [reviewsUnavailable, setReviewsUnavailable] = useState(false);
 
   //method to fetch wishlist from server using API call
   const fetchWishlist = async () => {
@@ -61,6 +88,53 @@ const ProductDetailScreen = ({ navigation, route }) => {
         setError(error.message);
         console.log("error", error);
       });
+  };
+
+  //method to fetch the product reviews from server using API call
+  //a review failure never calls setError: a review outage must not look like a
+  //product error, and the purchase controls stay untouched
+  const fetchReviews = async (limit = RECENT_REVIEWS_PAGE_SIZE) => {
+    if (!isReviewsEnabled()) return;
+    api
+      .getProductReviews(product?._id, { limit })
+      .then((result) => {
+        if (result.success) {
+          setReviewSummary(result.data?.summary || summarizeReviews([]));
+          setReviews(visibleReviews(result.data?.reviews));
+          setReviewsTotal(result.data?.total || 0);
+          setReviewsUnavailable(false);
+        } else {
+          setReviewsUnavailable(true);
+        }
+      })
+      .catch((error) => {
+        setReviewsUnavailable(true);
+        console.log("[reviews] load_failed", error?.message);
+      });
+  };
+
+  //method to ask the server whether this shopper may review this product
+  const fetchEligibility = async () => {
+    if (!isReviewsEnabled()) return;
+    api
+      .getReviewEligibility(product?._id)
+      .then((result) => {
+        setEligibility(resolveEligibility(result));
+        setMyReview(result?.data?.my_review || null);
+      })
+      .catch((error) => {
+        console.log("[reviews] load_failed", error?.message);
+      });
+  };
+
+  //method to show the next page of reviews
+  const handleShowMoreReviews = () => {
+    fetchReviews(
+      Math.min(
+        reviews.length + RECENT_REVIEWS_PAGE_SIZE,
+        RECENT_REVIEWS_MAX_PAGE_SIZE
+      )
+    );
   };
 
   //method to increase the product quantity
@@ -133,6 +207,20 @@ const ProductDetailScreen = ({ navigation, route }) => {
     fetchWishlist();
   }, []);
 
+  //fetch the reviews in their own effect, so the image, price, description and
+  //Add to Cart render on the first frame regardless of how the review calls go.
+  //Refetch on focus as well, so a review published or edited on the write screen
+  //is reflected here the moment the shopper comes back.
+  useEffect(() => {
+    fetchReviews();
+    fetchEligibility();
+    const unsubscribe = navigation.addListener("focus", () => {
+      fetchReviews();
+      fetchEligibility();
+    });
+    return unsubscribe;
+  }, []);
+
   //render whenever the value of wishlistItems change
   useEffect(() => {}, [wishlistItems]);
 
@@ -176,38 +264,110 @@ const ProductDetailScreen = ({ navigation, route }) => {
         <CustomAlert message={error} type={alertType} testID="product-detail-alert" />
         <View style={styles.productInfoContainer}>
           <View style={styles.productInfoTopContainer}>
-            <View style={styles.productNameContaier}>
-              <Text style={styles.productNameText} testID="product-detail-title">{product?.title}</Text>
-            </View>
-            <View style={styles.infoButtonContainer}>
-              <View style={styles.wishlistButtonContainer}>
-                <TouchableOpacity
-                  testID="product-detail-wishlist-btn"
-                  disabled={isDisable}
-                  style={styles.iconContainer}
-                  onPress={() => handleWishlistBtn()}
-                >
-                  {onWishlist == false ? (
-                    <Ionicons name="heart" size={25} color={colors.muted} />
+            {/* The review block scrolls; the counter and Add to Cart below sit
+                outside this ScrollView so they never move and never depend on
+                the review fetch. */}
+            <ScrollView
+              style={styles.productInfoScroll}
+              nestedScrollEnabled={true}
+              showsVerticalScrollIndicator={false}
+              testID="product-detail-scroll"
+            >
+              <View style={styles.productNameContaier}>
+                <Text style={styles.productNameText} testID="product-detail-title">{product?.title}</Text>
+              </View>
+              <View style={styles.infoButtonContainer}>
+                <View style={styles.wishlistButtonContainer}>
+                  <TouchableOpacity
+                    testID="product-detail-wishlist-btn"
+                    disabled={isDisable}
+                    style={styles.iconContainer}
+                    onPress={() => handleWishlistBtn()}
+                  >
+                    {onWishlist == false ? (
+                      <Ionicons name="heart" size={25} color={colors.muted} />
+                    ) : (
+                      <Ionicons name="heart" size={25} color={colors.danger} />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              </View>
+              <View style={styles.productDetailContainer}>
+                <View style={styles.productSizeOptionContainer}>
+                  {/* <Text style={styles.secondaryTextSm}>Size:</Text> */}
+                </View>
+                <View style={styles.productPriceContainer}>
+                  <Text style={styles.secondaryTextSm} testID="product-detail-price-label">Price:</Text>
+                  <Text style={styles.primaryTextSm} testID="product-detail-price">{product?.price}$</Text>
+                </View>
+              </View>
+              <View style={styles.productDescriptionContainer}>
+                <Text style={styles.secondaryTextSm} testID="product-detail-description-label">Description:</Text>
+                <Text testID="product-detail-description">{product?.description}</Text>
+              </View>
+              {isReviewsEnabled() && (
+                <View style={styles.reviewsContainer} testID="product-detail-reviews">
+                  <Text
+                    style={styles.containerNameText}
+                    testID="product-detail-reviews-heading"
+                  >
+                    Reviews
+                  </Text>
+                  {reviewsUnavailable ? (
+                    <Text
+                      style={styles.reviewsMutedText}
+                      testID="product-detail-reviews-unavailable"
+                    >
+                      {REVIEWS_UNAVAILABLE_TEXT}
+                    </Text>
                   ) : (
-                    <Ionicons name="heart" size={25} color={colors.danger} />
+                    <>
+                      <RatingSummary
+                        summary={reviewSummary}
+                        testID="product-detail-rating-summary"
+                      />
+                      {reviews.map((review, index) => (
+                        <ReviewList
+                          item={review}
+                          key={index}
+                          testID={`product-detail-review-${index}`}
+                        />
+                      ))}
+                      {reviews.length < reviewsTotal && (
+                        <TouchableOpacity
+                          style={styles.showMoreButton}
+                          onPress={handleShowMoreReviews}
+                          testID="product-detail-show-more-reviews-btn"
+                        >
+                          <Text style={styles.reviewsMutedText}>
+                            Show more reviews
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+                      {canSubmitReview(eligibility) ? (
+                        <CustomButton
+                          testID="product-detail-write-review-btn"
+                          text={myReview ? "Edit your review" : "Write a review"}
+                          onPress={() =>
+                            navigation.navigate("writereview", {
+                              product,
+                              myReview,
+                            })
+                          }
+                        />
+                      ) : (
+                        <Text
+                          style={styles.reviewsMutedText}
+                          testID="product-detail-review-ineligible-text"
+                        >
+                          {eligibilityMessage(eligibility)}
+                        </Text>
+                      )}
+                    </>
                   )}
-                </TouchableOpacity>
-              </View>
-            </View>
-            <View style={styles.productDetailContainer}>
-              <View style={styles.productSizeOptionContainer}>
-                {/* <Text style={styles.secondaryTextSm}>Size:</Text> */}
-              </View>
-              <View style={styles.productPriceContainer}>
-                <Text style={styles.secondaryTextSm} testID="product-detail-price-label">Price:</Text>
-                <Text style={styles.primaryTextSm} testID="product-detail-price">{product?.price}$</Text>
-              </View>
-            </View>
-            <View style={styles.productDescriptionContainer}>
-              <Text style={styles.secondaryTextSm} testID="product-detail-description-label">Description:</Text>
-              <Text testID="product-detail-description">{product?.description}</Text>
-            </View>
+                </View>
+              )}
+            </ScrollView>
           </View>
           <View style={styles.productInfoBottomContainer}>
             <View style={styles.counterContainer}>
@@ -318,6 +478,41 @@ const styles = StyleSheet.create({
     height: "100%",
     width: "100%",
     flex: 1,
+  },
+  productInfoScroll: {
+    width: "100%",
+    flex: 1,
+  },
+  reviewsContainer: {
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "flex-start",
+    justifyContent: "flex-start",
+    width: "100%",
+    paddingLeft: 20,
+    paddingRight: 20,
+    marginTop: 15,
+  },
+  containerNameText: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: colors.muted,
+    marginBottom: 10,
+  },
+  reviewsMutedText: {
+    fontSize: 13,
+    color: colors.muted,
+  },
+  showMoreButton: {
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 5,
+    borderColor: colors.muted,
+    marginBottom: 10,
+    width: 160,
   },
   productInfoBottomContainer: {
     display: "flex",

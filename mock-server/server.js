@@ -4,6 +4,15 @@ const multer = require("multer");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
 const { withPaymentDefaults, validatePaymentFields } = require("./payment");
+const {
+  REVIEW_VISIBILITIES,
+  validateReviewSubmission,
+  resolveEligibility,
+  summarizeReviews,
+  publicReview,
+  adminReview,
+  isReviewsEnabled,
+} = require("./reviews");
 
 const app = express();
 const PORT = 3002;
@@ -324,6 +333,180 @@ let orders = [
     createdAt: new Date("2024-01-16T11:15:00Z").toISOString(),
     updatedAt: new Date("2024-01-16T11:15:00Z").toISOString(),
   },
+  // Two delivered orders that make the seeded reviews below consistent with the
+  // eligibility rule: a review only exists where its author took delivery.
+  {
+    _id: "order005",
+    orderId: "ORD-2024-005",
+    user: {
+      _id: "user001",
+      name: "John Doe",
+      email: "user@easybuy.com",
+    },
+    items: [
+      {
+        productId: {
+          _id: "prod001",
+          title: "Classic White T-Shirt",
+        },
+        price: 19.99,
+        quantity: 1,
+      },
+      {
+        productId: {
+          _id: "prod003",
+          title: "Wireless Bluetooth Headphones",
+        },
+        price: 89.99,
+        quantity: 1,
+      },
+    ],
+    amount: 109.98,
+    discount: 0,
+    payment_type: "cod",
+    payment_status: "due_on_delivery",
+    payment_reference: null,
+    payment_status_updated_at: new Date("2024-01-05T09:00:00Z").toISOString(),
+    country: "Canada",
+    city: "Toronto",
+    zipcode: "M5V 3A8",
+    shippingAddress: "123 Main Street",
+    status: "delivered",
+    shippedOn: "2024-01-06",
+    deliveredOn: "2024-01-08",
+    createdAt: new Date("2024-01-05T09:00:00Z").toISOString(),
+    updatedAt: new Date("2024-01-08T15:00:00Z").toISOString(),
+  },
+  {
+    _id: "order006",
+    orderId: "ORD-2024-006",
+    user: {
+      _id: "user002",
+      name: "Jane Smith",
+      email: "jane@easybuy.com",
+    },
+    items: [
+      {
+        productId: {
+          _id: "prod001",
+          title: "Classic White T-Shirt",
+        },
+        price: 19.99,
+        quantity: 2,
+      },
+      {
+        productId: {
+          _id: "prod003",
+          title: "Wireless Bluetooth Headphones",
+        },
+        price: 89.99,
+        quantity: 1,
+      },
+    ],
+    amount: 129.97,
+    discount: 0,
+    payment_type: "card",
+    payment_status: "paid",
+    payment_reference: "SIMPAY-1704700000000-SEED",
+    payment_status_updated_at: new Date("2024-01-04T10:00:00Z").toISOString(),
+    country: "Canada",
+    city: "Vancouver",
+    zipcode: "V6B 1A1",
+    shippingAddress: "456 Oak Avenue",
+    status: "delivered",
+    shippedOn: "2024-01-05",
+    deliveredOn: "2024-01-07",
+    createdAt: new Date("2024-01-04T10:00:00Z").toISOString(),
+    updatedAt: new Date("2024-01-07T12:00:00Z").toISOString(),
+  },
+];
+
+// Reviews hold no order reference and no email — eligibility is derived from
+// orders at request time, so there is no foreign key for a moderation action to
+// disturb and no order detail for a shopper-facing payload to leak.
+//
+// Seeded so a preview shows every state without having to place an order and
+// wait for delivery first: prod001 has two visible reviews (one rating-only),
+// prod003 has one visible and one hidden review so the hidden row can be seen
+// excluded from the average, prod007 carries an editable review by the seeded
+// shopper, and prod005 and the rest stay review-free so the empty state is
+// visible in the same session. Data resets when the server restarts.
+let reviews = [
+  {
+    _id: "rev001",
+    productId: "prod001",
+    user: { _id: "user001", name: "John Doe" },
+    reviewer_name: "John Doe",
+    rating: 5,
+    text: "Fits well and the cotton is genuinely soft.",
+    verified_purchase: true,
+    visibility: "visible",
+    moderated_by: null,
+    moderated_at: null,
+    moderation_action: null,
+    createdAt: new Date("2024-01-20T09:00:00Z").toISOString(),
+    updatedAt: new Date("2024-01-20T09:00:00Z").toISOString(),
+  },
+  {
+    _id: "rev002",
+    productId: "prod001",
+    user: { _id: "user002", name: "Jane Smith" },
+    reviewer_name: "Jane Smith",
+    rating: 3,
+    text: "",
+    verified_purchase: true,
+    visibility: "visible",
+    moderated_by: null,
+    moderated_at: null,
+    moderation_action: null,
+    createdAt: new Date("2024-01-21T11:30:00Z").toISOString(),
+    updatedAt: new Date("2024-01-21T11:30:00Z").toISOString(),
+  },
+  {
+    _id: "rev003",
+    productId: "prod003",
+    user: { _id: "user002", name: "Jane Smith" },
+    reviewer_name: "Jane Smith",
+    rating: 4,
+    text: "Great sound, the case is bulkier than I expected.",
+    verified_purchase: true,
+    visibility: "visible",
+    moderated_by: null,
+    moderated_at: null,
+    moderation_action: null,
+    createdAt: new Date("2024-01-24T16:45:00Z").toISOString(),
+    updatedAt: new Date("2024-01-24T16:45:00Z").toISOString(),
+  },
+  {
+    _id: "rev004",
+    productId: "prod003",
+    user: { _id: "user001", name: "John Doe" },
+    reviewer_name: "John Doe",
+    rating: 2,
+    text: "Battery life was worse than advertised.",
+    verified_purchase: true,
+    visibility: "hidden",
+    moderated_by: "admin001",
+    moderated_at: new Date("2024-02-01T12:00:00Z").toISOString(),
+    moderation_action: "hide",
+    createdAt: new Date("2024-01-25T08:00:00Z").toISOString(),
+    updatedAt: new Date("2024-01-25T08:00:00Z").toISOString(),
+  },
+  {
+    _id: "rev005",
+    productId: "prod007",
+    user: { _id: "user001", name: "John Doe" },
+    reviewer_name: "John Doe",
+    rating: 5,
+    text: "Cooks evenly and smells wonderful.",
+    verified_purchase: true,
+    visibility: "visible",
+    moderated_by: null,
+    moderated_at: null,
+    moderation_action: null,
+    createdAt: new Date("2024-01-26T18:20:00Z").toISOString(),
+    updatedAt: new Date("2024-01-26T18:20:00Z").toISOString(),
+  },
 ];
 
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
@@ -347,6 +530,21 @@ const adminMiddleware = (req, res, next) => {
     }
     next();
   });
+};
+
+// The instant kill switch. REVIEWS_ENABLED=false cuts every review endpoint in
+// seconds with no app release — the app renders the 503 as the neutral
+// unavailable state, so the product page keeps working.
+const reviewsEnabledMiddleware = (req, res, next) => {
+  if (!isReviewsEnabled(process.env)) {
+    console.log("[reviews] disabled_request", JSON.stringify({ path: req.path }));
+    return res.status(503).json({
+      success: false,
+      reviews_disabled: true,
+      message: "Reviews are unavailable",
+    });
+  }
+  next();
 };
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
@@ -501,6 +699,8 @@ app.get("/dashboard", adminMiddleware, (req, res) => {
       ordersCount: orders.length,
       productsCount: products.length,
       categoriesCount: categories.length,
+      reviewsCount: reviews.length,
+      hiddenReviewsCount: reviews.filter((r) => r.visibility === "hidden").length,
     },
   });
 });
@@ -623,6 +823,248 @@ app.post("/checkout", authMiddleware, (req, res) => {
   });
 });
 
+// ─── Reviews ──────────────────────────────────────────────────────────────────
+// Shopper reads are public and visible-only; eligibility and writes are derived
+// from the caller's own token; moderation is admin-only. Review visibility is a
+// third independent axis — nothing here reads or writes an order.
+
+const DEFAULT_REVIEWS_PAGE_SIZE = 5;
+const MAX_REVIEWS_PAGE_SIZE = 50;
+
+const newestFirst = (a, b) => new Date(b.createdAt) - new Date(a.createdAt);
+
+const reviewsFor = (productId) =>
+  reviews.filter((r) => r.productId === productId);
+
+const visibleReviewsFor = (productId) =>
+  reviewsFor(productId).filter((r) => r.visibility === REVIEW_VISIBILITIES.VISIBLE);
+
+// GET /product-reviews?productId=&limit=&offset=   (public)
+app.get("/product-reviews", reviewsEnabledMiddleware, (req, res) => {
+  const { productId } = req.query;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "productId is required" });
+  }
+  const limit = Math.min(
+    Math.max(parseInt(req.query.limit) || DEFAULT_REVIEWS_PAGE_SIZE, 1),
+    MAX_REVIEWS_PAGE_SIZE
+  );
+  const offset = Math.max(parseInt(req.query.offset) || 0, 0);
+  const visible = visibleReviewsFor(productId).sort(newestFirst);
+  res.json({
+    success: true,
+    data: {
+      productId,
+      // The summary covers every visible row, not just the page.
+      summary: summarizeReviews(visible),
+      reviews: visible.slice(offset, offset + limit).map(publicReview),
+      total: visible.length,
+      limit,
+      offset,
+    },
+  });
+});
+
+// GET /review-eligibility?productId=   (user)
+app.get("/review-eligibility", reviewsEnabledMiddleware, authMiddleware, (req, res) => {
+  const { productId } = req.query;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "productId is required" });
+  }
+  const eligibility = resolveEligibility({
+    orders,
+    userId: req.user._id,
+    productId,
+  });
+  // Returned even when hidden, so the author can still edit their own review.
+  const own = reviewsFor(productId).find((r) => r.user._id === req.user._id);
+  res.json({
+    success: true,
+    data: {
+      productId,
+      eligibility,
+      can_review: eligibility === "eligible",
+      my_review: own ? publicReview(own) : null,
+    },
+  });
+});
+
+// POST /review   (user: create or update, one per customer per product)
+app.post("/review", reviewsEnabledMiddleware, authMiddleware, (req, res) => {
+  const { productId, rating, text } = req.body;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "productId is required" });
+  }
+  const check = validateReviewSubmission({ rating, text });
+  if (!check.valid) {
+    console.log(
+      "[reviews] submission_rejected",
+      JSON.stringify({ productId, reason: check.message })
+    );
+    return res.status(400).json({ success: false, message: check.message });
+  }
+  // Re-checked on every write, so a client that skips the read check still
+  // cannot post — hiding the form is UX, this 403 is the control.
+  const eligibility = resolveEligibility({
+    orders,
+    userId: req.user._id,
+    productId,
+  });
+  if (eligibility !== "eligible") {
+    console.log(
+      "[reviews] submission_rejected",
+      JSON.stringify({ productId, reason: eligibility })
+    );
+    const message =
+      eligibility === "not_delivered"
+        ? "You can review this product once your order has been delivered"
+        : "Only customers who bought this product can review it";
+    return res.status(403).json({ success: false, eligibility, message });
+  }
+  const now = new Date().toISOString();
+  const existing = reviewsFor(productId).find(
+    (r) => r.user._id === req.user._id
+  );
+  let review;
+  if (existing) {
+    // _id and createdAt are preserved, so the review count cannot move on an edit.
+    existing.rating = rating;
+    existing.text = text ? String(text).trim() : "";
+    existing.updatedAt = now;
+    review = existing;
+  } else {
+    review = {
+      _id: uuidv4(),
+      productId,
+      user: { _id: req.user._id, name: req.user.name },
+      reviewer_name: req.user.name,
+      rating,
+      text: text ? String(text).trim() : "",
+      verified_purchase: true,
+      visibility: REVIEW_VISIBILITIES.VISIBLE,
+      moderated_by: null,
+      moderated_at: null,
+      moderation_action: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    reviews.push(review);
+  }
+  console.log(
+    "[reviews] submitted",
+    JSON.stringify({
+      productId,
+      rating,
+      is_edit: Boolean(existing),
+      has_text: Boolean(review.text),
+    })
+  );
+  res.json({
+    success: true,
+    message: existing ? "Review updated" : "Review published",
+    data: {
+      review: publicReview(review),
+      summary: summarizeReviews(visibleReviewsFor(productId)),
+    },
+  });
+});
+
+// GET /admin/reviews?productId=&visibility=   (admin: the only surface that
+// returns hidden rows)
+app.get("/admin/reviews", reviewsEnabledMiddleware, adminMiddleware, (req, res) => {
+  const { productId, visibility } = req.query;
+  const matches = reviews
+    .filter((r) => (productId ? r.productId === productId : true))
+    .filter((r) => (visibility ? r.visibility === visibility : true))
+    .sort(newestFirst);
+  res.json({
+    success: true,
+    data: matches.map(adminReview),
+    summary: {
+      total: reviews.length,
+      visible: reviews.filter((r) => r.visibility === REVIEW_VISIBILITIES.VISIBLE)
+        .length,
+      hidden: reviews.filter((r) => r.visibility === REVIEW_VISIBILITIES.HIDDEN)
+        .length,
+    },
+  });
+});
+
+// GET /admin/review-visibility?reviewId=&visibility=   (admin: hide / restore)
+app.get(
+  "/admin/review-visibility",
+  reviewsEnabledMiddleware,
+  adminMiddleware,
+  (req, res) => {
+    const { reviewId, visibility } = req.query;
+    if (!Object.values(REVIEW_VISIBILITIES).includes(visibility)) {
+      return res.status(400).json({ success: false, message: "Invalid visibility value" });
+    }
+    const review = reviews.find((r) => r._id === reviewId);
+    if (!review) {
+      return res.status(404).json({ success: false, message: "Review not found" });
+    }
+    // Visibility only. Order fulfilment and payment fields are intentionally
+    // untouched here — hiding a review must never change the order it came
+    // from, and advancing an order must never change a review's visibility.
+    const action =
+      visibility === REVIEW_VISIBILITIES.HIDDEN ? "hide" : "restore";
+    review.visibility = visibility;
+    review.moderated_by = req.user._id;
+    review.moderated_at = new Date().toISOString();
+    review.moderation_action = action;
+    console.log(
+      "[reviews] moderated",
+      JSON.stringify({
+        reviewId: review._id,
+        action,
+        admin_id: req.user._id,
+        productId: review.productId,
+      })
+    );
+    res.json({
+      success: true,
+      message: action === "hide" ? "Review hidden" : "Review restored",
+      data: {
+        review: adminReview(review),
+        summary: summarizeReviews(visibleReviewsFor(review.productId)),
+      },
+    });
+  }
+);
+
+// GET /admin/delete-review?id=   (admin: permanent, unlike hide)
+app.get(
+  "/admin/delete-review",
+  reviewsEnabledMiddleware,
+  adminMiddleware,
+  (req, res) => {
+    const { id } = req.query;
+    const idx = reviews.findIndex((r) => r._id === id);
+    if (idx === -1) {
+      return res.status(404).json({ success: false, message: "Review not found" });
+    }
+    const removed = reviews.splice(idx, 1)[0];
+    console.log(
+      "[reviews] removed",
+      JSON.stringify({
+        reviewId: removed._id,
+        admin_id: req.user._id,
+        productId: removed.productId,
+      })
+    );
+    res.json({
+      success: true,
+      message: "Review removed permanently",
+      data: {
+        _id: removed._id,
+        productId: removed.productId,
+        summary: summarizeReviews(visibleReviewsFor(removed.productId)),
+      },
+    });
+  }
+);
+
 // GET /delete-user?id=
 app.get("/delete-user", (req, res) => {
   const { id } = req.query;
@@ -701,6 +1143,12 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
   console.log(`   GET    /orders               (user)`);
   console.log(`   POST   /checkout             (user)`);
+  console.log(`   GET    /product-reviews?productId=&limit=&offset=`);
+  console.log(`   GET    /review-eligibility?productId=        (user)`);
+  console.log(`   POST   /review                              (user)`);
+  console.log(`   GET    /admin/reviews?productId=&visibility= (admin)`);
+  console.log(`   GET    /admin/review-visibility?reviewId=&visibility=  (admin)`);
+  console.log(`   GET    /admin/delete-review?id=             (admin)`);
   console.log(`   GET    /delete-user?id=`);
   console.log(`   POST   /reset-password?id=`);
   console.log(`   POST   /photos/upload`);
@@ -710,6 +1158,12 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   payment_status            due_on_delivery | paid | failed | not_completed`);
   console.log(`   payment_reference         SIMPAY-<epochMs>-<4 chars> or null`);
   console.log(`   payment_status_updated_at ISO-8601 or null`);
+  console.log(`\n⭐ Review contract:`);
+  console.log(`   visibility                visible | hidden`);
+  console.log(`   eligibility               eligible | not_signed_in | no_purchase | not_delivered | feature_off`);
+  console.log(`   rating                    whole number 1..5`);
+  console.log(`   text                      up to 500 plain-text characters, "" when rating-only`);
+  console.log(`   REVIEWS_ENABLED=false     every review endpoint returns 503 (instant kill switch)`);
   console.log(`\n🔑 Test tokens:`);
   console.log(`   Admin token : mock-admin-token-001`);
   console.log(`   User token  : mock-user-token-001`);

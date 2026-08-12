@@ -18,6 +18,7 @@ import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
 import * as api from "../../api";
 import * as session from "../../utils/session";
 import ProgressDialog from "react-native-progress-dialog";
+import { isReviewsEnabled } from "../../utils/reviews";
 
 const DashboardScreen = ({ navigation, route }) => {
   const { authUser } = route.params;
@@ -74,6 +75,19 @@ const DashboardScreen = ({ navigation, route }) => {
               type: "muted",
               screenName: "viewcategories",
             },
+            //review coverage, read live from the extended /dashboard response
+            ...(isReviewsEnabled()
+              ? [
+                  {
+                    id: 5,
+                    title: "Reviews",
+                    value: result.data?.reviewsCount,
+                    iconName: "star",
+                    type: "warning",
+                    screenName: "viewreviews",
+                  },
+                ]
+              : []),
           ]);
           setError("");
           setIsloading(false);
@@ -209,6 +223,20 @@ const DashboardScreen = ({ navigation, route }) => {
               }
               type="morden"
             />
+            {/* Turning the client flag off hides every review surface, the
+                moderation entry point included. */}
+            {isReviewsEnabled() && (
+              <OptionList
+                testID="dashboard-reviews-option"
+                text={"Reviews"}
+                Icon={Ionicons}
+                iconName={"star"}
+                onPress={() =>
+                  navigation.navigate("viewreviews", { authUser: user })
+                }
+                type="morden"
+              />
+            )}
 
             <View style={{ height: 20 }}></View>
           </ScrollView>

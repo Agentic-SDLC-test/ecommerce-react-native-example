@@ -20,6 +20,7 @@ import {
   paymentReferenceOf,
   paymentUpdatedAt,
 } from "../../utils/payment";
+import { isReviewsEnabled } from "../../utils/reviews";
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -249,6 +250,24 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
                   price={product?.price}
                   quantity={product?.quantity}
                 />
+                {/* The second review entry point, placed where intent peaks:
+                    a package the shopper has actually received. */}
+                {isReviewsEnabled() && orderDetail?.status === "delivered" && (
+                  <TouchableOpacity
+                    style={styles.reviewButton}
+                    testID={`my-order-detail-review-btn-${index}`}
+                    onPress={() =>
+                      navigation.navigate("writereview", {
+                        product: {
+                          _id: product?.productId?._id,
+                          title: product?.productId?.title,
+                        },
+                      })
+                    }
+                  >
+                    <Text style={styles.reviewButtonText}>Write a review</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ))}
           </ScrollView>
@@ -405,5 +424,21 @@ const styles = StyleSheet.create({
   },
   emptyView: {
     height: 20,
+  },
+  reviewButton: {
+    marginTop: 5,
+    marginBottom: 10,
+    display: "flex",
+    justifyContent: "center",
+    alignItems: "center",
+    borderRadius: 10,
+    borderWidth: 1,
+    padding: 5,
+    borderColor: colors.muted,
+    width: 140,
+  },
+  reviewButtonText: {
+    fontSize: 13,
+    color: colors.muted,
   },
 });
