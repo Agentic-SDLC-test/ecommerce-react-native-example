@@ -10,8 +10,15 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
-import { colors } from "../../constants";
+import {
+  colors,
+  ENABLE_DIGITAL_PAYMENT,
+  PAYMENT_TYPES,
+  DEMO_CARD_FAIL_SUFFIX,
+  getPaymentMethodLabel,
+} from "../../constants";
 import CustomButton from "../../components/CustomButton";
+import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import { useSelector, useDispatch } from "react-redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import { bindActionCreators } from "redux";
@@ -33,10 +40,55 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [city, setCity] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
+  const [paymentType, setPaymentType] = useState(PAYMENT_TYPES.COD);
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCvv, setCardCvv] = useState("");
+  const [error, setError] = useState("");
+  const [alertType, setAlertType] = useState("error");
+
+  const selectPaymentType = (type) => {
+    setPaymentType(type);
+    setError("");
+    if (type === PAYMENT_TYPES.COD) {
+      setCardNumber("");
+      setCardExpiry("");
+      setCardCvv("");
+    }
+  };
+
+  const validateDemoCard = () => {
+    const numberDigits = String(cardNumber).replace(/\D/g, "");
+    if (!numberDigits || !cardExpiry.trim() || !cardCvv.trim()) {
+      return { ok: false, message: "Enter demo card number, expiry, and CVV." };
+    }
+    if (numberDigits.length < 12) {
+      return { ok: false, message: "Demo card number must be at least 12 digits." };
+    }
+    if (numberDigits.endsWith(DEMO_CARD_FAIL_SUFFIX)) {
+      return {
+        ok: false,
+        message: "Demo card payment failed. Try another test card (do not end with 0000).",
+      };
+    }
+    return { ok: true };
+  };
 
   //method to handle checkout
   const handleCheckout = async () => {
+    setError("");
     setIsloading(true);
+
+    if (paymentType === PAYMENT_TYPES.CARD) {
+      const validation = validateDemoCard();
+      if (!validation.ok) {
+        console.log("Demo card payment failed", validation.message);
+        setAlertType("error");
+        setError(validation.message);
+        setIsloading(false);
+        return;
+      }
+    }
 
     var payload = [];
     var totalamount = 0;
@@ -57,26 +109,35 @@ const CheckoutScreen = ({ navigation, route }) => {
         items: payload,
         amount: totalamount,
         discount: 0,
-        payment_type: "cod",
+        payment_type: paymentType,
         country: country,
         status: "pending",
         city: city,
         zipcode: zipcode,
         shippingAddress: streetAddress,
-      }) //API call
+      }) //API call — never include card fields
       .then((result) => {
-        console.log("Checkout=>", result);
         if (result.success == true) {
+          const order = result.data;
+          console.log("Checkout success", {
+            orderId: order?.orderId,
+            payment_type: order?.payment_type,
+            payment_status: order?.payment_status,
+          });
           setIsloading(false);
           emptyCart("empty");
-          navigation.replace("orderconfirm");
+          navigation.replace("orderconfirm", { order });
         } else {
           setIsloading(false);
+          setAlertType("error");
+          setError(result.message || "Checkout failed");
         }
       })
       .catch((error) => {
         setIsloading(false);
         console.log("error", error);
+        setAlertType("error");
+        setError("Checkout failed. Please try again.");
       });
   };
 
@@ -93,6 +154,18 @@ const CheckoutScreen = ({ navigation, route }) => {
       }, 0)
     );
   }, []);
+
+  const addressReady = country && city && streetAddress != "";
+  const cardReady =
+    paymentType !== PAYMENT_TYPES.CARD ||
+    (String(cardNumber).replace(/\D/g, "").length >= 12 &&
+      cardExpiry.trim() &&
+      cardCvv.trim());
+  const canSubmit = addressReady && cardReady;
+  const submitLabel =
+    paymentType === PAYMENT_TYPES.CARD
+      ? "Pay & Place Order (Demo)"
+      : "Submit Order";
 
   return (
     <View style={styles.container} testID="checkout-screen">
@@ -188,27 +261,94 @@ const CheckoutScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
+        <CustomAlert message={error} type={alertType} testID="checkout-payment-alert" />
         <View style={styles.listContainer}>
-          <View style={styles.list}>
-            <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
-          </View>
+          <TouchableOpacity
+            testID="checkout-payment-cod"
+            style={styles.list}
+            onPress={() => selectPaymentType(PAYMENT_TYPES.COD)}
+          >
+            <Text
+              style={
+                paymentType === PAYMENT_TYPES.COD
+                  ? styles.primaryTextSm
+                  : styles.secondaryTextSm
+              }
+              testID="checkout-method-cod-label"
+            >
+              {getPaymentMethodLabel(PAYMENT_TYPES.COD)}
+            </Text>
+            {paymentType === PAYMENT_TYPES.COD && (
+              <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
+            )}
+          </TouchableOpacity>
+          {ENABLE_DIGITAL_PAYMENT && (
+            <TouchableOpacity
+              testID="checkout-payment-card"
+              style={styles.list}
+              onPress={() => selectPaymentType(PAYMENT_TYPES.CARD)}
+            >
+              <Text
+                style={
+                  paymentType === PAYMENT_TYPES.CARD
+                    ? styles.primaryTextSm
+                    : styles.secondaryTextSm
+                }
+                testID="checkout-method-card-label"
+              >
+                {getPaymentMethodLabel(PAYMENT_TYPES.CARD)}
+              </Text>
+              {paymentType === PAYMENT_TYPES.CARD && (
+                <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
+              )}
+            </TouchableOpacity>
+          )}
         </View>
+        {ENABLE_DIGITAL_PAYMENT && paymentType === PAYMENT_TYPES.CARD && (
+          <View style={styles.cardDemoContainer} testID="checkout-card-demo">
+            <Text style={styles.demoBanner} testID="checkout-demo-banner">
+              Demo payment only — no real charge. Use any test card; end with 0000 to simulate failure.
+            </Text>
+            <CustomInput
+              testID="checkout-card-number"
+              value={cardNumber}
+              setValue={setCardNumber}
+              placeholder={"Card Number"}
+              keyboardType={"number-pad"}
+              maxLength={19}
+            />
+            <CustomInput
+              testID="checkout-card-expiry"
+              value={cardExpiry}
+              setValue={setCardExpiry}
+              placeholder={"Expiry (MM/YY)"}
+              maxLength={5}
+            />
+            <CustomInput
+              testID="checkout-card-cvv"
+              value={cardCvv}
+              setValue={setCardCvv}
+              placeholder={"CVV"}
+              keyboardType={"number-pad"}
+              secureTextEntry={true}
+              maxLength={4}
+            />
+          </View>
+        )}
 
         <View style={styles.emptyView}></View>
       </ScrollView>
       <View style={styles.buttomContainer}>
-        {country && city && streetAddress != "" ? (
+        {canSubmit ? (
           <CustomButton
             testID="checkout-submit-btn"
-            text={"Submit Order"}
-            // onPress={() => navigation.replace("orderconfirm")}
+            text={submitLabel}
             onPress={() => {
               handleCheckout();
             }}
           />
         ) : (
-          <CustomButton testID="checkout-submit-btn" text={"Submit Order"} disabled />
+          <CustomButton testID="checkout-submit-btn" text={submitLabel} disabled />
         )}
       </View>
       <Modal
@@ -343,6 +483,17 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 10,
     padding: 10,
+  },
+  cardDemoContainer: {
+    marginTop: 10,
+    backgroundColor: colors.white,
+    borderRadius: 10,
+    padding: 10,
+  },
+  demoBanner: {
+    fontSize: 13,
+    color: colors.muted,
+    marginBottom: 5,
   },
   buttomContainer: {
     width: "100%",

@@ -33,6 +33,9 @@ export const updateCategory = (id, payload) =>
 export const deleteCategory = (id) => get(`/delete-category?id=${q(id)}`);
 
 // ---- Orders ----
+// checkout payload.payment_type: "cod" | "card" (card PAN/CVV must not be sent).
+// Response data includes payment_status: "cod_pending" | "paid" (and may include
+// "pending" | "failed" on older or future records).
 export const checkout = (payload) => post("/checkout", payload);
 export const getOrders = () => get("/orders");
 export const getAdminOrders = () => get("/admin/orders");
