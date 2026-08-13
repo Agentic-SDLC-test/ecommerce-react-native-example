@@ -18,6 +18,41 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
+// ─── Payment constants and helpers ────────────────────────────────────────────
+const PAYMENT_METHODS = {
+  COD: "cod",
+  MOCK_WALLET: "mock_wallet",
+};
+
+const PAYMENT_STATUSES = {
+  DUE_ON_DELIVERY: "due_on_delivery",
+  PAID: "paid",
+};
+
+const ALLOWED_PAYMENT_TYPES = [PAYMENT_METHODS.COD, PAYMENT_METHODS.MOCK_WALLET];
+const ALLOWED_PAYMENT_STATUSES = [
+  PAYMENT_STATUSES.DUE_ON_DELIVERY,
+  PAYMENT_STATUSES.PAID,
+];
+
+function paymentStatusForMethod(paymentType) {
+  if (paymentType === PAYMENT_METHODS.MOCK_WALLET) {
+    return PAYMENT_STATUSES.PAID;
+  }
+  return PAYMENT_STATUSES.DUE_ON_DELIVERY;
+}
+
+function normalizeOrderPayment(order) {
+  const paymentType = order.payment_type || PAYMENT_METHODS.COD;
+  const paymentStatus =
+    order.payment_status || paymentStatusForMethod(paymentType);
+  return {
+    ...order,
+    payment_type: paymentType,
+    payment_status: paymentStatus,
+  };
+}
+
 // ─── In-memory data store ──────────────────────────────────────────────────────
 
 let users = [
@@ -211,6 +246,7 @@ let orders = [
     amount: 129.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "due_on_delivery",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -239,7 +275,8 @@ let orders = [
     ],
     amount: 24.99,
     discount: 0,
-    payment_type: "cod",
+    payment_type: "mock_wallet",
+    payment_status: "paid",
     country: "Canada",
     city: "Vancouver",
     zipcode: "V6B 1A1",
@@ -270,6 +307,7 @@ let orders = [
     amount: 38.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "due_on_delivery",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -463,7 +501,7 @@ app.get("/dashboard", adminMiddleware, (req, res) => {
 
 // GET /admin/orders  (admin: all orders)
 app.get("/admin/orders", adminMiddleware, (req, res) => {
-  res.json({ success: true, data: orders });
+  res.json({ success: true, data: orders.map(normalizeOrderPayment) });
 });
 
 // GET /admin/users  (admin: all users)
@@ -492,16 +530,35 @@ app.get("/admin/order-status", adminMiddleware, (req, res) => {
 
 // GET /orders  (user: their own orders)
 app.get("/orders", authMiddleware, (req, res) => {
-  const userOrders = orders.filter((o) => o.user._id === req.user._id);
+  const userOrders = orders
+    .filter((o) => o.user._id === req.user._id)
+    .map(normalizeOrderPayment);
   res.json({ success: true, data: userOrders });
 });
 
 // POST /checkout  (user: place order)
 app.post("/checkout", authMiddleware, (req, res) => {
-  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
+  const {
+    items,
+    amount,
+    discount,
+    payment_type,
+    country,
+    city,
+    zipcode,
+    shippingAddress,
+    status,
+  } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
   }
+  const resolvedPaymentType = payment_type || PAYMENT_METHODS.COD;
+  if (!ALLOWED_PAYMENT_TYPES.includes(resolvedPaymentType)) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Invalid payment type" });
+  }
+  const canonicalPaymentStatus = paymentStatusForMethod(resolvedPaymentType);
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
     return {
@@ -523,7 +580,8 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
+    payment_type: resolvedPaymentType,
+    payment_status: canonicalPaymentStatus,
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",
@@ -533,7 +591,14 @@ app.post("/checkout", authMiddleware, (req, res) => {
     updatedAt: new Date().toISOString(),
   };
   orders.push(newOrder);
-  res.json({ success: true, message: "Order placed successfully", data: newOrder });
+  console.log(
+    `Order placed: orderId=${newOrder.orderId}, payment_type=${newOrder.payment_type}, payment_status=${newOrder.payment_status}`
+  );
+  res.json({
+    success: true,
+    message: "Order placed successfully",
+    data: normalizeOrderPayment(newOrder),
+  });
 });
 
 // GET /delete-user?id=

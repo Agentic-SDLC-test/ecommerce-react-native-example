@@ -1,6 +1,11 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants";
+import {
+  normalizeOrderPayment,
+  formatPaymentMethod,
+  formatPaymentStatus,
+} from "../../utils/payment";
 
 function getTime(date) {
   let t = new Date(date);
@@ -38,6 +43,7 @@ const dateFormat = (datex) => {
 const OrderList = ({ item, onPress, testID }) => {
   const [totalCost, setTotalCost] = useState(0);
   const [quantity, setQuantity] = useState(0);
+  const payment = normalizeOrderPayment(item || {});
 
   useEffect(() => {
     let packageItems = 0;
@@ -78,6 +84,20 @@ const OrderList = ({ item, onPress, testID }) => {
       <View style={styles.innerRow}>
         <Text style={styles.secondaryText} testID={testID ? `${testID}-quantity` : undefined}>Quantity : {quantity}</Text>
         <Text style={styles.secondaryText} testID={testID ? `${testID}-total` : undefined}>Total Amount : {totalCost}$</Text>
+      </View>
+      <View style={styles.innerRow}>
+        <Text
+          style={styles.secondaryText}
+          testID={testID ? `${testID}-payment-method` : undefined}
+        >
+          Payment: {formatPaymentMethod(payment.payment_type)}
+        </Text>
+        <Text
+          style={styles.secondaryText}
+          testID={testID ? `${testID}-payment-status` : undefined}
+        >
+          {formatPaymentStatus(payment.payment_status, payment.payment_type)}
+        </Text>
       </View>
       <View style={styles.innerRow}>
         <TouchableOpacity style={styles.detailButton} onPress={onPress} testID={testID ? `${testID}-details-btn` : undefined}>

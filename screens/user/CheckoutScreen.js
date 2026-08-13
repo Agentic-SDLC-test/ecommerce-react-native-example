@@ -18,6 +18,11 @@ import { bindActionCreators } from "redux";
 import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import ProgressDialog from "react-native-progress-dialog";
+import {
+  PAYMENT_METHODS,
+  getPaymentStatusForMethod,
+  formatPaymentMethod,
+} from "../../utils/payment";
 
 const CheckoutScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -33,6 +38,13 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [city, setCity] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
+  const [selectedPaymentType, setSelectedPaymentType] = useState(
+    PAYMENT_METHODS.COD
+  );
+
+  const handlePaymentMethodChange = (paymentType) => {
+    setSelectedPaymentType(paymentType);
+  };
 
   //method to handle checkout
   const handleCheckout = async () => {
@@ -52,12 +64,15 @@ const CheckoutScreen = ({ navigation, route }) => {
       payload.push(obj);
     });
 
+    const paymentStatus = getPaymentStatusForMethod(selectedPaymentType);
+
     api
       .checkout({
         items: payload,
         amount: totalamount,
         discount: 0,
-        payment_type: "cod",
+        payment_type: selectedPaymentType,
+        payment_status: paymentStatus,
         country: country,
         status: "pending",
         city: city,
@@ -65,11 +80,10 @@ const CheckoutScreen = ({ navigation, route }) => {
         shippingAddress: streetAddress,
       }) //API call
       .then((result) => {
-        console.log("Checkout=>", result);
         if (result.success == true) {
           setIsloading(false);
           emptyCart("empty");
-          navigation.replace("orderconfirm");
+          navigation.replace("orderconfirm", { order: result.data });
         } else {
           setIsloading(false);
         }
@@ -189,10 +203,43 @@ const CheckoutScreen = ({ navigation, route }) => {
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
         <View style={styles.listContainer}>
-          <View style={styles.list}>
-            <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
-          </View>
+          <TouchableOpacity
+            testID="checkout-payment-cod"
+            style={[
+              styles.paymentOption,
+              selectedPaymentType === PAYMENT_METHODS.COD &&
+                styles.paymentOptionSelected,
+            ]}
+            onPress={() => handlePaymentMethodChange(PAYMENT_METHODS.COD)}
+          >
+            <Text
+              style={styles.secondaryTextSm}
+              testID="checkout-payment-cod-label"
+            >
+              {formatPaymentMethod(PAYMENT_METHODS.COD)}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID="checkout-payment-mock-wallet"
+            style={[
+              styles.paymentOption,
+              selectedPaymentType === PAYMENT_METHODS.MOCK_WALLET &&
+                styles.paymentOptionSelected,
+            ]}
+            onPress={() =>
+              handlePaymentMethodChange(PAYMENT_METHODS.MOCK_WALLET)
+            }
+          >
+            <Text
+              style={styles.secondaryTextSm}
+              testID="checkout-payment-mock-wallet-label"
+            >
+              {formatPaymentMethod(PAYMENT_METHODS.MOCK_WALLET)}
+            </Text>
+            <Text style={styles.paymentHelperText}>
+              No real payment will be collected
+            </Text>
+          </TouchableOpacity>
         </View>
 
         <View style={styles.emptyView}></View>
@@ -372,5 +419,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 20,
     elevation: 3,
+  },
+  paymentOption: {
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.light,
+    marginBottom: 8,
+  },
+  paymentOptionSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary_light,
+  },
+  paymentHelperText: {
+    fontSize: 12,
+    color: colors.muted,
+    marginTop: 4,
   },
 });
