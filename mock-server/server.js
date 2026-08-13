@@ -282,6 +282,145 @@ let orders = [
   },
 ];
 
+let reviews = [
+  {
+    _id: "review001",
+    productId: "prod007",
+    user: { _id: "user001", name: "John Doe" },
+    rating: 5,
+    comment: "Excellent quality rice, aromatic and cooks perfectly.",
+    verifiedPurchase: true,
+    visible: true,
+    removed: false,
+    createdAt: "2026-08-10T10:00:00.000Z",
+    updatedAt: "2026-08-10T10:00:00.000Z",
+  },
+  {
+    _id: "review002",
+    productId: "prod001",
+    user: { _id: "user002", name: "Jane Smith" },
+    rating: 2,
+    comment: "Fabric felt thinner than expected.",
+    verifiedPurchase: true,
+    visible: false,
+    removed: false,
+    createdAt: "2026-08-11T14:00:00.000Z",
+    updatedAt: "2026-08-11T14:00:00.000Z",
+    hiddenAt: "2026-08-12T09:00:00.000Z",
+    hiddenBy: "admin001",
+  },
+];
+
+// ─── Review helpers ───────────────────────────────────────────────────────────
+
+const findProductById = (productId) => products.find((p) => p._id === productId);
+
+const hasVerifiedPurchase = (userId, productId) =>
+  orders.some(
+    (order) =>
+      order.user._id === userId &&
+      order.status === "delivered" &&
+      order.items.some((item) => item.productId._id === productId)
+  );
+
+const getUserReview = (userId, productId) =>
+  reviews.find(
+    (review) =>
+      review.user._id === userId &&
+      review.productId === productId &&
+      review.removed !== true
+  );
+
+const visibleReviewsForProduct = (productId) =>
+  reviews.filter(
+    (review) =>
+      review.productId === productId &&
+      review.visible === true &&
+      review.removed !== true
+  );
+
+const sanitizeReview = (review) => ({
+  _id: review._id,
+  productId: review.productId,
+  user: { _id: review.user._id, name: review.user.name },
+  rating: review.rating,
+  comment: review.comment,
+  verifiedPurchase: review.verifiedPurchase,
+  createdAt: review.createdAt,
+  updatedAt: review.updatedAt,
+});
+
+const sanitizeAdminReview = (review) => {
+  const product = findProductById(review.productId);
+  return {
+    _id: review._id,
+    product: product
+      ? { _id: product._id, title: product.title }
+      : { _id: review.productId, title: "Unknown Product" },
+    user: { _id: review.user._id, name: review.user.name },
+    rating: review.rating,
+    comment: review.comment,
+    verifiedPurchase: review.verifiedPurchase,
+    visible: review.visible,
+    removed: review.removed,
+    createdAt: review.createdAt,
+    updatedAt: review.updatedAt,
+    hiddenAt: review.hiddenAt,
+    hiddenBy: review.hiddenBy,
+    removedAt: review.removedAt,
+    removedBy: review.removedBy,
+  };
+};
+
+const buildReviewSummary = (productId, viewerUserId) => {
+  const visible = visibleReviewsForProduct(productId);
+  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  let ratingSum = 0;
+
+  visible.forEach((review) => {
+    distribution[review.rating] = (distribution[review.rating] || 0) + 1;
+    ratingSum += review.rating;
+  });
+
+  const totalReviews = visible.length;
+  const averageRating =
+    totalReviews > 0 ? Math.round((ratingSum / totalReviews) * 10) / 10 : 0;
+
+  const recentReviews = [...visible]
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .slice(0, 5)
+    .map(sanitizeReview);
+
+  const summary = {
+    productId,
+    averageRating,
+    totalReviews,
+    distribution,
+    recentReviews,
+  };
+
+  if (viewerUserId) {
+    summary.canReview = hasVerifiedPurchase(viewerUserId, productId);
+    const existing = getUserReview(viewerUserId, productId);
+    summary.currentUserReview = existing ? sanitizeReview(existing) : null;
+  }
+
+  return summary;
+};
+
+const optionalAuth = (req, res, next) => {
+  const token = req.headers["x-auth-token"];
+  if (!token) {
+    return next();
+  }
+  const user = users.find((u) => u.token === token);
+  if (!user) {
+    return res.status(401).json({ success: false, err: "jwt expired", message: "Invalid or expired token" });
+  }
+  req.user = user;
+  next();
+};
+
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
 const authMiddleware = (req, res, next) => {
   const token = req.headers["x-auth-token"];
@@ -450,6 +589,7 @@ app.get("/delete-category", adminMiddleware, (req, res) => {
 
 // GET /dashboard  (admin)
 app.get("/dashboard", adminMiddleware, (req, res) => {
+  const activeReviews = reviews.filter((r) => r.removed !== true);
   res.json({
     success: true,
     data: {
@@ -457,6 +597,9 @@ app.get("/dashboard", adminMiddleware, (req, res) => {
       ordersCount: orders.length,
       productsCount: products.length,
       categoriesCount: categories.length,
+      reviewsCount: activeReviews.length,
+      visibleReviewsCount: activeReviews.filter((r) => r.visible === true).length,
+      hiddenReviewsCount: activeReviews.filter((r) => r.visible === false).length,
     },
   });
 });
@@ -563,6 +706,150 @@ app.post("/reset-password", (req, res) => {
   res.json({ success: true, message: "Password updated successfully" });
 });
 
+// GET /products/:productId/reviews
+app.get("/products/:productId/reviews", optionalAuth, (req, res) => {
+  const { productId } = req.params;
+  if (!findProductById(productId)) {
+    return res.status(404).json({ success: false, message: "Product not found" });
+  }
+  const viewerUserId = req.user ? req.user._id : undefined;
+  res.json({ success: true, data: buildReviewSummary(productId, viewerUserId) });
+});
+
+// POST /products/:productId/review
+app.post("/products/:productId/review", authMiddleware, (req, res) => {
+  const { productId } = req.params;
+  if (!findProductById(productId)) {
+    return res.status(404).json({ success: false, message: "Product not found" });
+  }
+  if (!hasVerifiedPurchase(req.user._id, productId)) {
+    console.warn(`Review eligibility denied for userId=${req.user._id} productId=${productId}`);
+    return res.status(403).json({
+      success: false,
+      message: "Only verified purchasers can review this product",
+    });
+  }
+
+  const { rating, comment } = req.body;
+  const parsedRating = parseInt(rating, 10);
+  if (!Number.isInteger(parsedRating) || parsedRating < 1 || parsedRating > 5) {
+    return res.status(400).json({ success: false, message: "Rating must be an integer from 1 to 5" });
+  }
+
+  const trimmedComment = (comment || "").trim();
+  if (trimmedComment.length > 500) {
+    return res.status(400).json({ success: false, message: "Comment must be at most 500 characters" });
+  }
+
+  const now = new Date().toISOString();
+  const existing = getUserReview(req.user._id, productId);
+  let review;
+
+  if (existing) {
+    existing.rating = parsedRating;
+    existing.comment = trimmedComment;
+    existing.updatedAt = now;
+    review = existing;
+    console.log(`Review updated reviewId=${review._id} productId=${productId} userId=${req.user._id}`);
+  } else {
+    review = {
+      _id: uuidv4(),
+      productId,
+      user: { _id: req.user._id, name: req.user.name },
+      rating: parsedRating,
+      comment: trimmedComment,
+      verifiedPurchase: true,
+      visible: true,
+      removed: false,
+      createdAt: now,
+      updatedAt: now,
+    };
+    reviews.push(review);
+    console.log(`Review created reviewId=${review._id} productId=${productId} userId=${req.user._id}`);
+  }
+
+  const summary = buildReviewSummary(productId);
+  res.json({
+    success: true,
+    message: "Review saved successfully",
+    data: {
+      review: sanitizeReview(review),
+      summary: {
+        averageRating: summary.averageRating,
+        totalReviews: summary.totalReviews,
+        distribution: summary.distribution,
+      },
+    },
+  });
+});
+
+// GET /admin/reviews
+app.get("/admin/reviews", adminMiddleware, (req, res) => {
+  const { productId, visibility } = req.query;
+  let filtered = reviews.filter((r) => r.removed !== true);
+
+  if (productId) {
+    filtered = filtered.filter((r) => r.productId === productId);
+  }
+  if (visibility === "visible") {
+    filtered = filtered.filter((r) => r.visible === true);
+  } else if (visibility === "hidden") {
+    filtered = filtered.filter((r) => r.visible === false);
+  }
+
+  res.json({ success: true, data: filtered.map(sanitizeAdminReview) });
+});
+
+// POST /admin/reviews/:reviewId/visibility
+app.post("/admin/reviews/:reviewId/visibility", adminMiddleware, (req, res) => {
+  const { reviewId } = req.params;
+  const { visible } = req.body;
+
+  if (typeof visible !== "boolean") {
+    return res.status(400).json({ success: false, message: "visible must be a boolean" });
+  }
+
+  const review = reviews.find((r) => r._id === reviewId && r.removed !== true);
+  if (!review) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+
+  review.visible = visible;
+  review.updatedAt = new Date().toISOString();
+  if (visible) {
+    delete review.hiddenAt;
+    delete review.hiddenBy;
+  } else {
+    review.hiddenAt = new Date().toISOString();
+    review.hiddenBy = req.user._id;
+  }
+
+  console.log(`Review visibility updated reviewId=${reviewId} visible=${visible} adminId=${req.user._id}`);
+  res.json({
+    success: true,
+    message: "Review visibility updated successfully",
+    data: sanitizeAdminReview(review),
+  });
+});
+
+// GET /admin/delete-review?id=
+app.get("/admin/delete-review", adminMiddleware, (req, res) => {
+  const { id } = req.query;
+  const review = reviews.find((r) => r._id === id && r.removed !== true);
+  if (!review) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+
+  review.removed = true;
+  review.visible = false;
+  review.removedAt = new Date().toISOString();
+  review.removedBy = req.user._id;
+  review.updatedAt = review.removedAt;
+
+  console.log(`Review removed reviewId=${id} adminId=${req.user._id}`);
+  res.json({ success: true, message: "Review removed successfully" });
+});
+
 // POST /photos/upload
 app.post("/photos/upload", upload.single("photos"), (req, res) => {
   if (!req.file) {
@@ -616,6 +903,11 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   POST   /checkout             (user)`);
   console.log(`   GET    /delete-user?id=`);
   console.log(`   POST   /reset-password?id=`);
+  console.log(`   GET    /products/:productId/reviews`);
+  console.log(`   POST   /products/:productId/review     (user)`);
+  console.log(`   GET    /admin/reviews                  (admin)`);
+  console.log(`   POST   /admin/reviews/:reviewId/visibility  (admin)`);
+  console.log(`   GET    /admin/delete-review?id=        (admin)`);
   console.log(`   POST   /photos/upload`);
   console.log(`   GET    /uploads/:filename`);
   console.log(`\n🔑 Test tokens:`);
