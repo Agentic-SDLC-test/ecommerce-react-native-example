@@ -211,6 +211,7 @@ let orders = [
     amount: 129.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "pay_on_delivery",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -240,6 +241,7 @@ let orders = [
     amount: 24.99,
     discount: 0,
     payment_type: "cod",
+    payment_status: "pay_on_delivery",
     country: "Canada",
     city: "Vancouver",
     zipcode: "V6B 1A1",
@@ -270,6 +272,7 @@ let orders = [
     amount: 38.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "pay_on_delivery",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -279,6 +282,36 @@ let orders = [
     deliveredOn: "2024-01-12",
     createdAt: new Date("2024-01-09T08:00:00Z").toISOString(),
     updatedAt: new Date("2024-01-12T16:00:00Z").toISOString(),
+  },
+  {
+    _id: "order004",
+    orderId: "ORD-2024-004",
+    user: {
+      _id: "user001",
+      name: "John Doe",
+      email: "user@easybuy.com",
+    },
+    items: [
+      {
+        productId: {
+          _id: "prod003",
+          title: "Wireless Bluetooth Headphones",
+        },
+        price: 89.99,
+        quantity: 1,
+      },
+    ],
+    amount: 89.99,
+    discount: 0,
+    payment_type: "wallet",
+    payment_status: "paid",
+    country: "Canada",
+    city: "Toronto",
+    zipcode: "M5V 3A8",
+    shippingAddress: "123 Main Street",
+    status: "pending",
+    createdAt: new Date("2024-02-01T12:00:00Z").toISOString(),
+    updatedAt: new Date("2024-02-01T12:00:00Z").toISOString(),
   },
 ];
 
@@ -498,10 +531,28 @@ app.get("/orders", authMiddleware, (req, res) => {
 
 // POST /checkout  (user: place order)
 app.post("/checkout", authMiddleware, (req, res) => {
-  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
+  const { items, amount, discount, payment_type, payment_status, country, city, zipcode, shippingAddress, status } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
   }
+
+  const resolvedPaymentType = payment_type || "cod";
+  if (resolvedPaymentType !== "cod" && resolvedPaymentType !== "wallet") {
+    return res.status(400).json({ success: false, message: "Invalid payment_type" });
+  }
+
+  let resolvedPaymentStatus = payment_status;
+  if (resolvedPaymentType === "cod") {
+    if (resolvedPaymentStatus === "paid") {
+      return res.status(400).json({ success: false, message: "COD orders cannot be marked paid at checkout" });
+    }
+    resolvedPaymentStatus = resolvedPaymentStatus || "pay_on_delivery";
+  } else if (resolvedPaymentType === "wallet") {
+    if (resolvedPaymentStatus !== "paid") {
+      return res.status(400).json({ success: false, message: "Wallet checkout requires paid status" });
+    }
+  }
+
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
     return {
@@ -523,7 +574,8 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
+    payment_type: resolvedPaymentType,
+    payment_status: resolvedPaymentStatus,
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",
