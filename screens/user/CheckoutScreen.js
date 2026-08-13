@@ -12,16 +12,26 @@ import React, { useState, useEffect } from "react";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import { colors } from "../../constants";
 import CustomButton from "../../components/CustomButton";
+import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import PaymentMethodSelector from "../../components/PaymentMethodSelector";
+import WalletMockModal from "../../components/WalletMockModal";
 import { useSelector, useDispatch } from "react-redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import { bindActionCreators } from "redux";
 import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import ProgressDialog from "react-native-progress-dialog";
+import { buildCheckoutPayload } from "../../utils/buildCheckoutPayload";
+
+const ENABLE_WALLET_PAYMENT = true;
 
 const CheckoutScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
+  const [walletModalVisible, setWalletModalVisible] = useState(false);
   const [isloading, setIsloading] = useState(false);
+  const [paymentType, setPaymentType] = useState("cod");
+  const [error, setError] = useState("");
+  const [alertType, setAlertType] = useState("error");
   const cartproduct = useSelector((state) => state.product);
   const dispatch = useDispatch();
   const { emptyCart } = bindActionCreators(actionCreaters, dispatch);
@@ -34,50 +44,76 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
 
-  //method to handle checkout
-  const handleCheckout = async () => {
+  const placeOrder = (type, paymentStatus) => {
     setIsloading(true);
-
-    var payload = [];
-    var totalamount = 0;
-
-    // fetch the cart items from redux and set the total cost
-    cartproduct.forEach((product) => {
-      let obj = {
-        productId: product._id,
-        price: product.price,
-        quantity: product.quantity,
-      };
-      totalamount += parseInt(product.price) * parseInt(product.quantity);
-      payload.push(obj);
-    });
+    setError("");
+    const payload = buildCheckoutPayload(
+      cartproduct,
+      { country, city, zipcode, streetAddress },
+      type,
+      paymentStatus
+    );
 
     api
-      .checkout({
-        items: payload,
-        amount: totalamount,
-        discount: 0,
-        payment_type: "cod",
-        country: country,
-        status: "pending",
-        city: city,
-        zipcode: zipcode,
-        shippingAddress: streetAddress,
-      }) //API call
+      .checkout(payload)
       .then((result) => {
-        console.log("Checkout=>", result);
+        console.log("Checkout=>", result, {
+          orderId: result?.data?.orderId,
+          payment_type: result?.data?.payment_type,
+          payment_status: result?.data?.payment_status,
+        });
         if (result.success == true) {
           setIsloading(false);
           emptyCart("empty");
-          navigation.replace("orderconfirm");
+          navigation.replace("orderconfirm", { order: result.data });
         } else {
           setIsloading(false);
+          setAlertType("error");
+          setError(result.message || "Checkout failed");
         }
       })
-      .catch((error) => {
+      .catch((err) => {
         setIsloading(false);
-        console.log("error", error);
+        console.log("error", err);
+        setAlertType("error");
+        setError("Checkout failed");
       });
+  };
+
+  const handleSelectPayment = (type) => {
+    setPaymentType(type);
+    setError("");
+  };
+
+  //method to handle checkout
+  const handleCheckout = async () => {
+    if (isloading) {
+      return;
+    }
+    if (!paymentType) {
+      setAlertType("error");
+      setError("Please select a payment method");
+      return;
+    }
+    if (paymentType === "wallet" && ENABLE_WALLET_PAYMENT) {
+      setWalletModalVisible(true);
+      return;
+    }
+    placeOrder("cod", "pending");
+  };
+
+  const handleWalletSuccess = () => {
+    setWalletModalVisible(false);
+    placeOrder("wallet", "paid");
+  };
+
+  const handleWalletFailOrCancel = () => {
+    setWalletModalVisible(false);
+    console.log({ event: "wallet_mock_abandoned" });
+    setAlertType("error");
+    setError(
+      "Wallet payment was not completed (demo). Order was not placed."
+    );
   };
 
   // set the address and total cost on initital render
@@ -115,6 +151,7 @@ const CheckoutScreen = ({ navigation, route }) => {
         <View></View>
       </View>
       <ScrollView style={styles.bodyContainer} nestedScrollEnabled={true} testID="checkout-scroll">
+        <CustomAlert message={error} type={alertType} testID="checkout-alert" />
         <Text style={styles.primaryText} testID="checkout-summary-heading">Order Summary</Text>
         <ScrollView
           style={styles.orderSummaryContainer}
@@ -188,12 +225,20 @@ const CheckoutScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
-        <View style={styles.listContainer}>
-          <View style={styles.list}>
-            <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
+        {ENABLE_WALLET_PAYMENT ? (
+          <PaymentMethodSelector
+            value={paymentType}
+            onChange={handleSelectPayment}
+            testIDPrefix="checkout-payment"
+          />
+        ) : (
+          <View style={styles.listContainer}>
+            <View style={styles.list}>
+              <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
+              <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
+            </View>
           </View>
-        </View>
+        )}
 
         <View style={styles.emptyView}></View>
       </ScrollView>
@@ -202,7 +247,6 @@ const CheckoutScreen = ({ navigation, route }) => {
           <CustomButton
             testID="checkout-submit-btn"
             text={"Submit Order"}
-            // onPress={() => navigation.replace("orderconfirm")}
             onPress={() => {
               handleCheckout();
             }}
@@ -268,6 +312,13 @@ const CheckoutScreen = ({ navigation, route }) => {
           </View>
         </View>
       </Modal>
+      <WalletMockModal
+        visible={walletModalVisible}
+        amount={totalCost + deliveryCost}
+        onSuccess={handleWalletSuccess}
+        onFail={handleWalletFailOrCancel}
+        onCancel={handleWalletFailOrCancel}
+      />
     </View>
   );
 };
