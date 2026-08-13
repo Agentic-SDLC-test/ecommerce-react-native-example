@@ -5,6 +5,7 @@ import {
   View,
   StatusBar,
   Text,
+  ScrollView,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,6 +17,7 @@ import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import * as api from "../../api";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import ProductReviewSummary from "../../components/Reviews/ProductReviewSummary";
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -37,6 +39,57 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const [error, setError] = useState("");
   const [isDisable, setIsDisbale] = useState(true);
   const [alertType, setAlertType] = useState("error");
+  const [reviewSummary, setReviewSummary] = useState({
+    averageRating: 0,
+    totalCount: 0,
+    distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  });
+  const [recentReviews, setRecentReviews] = useState([]);
+  const [reviewEligibility, setReviewEligibility] = useState(null);
+  const [reviewsLoading, setReviewsLoading] = useState(false);
+
+  //method to fetch product reviews from server using API call
+  const fetchReviews = () => {
+    setReviewsLoading(true);
+    api
+      .getProductReviews(product._id, { limit: 5, sort: "recent" })
+      .then((result) => {
+        if (result.success) {
+          setReviewSummary(result.data.summary);
+          setRecentReviews(result.data.reviews);
+        } else {
+          setError(result.message);
+          setAlertType("error");
+        }
+        setReviewsLoading(false);
+      })
+      .catch((err) => {
+        setReviewsLoading(false);
+        setError(err.message);
+        setAlertType("error");
+      });
+  };
+
+  //method to fetch review eligibility for signed-in user
+  const fetchReviewEligibility = () => {
+    api
+      .getMyProductReview(product._id)
+      .then((result) => {
+        if (result.success) {
+          setReviewEligibility(result.data);
+        }
+      })
+      .catch(() => {
+        setReviewEligibility(null);
+      });
+  };
+
+  const handleWriteReview = () => {
+    navigation.navigate("reviewform", {
+      productId: product._id,
+      productTitle: product.title,
+    });
+  };
 
   //method to fetch wishlist from server using API call
   const fetchWishlist = async () => {
@@ -131,7 +184,18 @@ const ProductDetailScreen = ({ navigation, route }) => {
     setAvaiableQuantity(product.quantity);
     SetProductImage(`${network.serverip}/uploads/${product?.image}`);
     fetchWishlist();
+    fetchReviews();
+    fetchReviewEligibility();
   }, []);
+
+  //refresh reviews when returning from review form
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", () => {
+      fetchReviews();
+      fetchReviewEligibility();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   //render whenever the value of wishlistItems change
   useEffect(() => {}, [wishlistItems]);
@@ -175,6 +239,11 @@ const ProductDetailScreen = ({ navigation, route }) => {
         </View>
         <CustomAlert message={error} type={alertType} testID="product-detail-alert" />
         <View style={styles.productInfoContainer}>
+          <ScrollView
+            style={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            testID="product-detail-scroll"
+          >
           <View style={styles.productInfoTopContainer}>
             <View style={styles.productNameContaier}>
               <Text style={styles.productNameText} testID="product-detail-title">{product?.title}</Text>
@@ -208,7 +277,17 @@ const ProductDetailScreen = ({ navigation, route }) => {
               <Text style={styles.secondaryTextSm} testID="product-detail-description-label">Description:</Text>
               <Text testID="product-detail-description">{product?.description}</Text>
             </View>
+            {!reviewsLoading && (
+              <ProductReviewSummary
+                summary={reviewSummary}
+                reviews={recentReviews}
+                onWriteReview={handleWriteReview}
+                eligibility={reviewEligibility}
+                testID="product-detail-reviews"
+              />
+            )}
           </View>
+          </ScrollView>
           <View style={styles.productInfoBottomContainer}>
             <View style={styles.counterContainer}>
               <View style={styles.counter}>
@@ -303,6 +382,10 @@ const styles = StyleSheet.create({
     justifyContent: "flex-end",
     alignItems: "center",
     elevation: 25,
+  },
+  scrollContent: {
+    width: "100%",
+    flex: 1,
   },
   productImage: {
     height: 300,

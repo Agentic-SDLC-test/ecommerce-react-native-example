@@ -282,6 +282,39 @@ let orders = [
   },
 ];
 
+let reviews = [
+  {
+    _id: "review001",
+    productId: "prod007",
+    productTitle: "Organic Basmati Rice (5kg)",
+    user: {
+      _id: "user001",
+      name: "John Doe",
+      email: "user@easybuy.com",
+    },
+    rating: 5,
+    body: "Great quality rice and fast delivery.",
+    verifiedPurchase: true,
+    isVisible: true,
+    moderationStatus: "visible",
+    moderationNote: "",
+    createdAt: "2026-08-13T13:00:00.000Z",
+    updatedAt: "2026-08-13T13:00:00.000Z",
+    hiddenAt: null,
+    removedAt: null,
+    removedBy: null,
+  },
+];
+
+const {
+  findProductById,
+  hasDeliveredPurchase,
+  findReview,
+  visibleReviewsForProduct,
+  buildReviewSummary,
+  serializeReview,
+} = require("./reviewHelpers");
+
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
 const authMiddleware = (req, res, next) => {
   const token = req.headers["x-auth-token"];
@@ -457,6 +490,12 @@ app.get("/dashboard", adminMiddleware, (req, res) => {
       ordersCount: orders.length,
       productsCount: products.length,
       categoriesCount: categories.length,
+      reviewsCount: reviews.length,
+      visibleReviewsCount: reviews.filter(
+        (r) => r.isVisible && r.moderationStatus === "visible"
+      ).length,
+      hiddenReviewsCount: reviews.filter((r) => r.moderationStatus === "hidden").length,
+      removedReviewsCount: reviews.filter((r) => r.moderationStatus === "removed").length,
     },
   });
 });
@@ -576,6 +615,277 @@ app.post("/photos/upload", upload.single("photos"), (req, res) => {
   });
 });
 
+// ─── Product reviews ──────────────────────────────────────────────────────────
+
+// GET /products/:productId/reviews
+app.get("/products/:productId/reviews", (req, res) => {
+  const { productId } = req.params;
+  const product = findProductById(products, productId);
+  if (!product) {
+    return res.status(404).json({ success: false, message: "Product not found" });
+  }
+
+  let limit = parseInt(req.query.limit, 10);
+  if (Number.isNaN(limit) || limit < 1) limit = 5;
+  if (limit > 20) limit = 20;
+
+  const sort = req.query.sort || "recent";
+  let visible = visibleReviewsForProduct(reviews, productId);
+
+  if (sort === "recent") {
+    visible = visible.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+  }
+
+  const summary = buildReviewSummary(reviews, productId);
+  const serialized = visible.slice(0, limit).map((r) => serializeReview(r, false));
+
+  res.json({
+    success: true,
+    data: {
+      summary,
+      reviews: serialized,
+    },
+  });
+});
+
+// GET /products/:productId/reviews/me
+app.get("/products/:productId/reviews/me", authMiddleware, (req, res) => {
+  const { productId } = req.params;
+  const product = findProductById(products, productId);
+  if (!product) {
+    return res.status(404).json({ success: false, message: "Product not found" });
+  }
+
+  const eligible = hasDeliveredPurchase(orders, req.user._id, productId);
+  const existingReview = findReview(reviews, req.user._id, productId);
+
+  if (!eligible) {
+    return res.json({
+      success: true,
+      data: {
+        eligible: false,
+        reason: "Only delivered purchases can be reviewed",
+        existingReview: null,
+      },
+    });
+  }
+
+  res.json({
+    success: true,
+    data: {
+      eligible: true,
+      reason: "Delivered purchase found",
+      existingReview: existingReview
+        ? serializeReview(existingReview, true)
+        : null,
+    },
+  });
+});
+
+// POST /products/:productId/reviews
+app.post("/products/:productId/reviews", authMiddleware, (req, res) => {
+  const { productId } = req.params;
+  const product = findProductById(products, productId);
+  if (!product) {
+    return res.status(404).json({ success: false, message: "Product not found" });
+  }
+
+  if (!hasDeliveredPurchase(orders, req.user._id, productId)) {
+    return res
+      .status(403)
+      .json({ success: false, message: "Only delivered purchases can be reviewed" });
+  }
+
+  const { rating, body } = req.body;
+  const parsedRating = parseInt(rating, 10);
+  if (!parsedRating || parsedRating < 1 || parsedRating > 5) {
+    return res.status(400).json({ success: false, message: "Rating must be an integer from 1 to 5" });
+  }
+
+  const trimmedBody = (body || "").trim();
+  if (!trimmedBody || trimmedBody.length > 500) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Review body is required and must be at most 500 characters" });
+  }
+
+  const now = new Date().toISOString();
+  const existing = findReview(reviews, req.user._id, productId);
+  let review;
+  let statusCode = 201;
+
+  if (existing) {
+    existing.rating = parsedRating;
+    existing.body = trimmedBody;
+    existing.productTitle = product.title;
+    existing.updatedAt = now;
+    if (existing.moderationStatus !== "removed") {
+      existing.isVisible = true;
+      existing.moderationStatus = "visible";
+    }
+    review = existing;
+    statusCode = 200;
+    console.log("review.updated", {
+      reviewId: review._id,
+      productId,
+      userId: req.user._id,
+      timestamp: now,
+    });
+  } else {
+    review = {
+      _id: uuidv4(),
+      productId,
+      productTitle: product.title,
+      user: {
+        _id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+      },
+      rating: parsedRating,
+      body: trimmedBody,
+      verifiedPurchase: true,
+      isVisible: true,
+      moderationStatus: "visible",
+      moderationNote: "",
+      createdAt: now,
+      updatedAt: now,
+      hiddenAt: null,
+      removedAt: null,
+      removedBy: null,
+    };
+    reviews.push(review);
+    console.log("review.created", {
+      reviewId: review._id,
+      productId,
+      userId: req.user._id,
+      timestamp: now,
+    });
+  }
+
+  const summary = buildReviewSummary(reviews, productId);
+
+  res.status(statusCode).json({
+    success: true,
+    message: "Review saved successfully",
+    data: {
+      review: serializeReview(review, true),
+      summary,
+    },
+  });
+});
+
+// GET /admin/reviews
+app.get("/admin/reviews", adminMiddleware, (req, res) => {
+  const { visibility = "all", productId, search } = req.query;
+  let result = [...reviews];
+
+  if (visibility === "visible") {
+    result = result.filter((r) => r.moderationStatus === "visible" && r.isVisible);
+  } else if (visibility === "hidden") {
+    result = result.filter((r) => r.moderationStatus === "hidden");
+  } else if (visibility === "removed") {
+    result = result.filter((r) => r.moderationStatus === "removed");
+  }
+
+  if (productId) {
+    result = result.filter((r) => r.productId === productId);
+  }
+
+  if (search) {
+    const keyword = search.toLowerCase();
+    result = result.filter(
+      (r) =>
+        r.productTitle.toLowerCase().includes(keyword) ||
+        r.user.name.toLowerCase().includes(keyword) ||
+        r.body.toLowerCase().includes(keyword)
+    );
+  }
+
+  res.json({
+    success: true,
+    data: result.map((r) => serializeReview(r, true)),
+  });
+});
+
+// POST /admin/review-visibility?id=
+app.post("/admin/review-visibility", adminMiddleware, (req, res) => {
+  const { id } = req.query;
+  const review = reviews.find((r) => r._id === id);
+  if (!review) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+
+  const { isVisible, moderationStatus, moderationNote } = req.body;
+  const validStatuses = ["visible", "hidden"];
+  if (!validStatuses.includes(moderationStatus)) {
+    return res.status(400).json({ success: false, message: "Invalid moderation status" });
+  }
+
+  const now = new Date().toISOString();
+  review.isVisible = isVisible;
+  review.moderationStatus = moderationStatus;
+  review.moderationNote = moderationNote || "";
+  review.updatedAt = now;
+
+  if (moderationStatus === "hidden") {
+    review.hiddenAt = now;
+    console.log("review.hidden", {
+      reviewId: review._id,
+      productId: review.productId,
+      adminId: req.user._id,
+      timestamp: now,
+    });
+  } else {
+    review.hiddenAt = null;
+    console.log("review.restored", {
+      reviewId: review._id,
+      productId: review.productId,
+      adminId: req.user._id,
+      timestamp: now,
+    });
+  }
+
+  res.json({
+    success: true,
+    message: "Review visibility updated",
+    data: { review: serializeReview(review, true) },
+  });
+});
+
+// POST /admin/remove-review?id=
+app.post("/admin/remove-review", adminMiddleware, (req, res) => {
+  const { id } = req.query;
+  const review = reviews.find((r) => r._id === id);
+  if (!review) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+
+  const { moderationNote } = req.body;
+  const now = new Date().toISOString();
+
+  review.isVisible = false;
+  review.moderationStatus = "removed";
+  review.moderationNote = moderationNote || "";
+  review.removedAt = now;
+  review.removedBy = req.user._id;
+  review.updatedAt = now;
+
+  console.log("review.removed", {
+    reviewId: review._id,
+    productId: review.productId,
+    adminId: req.user._id,
+    timestamp: now,
+  });
+
+  res.json({
+    success: true,
+    message: "Review removed",
+    data: { review: serializeReview(review, true) },
+  });
+});
+
 // ─── Fallback placeholder image for /uploads/* ────────────────────────────────
 // Returns a simple SVG placeholder when the requested image doesn't exist
 app.get("/uploads/:filename", (req, res) => {
@@ -617,6 +927,12 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   GET    /delete-user?id=`);
   console.log(`   POST   /reset-password?id=`);
   console.log(`   POST   /photos/upload`);
+  console.log(`   GET    /products/:productId/reviews`);
+  console.log(`   GET    /products/:productId/reviews/me  (user)`);
+  console.log(`   POST   /products/:productId/reviews       (user)`);
+  console.log(`   GET    /admin/reviews                     (admin)`);
+  console.log(`   POST   /admin/review-visibility?id=       (admin)`);
+  console.log(`   POST   /admin/remove-review?id=           (admin)`);
   console.log(`   GET    /uploads/:filename`);
   console.log(`\n🔑 Test tokens:`);
   console.log(`   Admin token : mock-admin-token-001`);

@@ -13,6 +13,7 @@ import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import StepIndicator from "react-native-step-indicator";
+import CustomButton from "../../components/CustomButton";
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -211,6 +212,20 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
                   price={product?.price}
                   quantity={product?.quantity}
                 />
+                {orderDetail?.status === "delivered" && (
+                  <View style={styles.reviewButtonContainer}>
+                    <CustomButton
+                      text="Review"
+                      onPress={() =>
+                        navigation.navigate("reviewform", {
+                          productId: product?.productId?._id,
+                          productTitle: product?.productId?.title,
+                        })
+                      }
+                      testID={`my-order-detail-review-btn-${index}`}
+                    />
+                  </View>
+                )}
               </View>
             ))}
           </ScrollView>
@@ -367,5 +382,10 @@ const styles = StyleSheet.create({
   },
   emptyView: {
     height: 20,
+  },
+  reviewButtonContainer: {
+    marginTop: 8,
+    marginBottom: 8,
+    paddingHorizontal: 4,
   },
 });
