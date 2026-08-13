@@ -5,6 +5,7 @@ import {
   View,
   StatusBar,
   Text,
+  ScrollView,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,6 +17,7 @@ import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import * as api from "../../api";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import { ReviewSummary, ReviewCard, ReviewForm } from "../../components/Reviews";
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -37,6 +39,92 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const [error, setError] = useState("");
   const [isDisable, setIsDisbale] = useState(true);
   const [alertType, setAlertType] = useState("error");
+
+  const [reviewSummary, setReviewSummary] = useState({
+    averageRating: 0,
+    totalReviews: 0,
+    distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  });
+  const [recentReviews, setRecentReviews] = useState([]);
+  const [myReview, setMyReview] = useState(null);
+  const [canReview, setCanReview] = useState(false);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [reviewLoading, setReviewLoading] = useState(false);
+  const [reviewError, setReviewError] = useState("");
+  const [reviewFetched, setReviewFetched] = useState(false);
+
+  //method to fetch product reviews from server
+  const fetchProductReviews = () => {
+    api
+      .getProductReviews(product._id)
+      .then((result) => {
+        if (result.success) {
+          setReviewSummary(result.data.summary);
+          setRecentReviews(result.data.recentReviews || []);
+        }
+      })
+      .catch((err) => {
+        console.log("error", err);
+      });
+  };
+
+  //method to fetch current user's review eligibility
+  const fetchMyReview = () => {
+    api
+      .getMyProductReview(product._id)
+      .then((result) => {
+        if (result.success) {
+          setCanReview(result.data.canReview);
+          setMyReview(result.data.existingReview);
+          if (result.data.existingReview) {
+            setReviewRating(result.data.existingReview.rating);
+            setReviewComment(result.data.existingReview.comment);
+          }
+          setReviewFetched(true);
+        }
+      })
+      .catch((err) => {
+        setReviewFetched(true);
+        console.log("error", err);
+      });
+  };
+
+  const handleSubmitReview = () => {
+    if (reviewRating < 1 || reviewRating > 5) {
+      setReviewError("Please select a rating between 1 and 5");
+      return;
+    }
+    const trimmed = reviewComment.trim();
+    if (trimmed.length < 10) {
+      setReviewError("Comment must be at least 10 characters");
+      return;
+    }
+    if (trimmed.length > 500) {
+      setReviewError("Comment must be at most 500 characters");
+      return;
+    }
+    setReviewLoading(true);
+    setReviewError("");
+    api
+      .upsertProductReview(product._id, { rating: reviewRating, comment: trimmed })
+      .then((result) => {
+        setReviewLoading(false);
+        if (result.success) {
+          setError(result.message);
+          setAlertType("success");
+          fetchProductReviews();
+          fetchMyReview();
+        } else {
+          setReviewError(result.message);
+        }
+      })
+      .catch((err) => {
+        setReviewLoading(false);
+        setReviewError(err.message);
+        console.log("error", err);
+      });
+  };
 
   //method to fetch wishlist from server using API call
   const fetchWishlist = async () => {
@@ -131,6 +219,8 @@ const ProductDetailScreen = ({ navigation, route }) => {
     setAvaiableQuantity(product.quantity);
     SetProductImage(`${network.serverip}/uploads/${product?.image}`);
     fetchWishlist();
+    fetchProductReviews();
+    fetchMyReview();
   }, []);
 
   //render whenever the value of wishlistItems change
@@ -173,6 +263,7 @@ const ProductDetailScreen = ({ navigation, route }) => {
         <View style={styles.productImageContainer}>
           <Image source={{ uri: productImage }} style={styles.productImage} testID="product-detail-image" />
         </View>
+        <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         <CustomAlert message={error} type={alertType} testID="product-detail-alert" />
         <View style={styles.productInfoContainer}>
           <View style={styles.productInfoTopContainer}>
@@ -207,6 +298,35 @@ const ProductDetailScreen = ({ navigation, route }) => {
             <View style={styles.productDescriptionContainer}>
               <Text style={styles.secondaryTextSm} testID="product-detail-description-label">Description:</Text>
               <Text testID="product-detail-description">{product?.description}</Text>
+            </View>
+            <View style={styles.reviewSectionContainer}>
+              <Text style={styles.reviewSectionTitle}>Customer Reviews</Text>
+              <ReviewSummary summary={reviewSummary} testID="product-detail-review-summary" />
+              {reviewFetched && canReview && (
+                <ReviewForm
+                  rating={reviewRating}
+                  comment={reviewComment}
+                  onRatingChange={setReviewRating}
+                  onCommentChange={setReviewComment}
+                  onSubmit={handleSubmitReview}
+                  loading={reviewLoading}
+                  isEdit={!!myReview}
+                  error={reviewError}
+                  testID="product-detail-review-form"
+                />
+              )}
+              {reviewFetched && !canReview && (
+                <Text style={styles.ineligibleText} testID="product-detail-review-ineligible">
+                  Only verified purchasers can review this product
+                </Text>
+              )}
+              {recentReviews.map((review, index) => (
+                <ReviewCard
+                  key={review._id || index}
+                  review={review}
+                  testID={`product-detail-review-card-${index}`}
+                />
+              ))}
             </View>
           </View>
           <View style={styles.productInfoBottomContainer}>
@@ -248,6 +368,7 @@ const ProductDetailScreen = ({ navigation, route }) => {
             </View>
           </View>
         </View>
+        </ScrollView>
       </View>
     </View>
   );
@@ -284,6 +405,10 @@ const styles = StyleSheet.create({
     justifyContent: "flex-start",
     flex: 1,
   },
+  scrollContainer: {
+    width: "100%",
+    flex: 1,
+  },
   productImageContainer: {
     width: "100%",
     flex: 2,
@@ -295,7 +420,6 @@ const styles = StyleSheet.create({
   },
   productInfoContainer: {
     width: "100%",
-    flex: 3,
     backgroundColor: colors.white,
     borderTopLeftRadius: 25,
     borderTopRightRadius: 25,
@@ -315,9 +439,7 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     alignItems: "center",
     justifyContent: "flex-start",
-    height: "100%",
     width: "100%",
-    flex: 1,
   },
   productInfoBottomContainer: {
     display: "flex",
@@ -465,5 +587,24 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: "bold",
     fontSize: 10,
+  },
+  reviewSectionContainer: {
+    width: "100%",
+    marginTop: 10,
+    paddingBottom: 10,
+  },
+  reviewSectionTitle: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: colors.dark,
+    paddingHorizontal: 20,
+    marginBottom: 4,
+  },
+  ineligibleText: {
+    fontSize: 13,
+    color: colors.muted,
+    fontStyle: "italic",
+    paddingHorizontal: 20,
+    paddingVertical: 8,
   },
 });
