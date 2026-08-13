@@ -15,9 +15,15 @@ import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import CustomButton from "../../components/CustomButton";
 import DropDownPicker from "react-native-dropdown-picker";
+import {
+  normalizeOrderPayment,
+  formatPaymentMethod,
+  formatPaymentStatus,
+} from "../../utils/payment";
 
 const ViewOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
+  const payment = normalizeOrderPayment(orderDetail || {});
   const [isloading, setIsloading] = useState(false);
   const [label, setLabel] = useState("Loading..");
   const [error, setError] = useState("");
@@ -176,6 +182,33 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
               Delivered on {orderDetail?.deliveredOn}
             </Text>
           )}
+        </View>
+        <View style={styles.containerNameContainer}>
+          <View>
+            <Text
+              style={styles.containerNameText}
+              testID="view-order-detail-payment-heading"
+            >
+              Payment Details
+            </Text>
+          </View>
+        </View>
+        <View style={styles.orderInfoContainer}>
+          <View style={styles.orderItemContainer}>
+            <Text style={styles.orderItemText}>Method</Text>
+            <Text testID="view-order-detail-payment-method">
+              {formatPaymentMethod(payment.payment_type)}
+            </Text>
+          </View>
+          <View style={styles.orderItemContainer}>
+            <Text style={styles.orderItemText}>Status</Text>
+            <Text testID="view-order-detail-payment-status">
+              {formatPaymentStatus(
+                payment.payment_status,
+                payment.payment_type
+              )}
+            </Text>
+          </View>
         </View>
         <View style={styles.containerNameContainer}>
           <View>
