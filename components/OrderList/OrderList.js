@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants";
+import { normalizeOrderPayment } from "../../utils/payment";
 
 function getTime(date) {
   let t = new Date(date);
@@ -52,6 +53,8 @@ const OrderList = ({ item, onPress, testID }) => {
     );
   }, []);
 
+  const payment = normalizeOrderPayment(item);
+
   return (
     <View style={styles.container} testID={testID}>
       <View style={styles.innerRow}>
@@ -80,10 +83,15 @@ const OrderList = ({ item, onPress, testID }) => {
         <Text style={styles.secondaryText} testID={testID ? `${testID}-total` : undefined}>Total Amount : {totalCost}$</Text>
       </View>
       <View style={styles.innerRow}>
+        <Text style={styles.secondaryText} testID={testID ? `${testID}-payment` : undefined}>
+          Payment: {payment.methodLabel} - {payment.statusLabel}
+        </Text>
+      </View>
+      <View style={styles.innerRow}>
         <TouchableOpacity style={styles.detailButton} onPress={onPress} testID={testID ? `${testID}-details-btn` : undefined}>
           <Text>Details</Text>
         </TouchableOpacity>
-        <Text style={styles.secondaryText} testID={testID ? `${testID}-status` : undefined}>{item?.status}</Text>
+        <Text style={styles.secondaryText} testID={testID ? `${testID}-status` : undefined}>Package: {item?.status}</Text>
       </View>
     </View>
   );

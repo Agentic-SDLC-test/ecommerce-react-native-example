@@ -17,11 +17,19 @@ import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import { bindActionCreators } from "redux";
 import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
+import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
+import {
+  PAYMENT_METHODS,
+  getPaymentStatusForMethod,
+} from "../../utils/payment";
 
 const CheckoutScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [isloading, setIsloading] = useState(false);
+  const [selectedPaymentType, setSelectedPaymentType] = useState(null);
+  const [error, setError] = useState("");
+  const [alertType, setAlertType] = useState("error");
   const cartproduct = useSelector((state) => state.product);
   const dispatch = useDispatch();
   const { emptyCart } = bindActionCreators(actionCreaters, dispatch);
@@ -34,16 +42,17 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
 
-  //method to handle checkout
-  const handleCheckout = async () => {
-    setIsloading(true);
+  const handleSelectPayment = (paymentType) => {
+    setSelectedPaymentType(paymentType);
+    setError("");
+  };
 
-    var payload = [];
-    var totalamount = 0;
+  const buildCheckoutPayload = () => {
+    const payload = [];
+    let totalamount = 0;
 
-    // fetch the cart items from redux and set the total cost
     cartproduct.forEach((product) => {
-      let obj = {
+      const obj = {
         productId: product._id,
         price: product.price,
         quantity: product.quantity,
@@ -52,35 +61,59 @@ const CheckoutScreen = ({ navigation, route }) => {
       payload.push(obj);
     });
 
+    return {
+      items: payload,
+      amount: totalamount,
+      discount: 0,
+      payment_type: selectedPaymentType,
+      payment_status: getPaymentStatusForMethod(selectedPaymentType),
+      country: country,
+      status: "pending",
+      city: city,
+      zipcode: zipcode,
+      shippingAddress: streetAddress,
+    };
+  };
+
+  const handleCheckout = async () => {
+    if (!selectedPaymentType) {
+      setError("Please select a payment method before placing your order.");
+      setAlertType("error");
+      return;
+    }
+
+    setIsloading(true);
+    setError("");
+    setAlertType("error");
+
     api
-      .checkout({
-        items: payload,
-        amount: totalamount,
-        discount: 0,
-        payment_type: "cod",
-        country: country,
-        status: "pending",
-        city: city,
-        zipcode: zipcode,
-        shippingAddress: streetAddress,
-      }) //API call
+      .checkout(buildCheckoutPayload())
       .then((result) => {
-        console.log("Checkout=>", result);
         if (result.success == true) {
           setIsloading(false);
           emptyCart("empty");
-          navigation.replace("orderconfirm");
+          navigation.replace("orderconfirm", { order: result.data });
         } else {
           setIsloading(false);
+          setError(result.message || "Checkout failed. Please try again.");
+          setAlertType("error");
         }
       })
-      .catch((error) => {
+      .catch((checkoutError) => {
         setIsloading(false);
-        console.log("error", error);
+        setError(
+          typeof checkoutError === "string"
+            ? checkoutError
+            : "Checkout failed. Please try again."
+        );
+        setAlertType("error");
+        console.log("error", checkoutError);
       });
   };
 
-  // set the address and total cost on initital render
+  const isAddressComplete = country && city && streetAddress != "";
+  const canSubmit = isAddressComplete && selectedPaymentType;
+
   useEffect(() => {
     if (streetAddress && city && country != "") {
       setAddress(`${streetAddress}, ${city},${country}`);
@@ -98,6 +131,7 @@ const CheckoutScreen = ({ navigation, route }) => {
     <View style={styles.container} testID="checkout-screen">
       <StatusBar testID="checkout-status-bar"></StatusBar>
       <ProgressDialog visible={isloading} label={"Placing Order..."} />
+      <CustomAlert message={error} type={alertType} testID="checkout-alert" />
       <View style={styles.topBarContainer}>
         <TouchableOpacity
           testID="checkout-back-btn"
@@ -189,20 +223,51 @@ const CheckoutScreen = ({ navigation, route }) => {
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
         <View style={styles.listContainer}>
-          <View style={styles.list}>
-            <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
-          </View>
+          {PAYMENT_METHODS.map((method) => {
+            const isSelected = selectedPaymentType === method.value;
+            const testIdSuffix =
+              method.value === "cod" ? "cod" : "mock-wallet";
+            return (
+              <TouchableOpacity
+                key={method.value}
+                testID={`checkout-payment-${testIdSuffix}`}
+                style={[
+                  styles.paymentOption,
+                  isSelected && styles.paymentOptionSelected,
+                ]}
+                onPress={() => handleSelectPayment(method.value)}
+              >
+                <View style={styles.paymentOptionContent}>
+                  <Text
+                    style={[
+                      styles.secondaryTextSm,
+                      isSelected && styles.selectedPaymentLabel,
+                    ]}
+                  >
+                    {method.label}
+                  </Text>
+                  <Text style={styles.paymentDescription}>{method.description}</Text>
+                </View>
+                {isSelected && (
+                  <Text
+                    style={styles.selectedIndicator}
+                    testID={`checkout-payment-selected-${testIdSuffix}`}
+                  >
+                    Selected
+                  </Text>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         <View style={styles.emptyView}></View>
       </ScrollView>
       <View style={styles.buttomContainer}>
-        {country && city && streetAddress != "" ? (
+        {canSubmit ? (
           <CustomButton
             testID="checkout-submit-btn"
             text={"Submit Order"}
-            // onPress={() => navigation.replace("orderconfirm")}
             onPress={() => {
               handleCheckout();
             }}
@@ -343,6 +408,37 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 10,
     padding: 10,
+  },
+  paymentOption: {
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.light,
+    padding: 10,
+    minHeight: 60,
+  },
+  paymentOptionSelected: {
+    backgroundColor: colors.light,
+  },
+  paymentOptionContent: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  paymentDescription: {
+    fontSize: 12,
+    color: colors.muted,
+    marginTop: 4,
+  },
+  selectedPaymentLabel: {
+    color: colors.primary,
+  },
+  selectedIndicator: {
+    fontSize: 13,
+    fontWeight: "bold",
+    color: colors.primary,
   },
   buttomContainer: {
     width: "100%",

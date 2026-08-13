@@ -211,6 +211,8 @@ let orders = [
     amount: 129.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "pending_collection",
+    payment_note: "Payment due on delivery.",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -239,7 +241,9 @@ let orders = [
     ],
     amount: 24.99,
     discount: 0,
-    payment_type: "cod",
+    payment_type: "mock_wallet",
+    payment_status: "paid",
+    payment_note: "Mock wallet payment. No real funds moved.",
     country: "Canada",
     city: "Vancouver",
     zipcode: "V6B 1A1",
@@ -270,6 +274,8 @@ let orders = [
     amount: 38.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "pending_collection",
+    payment_note: "Payment due on delivery.",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -304,6 +310,21 @@ const adminMiddleware = (req, res, next) => {
     next();
   });
 };
+
+// ─── Payment helpers ──────────────────────────────────────────────────────────
+const PAYMENT_TYPES = ["cod", "mock_wallet"];
+const PAYMENT_STATUS_BY_TYPE = {
+  cod: "pending_collection",
+  mock_wallet: "paid",
+};
+
+function getPaymentStatus(paymentType) {
+  return PAYMENT_STATUS_BY_TYPE[paymentType] || PAYMENT_STATUS_BY_TYPE.cod;
+}
+
+function normalizePaymentType(paymentType) {
+  return PAYMENT_TYPES.includes(paymentType) ? paymentType : "cod";
+}
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
@@ -502,6 +523,13 @@ app.post("/checkout", authMiddleware, (req, res) => {
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
   }
+  if (payment_type && !PAYMENT_TYPES.includes(payment_type)) {
+    console.warn(
+      `Invalid payment_type rejected: ${payment_type} for user ${req.user._id}`
+    );
+    return res.status(400).json({ success: false, message: "Invalid payment type" });
+  }
+  const normalizedPaymentType = payment_type || "cod";
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
     return {
@@ -523,7 +551,12 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
+    payment_type: normalizedPaymentType,
+    payment_status: getPaymentStatus(normalizedPaymentType),
+    payment_note:
+      normalizedPaymentType === "mock_wallet"
+        ? "Mock wallet payment. No real funds moved."
+        : "Payment due on delivery.",
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",
@@ -533,6 +566,9 @@ app.post("/checkout", authMiddleware, (req, res) => {
     updatedAt: new Date().toISOString(),
   };
   orders.push(newOrder);
+  console.log(
+    `Checkout success: orderId=${newOrder.orderId} userId=${req.user._id} payment_type=${newOrder.payment_type} payment_status=${newOrder.payment_status} status=${newOrder.status}`
+  );
   res.json({ success: true, message: "Order placed successfully", data: newOrder });
 });
 

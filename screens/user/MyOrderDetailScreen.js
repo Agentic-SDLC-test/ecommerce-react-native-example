@@ -13,6 +13,7 @@ import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import StepIndicator from "react-native-step-indicator";
+import { normalizeOrderPayment } from "../../utils/payment";
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -109,6 +110,8 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
     }
   }, []);
 
+  const payment = normalizeOrderPayment(orderDetail);
+
   return (
     <View style={styles.container} testID="my-order-detail-screen">
       <ProgressDialog visible={isloading} label={label} />
@@ -181,6 +184,31 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
               labels={labels}
             />
           </View>
+        </View>
+
+        <View style={styles.containerNameContainer}>
+          <View>
+            <Text style={styles.containerNameText} testID="my-order-detail-payment-heading">Payment Details</Text>
+          </View>
+        </View>
+        <View style={styles.orderInfoContainer}>
+          <View style={styles.orderItemContainer}>
+            <Text style={styles.secondarytextSm}>Method</Text>
+            <Text style={styles.secondarytextSm} testID="my-order-detail-payment-method">
+              {payment.methodLabel}
+            </Text>
+          </View>
+          <View style={styles.orderItemContainer}>
+            <Text style={styles.secondarytextSm}>Payment status</Text>
+            <Text style={styles.secondarytextSm} testID="my-order-detail-payment-status">
+              {payment.statusLabel}
+            </Text>
+          </View>
+          {orderDetail?.payment_type === "mock_wallet" && (
+            <Text style={styles.secondarytextSm} testID="my-order-detail-payment-note">
+              Demo payment only. No real money was charged.
+            </Text>
+          )}
         </View>
 
         <View style={styles.containerNameContainer}>
