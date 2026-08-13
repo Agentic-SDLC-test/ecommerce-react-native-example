@@ -18,6 +18,22 @@ import { bindActionCreators } from "redux";
 import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import ProgressDialog from "react-native-progress-dialog";
+import {
+  getPaymentStatusForType,
+} from "../../utils/paymentFormatters";
+
+const paymentOptions = [
+  {
+    type: "cod",
+    label: "Cash On Delivery",
+    description: "Pay when your package arrives.",
+  },
+  {
+    type: "mock_wallet",
+    label: "Mock Wallet Payment",
+    description: "Demo payment only. No real funds are processed.",
+  },
+];
 
 const CheckoutScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -33,6 +49,11 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [city, setCity] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
+  const [paymentType, setPaymentType] = useState("cod");
+
+  const canSubmitOrder = () => {
+    return Boolean(country && city && streetAddress && paymentType);
+  };
 
   //method to handle checkout
   const handleCheckout = async () => {
@@ -57,7 +78,8 @@ const CheckoutScreen = ({ navigation, route }) => {
         items: payload,
         amount: totalamount,
         discount: 0,
-        payment_type: "cod",
+        payment_type: paymentType,
+        payment_status: getPaymentStatusForType(paymentType),
         country: country,
         status: "pending",
         city: city,
@@ -69,7 +91,7 @@ const CheckoutScreen = ({ navigation, route }) => {
         if (result.success == true) {
           setIsloading(false);
           emptyCart("empty");
-          navigation.replace("orderconfirm");
+          navigation.replace("orderconfirm", { order: result.data });
         } else {
           setIsloading(false);
         }
@@ -189,20 +211,41 @@ const CheckoutScreen = ({ navigation, route }) => {
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
         <View style={styles.listContainer}>
-          <View style={styles.list}>
-            <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
-          </View>
+          {paymentOptions.map((option) => (
+            <TouchableOpacity
+              key={option.type}
+              testID={`checkout-payment-option-${option.type}`}
+              style={[
+                styles.paymentOption,
+                paymentType === option.type && styles.paymentOptionSelected,
+              ]}
+              onPress={() => setPaymentType(option.type)}
+            >
+              <View style={styles.paymentOptionContent}>
+                <Text
+                  style={[
+                    styles.primaryTextSm,
+                    paymentType === option.type && styles.paymentOptionLabelSelected,
+                  ]}
+                >
+                  {option.label}
+                </Text>
+                <Text style={styles.paymentOptionDescription}>{option.description}</Text>
+              </View>
+              {paymentType === option.type && (
+                <Ionicons name="checkmark-circle" size={22} color={colors.primary} />
+              )}
+            </TouchableOpacity>
+          ))}
         </View>
 
         <View style={styles.emptyView}></View>
       </ScrollView>
       <View style={styles.buttomContainer}>
-        {country && city && streetAddress != "" ? (
+        {canSubmitOrder() ? (
           <CustomButton
             testID="checkout-submit-btn"
             text={"Submit Order"}
-            // onPress={() => navigation.replace("orderconfirm")}
             onPress={() => {
               handleCheckout();
             }}
@@ -343,6 +386,34 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 10,
     padding: 10,
+  },
+  paymentOption: {
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: colors.light,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+  },
+  paymentOptionSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primary_light,
+  },
+  paymentOptionContent: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  paymentOptionLabelSelected: {
+    color: colors.primary,
+  },
+  paymentOptionDescription: {
+    fontSize: 13,
+    color: colors.muted,
+    marginTop: 4,
   },
   buttomContainer: {
     width: "100%",

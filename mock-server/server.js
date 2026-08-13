@@ -211,6 +211,7 @@ let orders = [
     amount: 129.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "pending_on_delivery",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -240,6 +241,7 @@ let orders = [
     amount: 24.99,
     discount: 0,
     payment_type: "cod",
+    payment_status: "pending_on_delivery",
     country: "Canada",
     city: "Vancouver",
     zipcode: "V6B 1A1",
@@ -270,6 +272,7 @@ let orders = [
     amount: 38.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "pending_on_delivery",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -280,7 +283,54 @@ let orders = [
     createdAt: new Date("2024-01-09T08:00:00Z").toISOString(),
     updatedAt: new Date("2024-01-12T16:00:00Z").toISOString(),
   },
+  {
+    _id: "order004",
+    orderId: "ORD-2024-004",
+    user: {
+      _id: "user002",
+      name: "Jane Smith",
+      email: "jane@easybuy.com",
+    },
+    items: [
+      {
+        productId: {
+          _id: "prod004",
+          title: "Smartphone Stand",
+        },
+        price: 14.99,
+        quantity: 1,
+      },
+    ],
+    amount: 14.99,
+    discount: 0,
+    payment_type: "mock_wallet",
+    payment_status: "mock_paid",
+    country: "Canada",
+    city: "Vancouver",
+    zipcode: "V6B 1A1",
+    shippingAddress: "456 Oak Avenue",
+    status: "pending",
+    createdAt: new Date("2024-01-18T11:00:00Z").toISOString(),
+    updatedAt: new Date("2024-01-18T11:00:00Z").toISOString(),
+  },
 ];
+
+const VALID_PAYMENT_TYPES = ["cod", "mock_wallet"];
+const PAYMENT_STATUS_BY_TYPE = {
+  cod: "pending_on_delivery",
+  mock_wallet: "mock_paid",
+};
+
+function normalizePaymentType(paymentType) {
+  if (!paymentType) {
+    return "cod";
+  }
+  return VALID_PAYMENT_TYPES.includes(paymentType) ? paymentType : null;
+}
+
+function paymentStatusFor(paymentType) {
+  return PAYMENT_STATUS_BY_TYPE[paymentType] || PAYMENT_STATUS_BY_TYPE.cod;
+}
 
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
 const authMiddleware = (req, res, next) => {
@@ -502,6 +552,10 @@ app.post("/checkout", authMiddleware, (req, res) => {
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
   }
+  const normalizedPaymentType = normalizePaymentType(payment_type);
+  if (!normalizedPaymentType) {
+    return res.status(400).json({ success: false, message: "Invalid payment type" });
+  }
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
     return {
@@ -523,7 +577,8 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
+    payment_type: normalizedPaymentType,
+    payment_status: paymentStatusFor(normalizedPaymentType),
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",
