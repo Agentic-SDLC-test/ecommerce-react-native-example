@@ -74,6 +74,14 @@ const DashboardScreen = ({ navigation, route }) => {
               type: "muted",
               screenName: "viewcategories",
             },
+            {
+              id: 5,
+              title: "Reviews",
+              value: result.data?.reviewsCount,
+              iconName: "star",
+              type: "warning",
+              screenName: "viewreviews",
+            },
           ]);
           setError("");
           setIsloading(false);
@@ -206,6 +214,16 @@ const DashboardScreen = ({ navigation, route }) => {
               iconName={"person"}
               onPress={() =>
                 navigation.navigate("viewusers", { authUser: user })
+              }
+              type="morden"
+            />
+            <OptionList
+              testID="dashboard-reviews-option"
+              text={"Reviews"}
+              Icon={Ionicons}
+              iconName={"star"}
+              onPress={() =>
+                navigation.navigate("viewreviews", { authUser: user })
               }
               type="morden"
             />

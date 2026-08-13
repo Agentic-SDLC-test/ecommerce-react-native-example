@@ -5,6 +5,9 @@ import {
   View,
   StatusBar,
   Text,
+  ScrollView,
+  TextInput,
+  ActivityIndicator,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,6 +19,18 @@ import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import * as api from "../../api";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import ReviewSummary from "../../components/ReviewSummary";
+import ReviewStars from "../../components/ReviewStars";
+import ReviewListItem from "../../components/ReviewListItem";
+
+const emptyReviewSummary = {
+  averageRating: 0,
+  totalReviews: 0,
+  distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
+  recentReviews: [],
+  canReview: false,
+  currentUserReview: null,
+};
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -37,6 +52,68 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const [error, setError] = useState("");
   const [isDisable, setIsDisbale] = useState(true);
   const [alertType, setAlertType] = useState("error");
+  const [reviewSummary, setReviewSummary] = useState(emptyReviewSummary);
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState("");
+  const [canReview, setCanReview] = useState(false);
+  const [currentUserReview, setCurrentUserReview] = useState(null);
+  const [reviewLoading, setReviewLoading] = useState(false);
+
+  const fetchReviews = async () => {
+    setReviewLoading(true);
+    api
+      .getProductReviews(product._id)
+      .then((result) => {
+        if (result.success) {
+          setReviewSummary(result.data);
+          setCanReview(result.data.canReview === true);
+          setCurrentUserReview(result.data.currentUserReview || null);
+          if (result.data.currentUserReview) {
+            setReviewRating(result.data.currentUserReview.rating);
+            setReviewComment(result.data.currentUserReview.comment || "");
+          }
+        }
+        setReviewLoading(false);
+      })
+      .catch((err) => {
+        console.log("error", err);
+        setReviewLoading(false);
+      });
+  };
+
+  const handleSelectRating = (nextRating) => {
+    setReviewRating(nextRating);
+  };
+
+  const handleSubmitReview = async () => {
+    if (reviewRating < 1 || reviewRating > 5) {
+      setError("Please select a rating from 1 to 5 stars.");
+      setAlertType("error");
+      return;
+    }
+    setReviewLoading(true);
+    api
+      .upsertProductReview(product._id, {
+        rating: reviewRating,
+        comment: reviewComment,
+      })
+      .then((result) => {
+        if (result.success) {
+          setError(result.message);
+          setAlertType("success");
+          fetchReviews();
+        } else {
+          setError(result.message);
+          setAlertType("error");
+          setReviewLoading(false);
+        }
+      })
+      .catch((err) => {
+        setError(err.message || "Failed to save review");
+        setAlertType("error");
+        setReviewLoading(false);
+      });
+  };
 
   //method to fetch wishlist from server using API call
   const fetchWishlist = async () => {
@@ -131,6 +208,7 @@ const ProductDetailScreen = ({ navigation, route }) => {
     setAvaiableQuantity(product.quantity);
     SetProductImage(`${network.serverip}/uploads/${product?.image}`);
     fetchWishlist();
+    fetchReviews();
   }, []);
 
   //render whenever the value of wishlistItems change
@@ -170,11 +248,11 @@ const ProductDetailScreen = ({ navigation, route }) => {
         </TouchableOpacity>
       </View>
       <View style={styles.bodyContainer}>
-        <View style={styles.productImageContainer}>
-          <Image source={{ uri: productImage }} style={styles.productImage} testID="product-detail-image" />
-        </View>
-        <CustomAlert message={error} type={alertType} testID="product-detail-alert" />
-        <View style={styles.productInfoContainer}>
+        <ScrollView style={styles.scrollBody} contentContainerStyle={styles.scrollContent}>
+          <View style={styles.productImageContainer}>
+            <Image source={{ uri: productImage }} style={styles.productImage} testID="product-detail-image" />
+          </View>
+          <CustomAlert message={error} type={alertType} testID="product-detail-alert" />
           <View style={styles.productInfoTopContainer}>
             <View style={styles.productNameContaier}>
               <Text style={styles.productNameText} testID="product-detail-title">{product?.title}</Text>
@@ -196,9 +274,7 @@ const ProductDetailScreen = ({ navigation, route }) => {
               </View>
             </View>
             <View style={styles.productDetailContainer}>
-              <View style={styles.productSizeOptionContainer}>
-                {/* <Text style={styles.secondaryTextSm}>Size:</Text> */}
-              </View>
+              <View style={styles.productSizeOptionContainer}></View>
               <View style={styles.productPriceContainer}>
                 <Text style={styles.secondaryTextSm} testID="product-detail-price-label">Price:</Text>
                 <Text style={styles.primaryTextSm} testID="product-detail-price">{product?.price}$</Text>
@@ -208,8 +284,65 @@ const ProductDetailScreen = ({ navigation, route }) => {
               <Text style={styles.secondaryTextSm} testID="product-detail-description-label">Description:</Text>
               <Text testID="product-detail-description">{product?.description}</Text>
             </View>
+
+            <View style={styles.reviewsSection} testID="product-detail-reviews-section">
+              <Text style={styles.reviewsHeading}>Customer Reviews</Text>
+              {reviewLoading && !reviewSummary.totalReviews ? (
+                <ActivityIndicator color={colors.primary} testID="product-detail-reviews-loading" />
+              ) : (
+                <>
+                  <ReviewSummary summary={reviewSummary} testID="product-detail-review-summary" />
+                  {reviewSummary.totalReviews === 0 ? (
+                    <Text style={styles.emptyReviewsText} testID="product-detail-no-reviews">
+                      No reviews yet. Verified purchasers can be the first to review this product.
+                    </Text>
+                  ) : (
+                    reviewSummary.recentReviews?.map((review, index) => (
+                      <ReviewListItem
+                        key={review._id}
+                        review={review}
+                        testID={`product-detail-review-${index}`}
+                      />
+                    ))
+                  )}
+                  {canReview ? (
+                    <View style={styles.reviewForm} testID="product-detail-review-form">
+                      <Text style={styles.secondaryTextSm}>
+                        {currentUserReview ? "Update Review" : "Write a Review"}
+                      </Text>
+                      <ReviewStars
+                        rating={reviewRating}
+                        onChange={handleSelectRating}
+                        size={24}
+                        testID="product-detail-review-stars"
+                      />
+                      <TextInput
+                        style={styles.reviewInput}
+                        placeholder="Share your experience (optional)"
+                        value={reviewComment}
+                        onChangeText={setReviewComment}
+                        multiline
+                        maxLength={500}
+                        testID="product-detail-review-comment"
+                      />
+                      <CustomButton
+                        testID="product-detail-submit-review-btn"
+                        text={currentUserReview ? "Update Review" : "Submit Review"}
+                        onPress={handleSubmitReview}
+                        disabled={reviewLoading}
+                      />
+                    </View>
+                  ) : (
+                    <Text style={styles.ineligibleText} testID="product-detail-ineligible">
+                      Only verified purchasers can review this product.
+                    </Text>
+                  )}
+                </>
+              )}
+            </View>
           </View>
-          <View style={styles.productInfoBottomContainer}>
+        </ScrollView>
+        <View style={styles.productInfoBottomContainer}>
             <View style={styles.counterContainer}>
               <View style={styles.counter}>
                 <TouchableOpacity
@@ -245,7 +378,6 @@ const ProductDetailScreen = ({ navigation, route }) => {
               ) : (
                 <CustomButton testID="product-detail-out-of-stock-btn" text={"Out of Stock"} disabled={true} />
               )}
-            </View>
           </View>
         </View>
       </View>
@@ -278,11 +410,21 @@ const styles = StyleSheet.create({
   },
   bodyContainer: {
     width: "100%",
-    flexDirecion: "row",
+    flexDirection: "column",
     backgroundColor: colors.light,
     alignItems: "center",
     justifyContent: "flex-start",
     flex: 1,
+  },
+  scrollBody: {
+    flex: 1,
+    width: "100%",
+  },
+  scrollContent: {
+    paddingBottom: 20,
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
   },
   productImageContainer: {
     width: "100%",
@@ -397,6 +539,47 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingLeft: 20,
     paddingRight: 20,
+  },
+  reviewsSection: {
+    width: "100%",
+    marginTop: 16,
+    paddingBottom: 16,
+    borderTopWidth: 1,
+    borderTopColor: colors.light,
+  },
+  reviewsHeading: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: colors.dark,
+    paddingHorizontal: 20,
+    marginBottom: 8,
+  },
+  emptyReviewsText: {
+    fontSize: 13,
+    color: colors.muted,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+  },
+  ineligibleText: {
+    fontSize: 13,
+    color: colors.muted,
+    paddingHorizontal: 20,
+    marginTop: 8,
+    fontStyle: "italic",
+  },
+  reviewForm: {
+    paddingHorizontal: 20,
+    marginTop: 12,
+  },
+  reviewInput: {
+    borderWidth: 1,
+    borderColor: colors.light,
+    borderRadius: 8,
+    padding: 10,
+    marginVertical: 10,
+    minHeight: 60,
+    textAlignVertical: "top",
+    backgroundColor: colors.white,
   },
   iconContainer: {
     display: "flex",
