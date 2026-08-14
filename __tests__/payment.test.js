@@ -49,4 +49,25 @@ describe("Payment constants", () => {
       resolvePaymentStatus({ payment_type: "card", payment_status: "paid" })
     ).toBe("paid");
   });
+
+  // Mirrors the payment method/status lookups rendered by the admin
+  // ViewOrderDetailScreen "Payment" section (view-order-detail-payment-*
+  // testIDs) for both a COD and a card order.
+  it("resolves the admin order-detail payment display for a COD order", () => {
+    const codOrder = { payment_type: "cod", payment_status: "cod_pending" };
+    expect(getPaymentMethodLabel(codOrder.payment_type)).toBe(
+      "Cash on Delivery"
+    );
+    expect(getPaymentStatusLabel(resolvePaymentStatus(codOrder))).toBe(
+      "Pay on delivery"
+    );
+  });
+
+  it("resolves the admin order-detail payment display for a card order", () => {
+    const cardOrder = { payment_type: "card", payment_status: "paid" };
+    expect(getPaymentMethodLabel(cardOrder.payment_type)).toBe("Card (Demo)");
+    expect(getPaymentStatusLabel(resolvePaymentStatus(cardOrder))).toBe(
+      "Paid"
+    );
+  });
 });
