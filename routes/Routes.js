@@ -15,6 +15,7 @@ import CartScreen from "../screens/user/CartScreen";
 import CheckoutScreen from "../screens/user/CheckoutScreen.js";
 import OrderConfirmScreen from "../screens/user/OrderConfirmScreen";
 import ProductDetailScreen from "../screens/user/ProductDetailScreen";
+import ProductReviewScreen from "../screens/user/ProductReviewScreen";
 import EditProductScreen from "../screens/admin/EditProductScreen";
 import ViewOrdersScreen from "../screens/admin/ViewOrdersScreen";
 import ViewOrderDetailScreen from "../screens/admin/ViewOrderDetailScreen";
@@ -26,6 +27,7 @@ import ViewUsersScreen from "../screens/admin/ViewUsersScreen";
 import CategoriesScreen from "../screens/user/CategoriesScreen";
 import EditCategoryScreen from "../screens/admin/EditCategoryScreen";
 import MyWishlistScreen from "../screens/profile/MyWishlistScreen";
+import ViewReviewsScreen from "../screens/admin/ViewReviewsScreen";
 
 const Stack = createNativeStackNavigator();
 
@@ -52,6 +54,7 @@ const Routes = () => {
         <Stack.Screen name="checkout" component={CheckoutScreen} />
         <Stack.Screen name="orderconfirm" component={OrderConfirmScreen} />
         <Stack.Screen name="productdetail" component={ProductDetailScreen} />
+        <Stack.Screen name="productreview" component={ProductReviewScreen} />
         <Stack.Screen name="vieworder" component={ViewOrdersScreen} />
         <Stack.Screen
           name="vieworderdetails"
@@ -63,6 +66,7 @@ const Routes = () => {
         <Stack.Screen name="addcategories" component={AddCategoryScreen} />
         <Stack.Screen name="editcategories" component={EditCategoryScreen} />
         <Stack.Screen name="viewusers" component={ViewUsersScreen} />
+        <Stack.Screen name="viewreviews" component={ViewReviewsScreen} />
         <Stack.Screen name="categories" component={CategoriesScreen} />
       </Stack.Navigator>
     </NavigationContainer>

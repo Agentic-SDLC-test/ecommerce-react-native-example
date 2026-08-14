@@ -42,6 +42,34 @@ export const getAdminOrders = () => get("/admin/orders");
 export const updateOrderStatus = (orderId, status) =>
   get(`/admin/order-status?orderId=${q(orderId)}&status=${q(status)}`);
 
+// ---- Reviews ----
+export const getProductReviewBundle = (productId) => {
+  if (!productId) {
+    return Promise.reject(new Error("productId is required"));
+  }
+  return get(`/product-reviews?productId=${q(productId)}`);
+};
+
+export const saveReview = (payload) => post("/review", payload);
+
+export const getAdminReviews = (filters = {}) => {
+  const params = new URLSearchParams();
+  if (filters.productId) params.append("productId", filters.productId);
+  if (filters.visibility) params.append("visibility", filters.visibility);
+  if (filters.search) params.append("search", filters.search);
+
+  const query = params.toString();
+  return get(`/admin/reviews${query ? `?${query}` : ""}`);
+};
+
+export const updateReviewVisibility = (reviewId, visibility) =>
+  get(
+    `/admin/review-visibility?id=${q(reviewId)}&visibility=${q(visibility)}`
+  );
+
+export const removeReview = (reviewId) =>
+  get(`/admin/delete-review?id=${q(reviewId)}`);
+
 // ---- Wishlist ----
 export const getWishlist = () => get("/wishlist");
 export const addToWishlist = (productId, quantity = 1) =>

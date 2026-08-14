@@ -13,6 +13,10 @@ const CustomInput = ({
   width = "100%",
   keyboardType,
   maxLength,
+  multiline = false,
+  numberOfLines,
+  textAlignVertical,
+  inputStyle,
   testID,
 }) => {
   return (
@@ -22,12 +26,15 @@ const CustomInput = ({
         onChangeText={setValue}
         value={value}
         secureTextEntry={secureTextEntry}
-        style={styles.CustomInput}
         placeholderTextColor={placeholderTextColor}
         onFocus={onFocus}
         borderRadius={radius}
         maxLength={maxLength}
         keyboardType={keyboardType}
+        multiline={multiline}
+        numberOfLines={numberOfLines}
+        textAlignVertical={textAlignVertical}
+        style={[styles.CustomInput, inputStyle]}
         testID={testID}
       />
     </View>
