@@ -5,6 +5,7 @@ import {
   View,
   StatusBar,
   Text,
+  ScrollView,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,6 +17,9 @@ import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import * as api from "../../api";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import RatingSummary from "../../components/RatingSummary";
+import ReviewList from "../../components/ReviewList";
+import ReviewForm from "../../components/ReviewForm";
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -37,6 +41,80 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const [error, setError] = useState("");
   const [isDisable, setIsDisbale] = useState(true);
   const [alertType, setAlertType] = useState("error");
+
+  // ---- Reviews state ----
+  const [reviewSummary, setReviewSummary] = useState({ average: 0, count: 0, distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 } });
+  const [recentReviews, setRecentReviews] = useState([]);
+  const [reviewsPage, setReviewsPage] = useState(1);
+  const [reviewEligibility, setReviewEligibility] = useState({
+    canReview: false,
+    hasReviewed: false,
+    reviewId: null,
+  });
+  const [reviewFormVisible, setReviewFormVisible] = useState(false);
+  const [reviewFormError, setReviewFormError] = useState("");
+
+  //method to fetch the aggregate rating summary and recent reviews for this product
+  const fetchReviews = (page = 1) => {
+    api
+      .getProductReviews(product?._id, { page, limit: 5, sort: "recent" })
+      .then((result) => {
+        if (result.success) {
+          setReviewSummary(result.data.summary);
+          setRecentReviews(
+            page === 1 ? result.data.reviews : [...recentReviews, ...result.data.reviews]
+          );
+        }
+      })
+      .catch((error) => {
+        console.log("error", error);
+      });
+  };
+
+  //method to fetch whether the signed-in shopper may submit/edit a review for this product
+  const fetchReviewEligibility = () => {
+    api
+      .getReviewEligibility(product?._id)
+      .then((result) => {
+        if (result.success) {
+          setReviewEligibility(result.data);
+        }
+      })
+      .catch((error) => {
+        console.log("error", error);
+      });
+  };
+
+  //method to load one more page of the recent-reviews feed
+  const handleShowMoreReviews = () => {
+    const nextPage = reviewsPage + 1;
+    setReviewsPage(nextPage);
+    fetchReviews(nextPage);
+  };
+
+  //method to submit a new review or an edit to the shopper's existing review
+  const handleReviewSubmit = ({ rating, text }) => {
+    setReviewFormError("");
+    const request = reviewEligibility.hasReviewed
+      ? api.updateReview(reviewEligibility.reviewId, { rating, text })
+      : api.submitReview(product?._id, { rating, text });
+
+    request
+      .then((result) => {
+        if (result.success) {
+          setReviewFormVisible(false);
+          fetchReviewEligibility();
+          fetchReviews(1);
+          setReviewsPage(1);
+        } else {
+          setReviewFormError(result.message);
+        }
+      })
+      .catch((error) => {
+        setReviewFormError(error.message);
+        console.log("error", error);
+      });
+  };
 
   //method to fetch wishlist from server using API call
   const fetchWishlist = async () => {
@@ -131,6 +209,8 @@ const ProductDetailScreen = ({ navigation, route }) => {
     setAvaiableQuantity(product.quantity);
     SetProductImage(`${network.serverip}/uploads/${product?.image}`);
     fetchWishlist();
+    fetchReviews(1);
+    fetchReviewEligibility();
   }, []);
 
   //render whenever the value of wishlistItems change
@@ -208,6 +288,54 @@ const ProductDetailScreen = ({ navigation, route }) => {
               <Text style={styles.secondaryTextSm} testID="product-detail-description-label">Description:</Text>
               <Text testID="product-detail-description">{product?.description}</Text>
             </View>
+            <ScrollView
+              style={styles.reviewsScroll}
+              showsVerticalScrollIndicator={false}
+              testID="product-detail-reviews-scroll"
+            >
+              <RatingSummary summary={reviewSummary} testID="product-detail-rating-summary" />
+              {reviewEligibility.canReview ? (
+                <View style={styles.reviewCtaContainer}>
+                  <CustomButton
+                    testID="product-detail-write-review-btn"
+                    text={reviewEligibility.hasReviewed ? "Edit your Review" : "Write a Review"}
+                    onPress={() => setReviewFormVisible(true)}
+                  />
+                </View>
+              ) : null}
+              <ReviewForm
+                testID="product-detail-review-form"
+                visible={reviewFormVisible}
+                isEdit={reviewEligibility.hasReviewed}
+                initialRating={
+                  reviewEligibility.hasReviewed
+                    ? recentReviews.find((r) => r._id === reviewEligibility.reviewId)?.rating || 0
+                    : 0
+                }
+                initialText={
+                  reviewEligibility.hasReviewed
+                    ? recentReviews.find((r) => r._id === reviewEligibility.reviewId)?.text || ""
+                    : ""
+                }
+                error={reviewFormError}
+                onSubmit={handleReviewSubmit}
+                onCancel={() => setReviewFormVisible(false)}
+              />
+              <ReviewList
+                testID="product-detail-review-list"
+                reviews={recentReviews}
+                emptyText="No reviews yet. Be the first to review this product!"
+              />
+              {recentReviews.length > 0 && recentReviews.length < reviewSummary.count ? (
+                <TouchableOpacity
+                  testID="product-detail-show-more-reviews-btn"
+                  style={styles.showMoreButton}
+                  onPress={handleShowMoreReviews}
+                >
+                  <Text style={styles.showMoreButtonText}>Show more</Text>
+                </TouchableOpacity>
+              ) : null}
+            </ScrollView>
           </View>
           <View style={styles.productInfoBottomContainer}>
             <View style={styles.counterContainer}>
@@ -397,6 +525,24 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingLeft: 20,
     paddingRight: 20,
+  },
+  reviewsScroll: {
+    width: "100%",
+    flex: 1,
+  },
+  reviewCtaContainer: {
+    width: "100%",
+    paddingLeft: 20,
+    paddingRight: 20,
+    marginTop: 10,
+  },
+  showMoreButton: {
+    alignItems: "center",
+    padding: 10,
+  },
+  showMoreButtonText: {
+    color: colors.primary,
+    fontWeight: "bold",
   },
   iconContainer: {
     display: "flex",

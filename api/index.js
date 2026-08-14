@@ -42,6 +42,27 @@ export const getAdminOrders = () => get("/admin/orders");
 export const updateOrderStatus = (orderId, status) =>
   get(`/admin/order-status?orderId=${q(orderId)}&status=${q(status)}`);
 
+// ---- Reviews ----
+export const getProductReviews = (productId, { page, limit, sort } = {}) => {
+  const params = new URLSearchParams();
+  if (page) params.append("page", page);
+  if (limit) params.append("limit", limit);
+  if (sort) params.append("sort", sort);
+  const qs = params.toString();
+  return get(`/products/${q(productId)}/reviews${qs ? `?${qs}` : ""}`);
+};
+export const getReviewEligibility = (productId) =>
+  get(`/products/${q(productId)}/reviews/eligibility`);
+export const submitReview = (productId, payload) =>
+  post(`/products/${q(productId)}/reviews`, payload);
+export const updateReview = (reviewId, payload) =>
+  post(`/update-review?id=${q(reviewId)}`, payload);
+export const getAdminReviews = (status) =>
+  get(`/admin/reviews${status ? `?status=${q(status)}` : ""}`);
+export const updateReviewStatus = (reviewId, status) =>
+  get(`/admin/review-status?reviewId=${q(reviewId)}&status=${q(status)}`);
+export const deleteReview = (reviewId) => get(`/delete-review?id=${q(reviewId)}`);
+
 // ---- Wishlist ----
 export const getWishlist = () => get("/wishlist");
 export const addToWishlist = (productId, quantity = 1) =>

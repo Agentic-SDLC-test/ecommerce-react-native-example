@@ -10,6 +10,7 @@ import MyAccountScreen from "../screens/profile/MyAccountScreen";
 import AddProductScreen from "../screens/admin/AddProductScreen";
 import DashboardScreen from "../screens/admin/DashboardScreen";
 import ViewProductScreen from "../screens/admin/ViewProductScreen";
+import ViewReviewsScreen from "../screens/admin/ViewReviewsScreen";
 import Tabs from "./tabs/Tabs";
 import CartScreen from "../screens/user/CartScreen";
 import CheckoutScreen from "../screens/user/CheckoutScreen.js";
@@ -46,6 +47,7 @@ const Routes = () => {
         <Stack.Screen name="dashboard" component={DashboardScreen} />
         <Stack.Screen name="addproduct" component={AddProductScreen} />
         <Stack.Screen name="viewproduct" component={ViewProductScreen} />
+        <Stack.Screen name="viewreviews" component={ViewReviewsScreen} />
         <Stack.Screen name="editproduct" component={EditProductScreen} />
         <Stack.Screen name="tab" component={Tabs} />
         <Stack.Screen name="cart" component={CartScreen} />
