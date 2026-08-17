@@ -10,4 +10,5 @@ export {
   getPaymentMethodLabel,
   getPaymentStatusLabel,
   resolvePaymentStatus,
+  validateDemoCard,
 } from "./Payment";

@@ -14,8 +14,8 @@ import {
   colors,
   ENABLE_DIGITAL_PAYMENT,
   PAYMENT_TYPES,
-  DEMO_CARD_FAIL_SUFFIX,
   getPaymentMethodLabel,
+  validateDemoCard,
 } from "../../constants";
 import CustomButton from "../../components/CustomButton";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
@@ -57,30 +57,17 @@ const CheckoutScreen = ({ navigation, route }) => {
     }
   };
 
-  const validateDemoCard = () => {
-    const numberDigits = String(cardNumber).replace(/\D/g, "");
-    if (!numberDigits || !cardExpiry.trim() || !cardCvv.trim()) {
-      return { ok: false, message: "Enter demo card number, expiry, and CVV." };
-    }
-    if (numberDigits.length < 12) {
-      return { ok: false, message: "Demo card number must be at least 12 digits." };
-    }
-    if (numberDigits.endsWith(DEMO_CARD_FAIL_SUFFIX)) {
-      return {
-        ok: false,
-        message: "Demo card payment failed. Try another test card (do not end with 0000).",
-      };
-    }
-    return { ok: true };
-  };
-
   //method to handle checkout
   const handleCheckout = async () => {
     setError("");
     setIsloading(true);
 
     if (paymentType === PAYMENT_TYPES.CARD) {
-      const validation = validateDemoCard();
+      const validation = validateDemoCard({
+        cardNumber,
+        cardExpiry,
+        cardCvv,
+      });
       if (!validation.ok) {
         console.log("Demo card payment failed", validation.message);
         setAlertType("error");
