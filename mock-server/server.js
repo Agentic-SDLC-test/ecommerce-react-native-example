@@ -3,6 +3,7 @@ const cors = require("cors");
 const multer = require("multer");
 const path = require("path");
 const { v4: uuidv4 } = require("uuid");
+const { derivePaymentStatus, stripCardFieldsFromBody } = require("./checkoutUtils");
 
 const app = express();
 const PORT = 3002;
@@ -283,6 +284,35 @@ let orders = [
     createdAt: new Date("2024-01-09T08:00:00Z").toISOString(),
     updatedAt: new Date("2024-01-12T16:00:00Z").toISOString(),
   },
+  {
+    _id: "order004",
+    orderId: "ORD-2024-004",
+    user: {
+      _id: "user001",
+      name: "John Doe",
+      email: "user@easybuy.com",
+    },
+    items: [
+      {
+        productId: {
+          _id: "prod002",
+          title: "Blue Denim Jeans",
+        },
+        price: 49.99,
+        quantity: 1,
+      },
+    ],
+    amount: 49.99,
+    discount: 0,
+    payment_type: "cod",
+    country: "Canada",
+    city: "Toronto",
+    zipcode: "M5V 3A8",
+    shippingAddress: "123 Main Street",
+    status: "pending",
+    createdAt: new Date("2024-01-08T12:00:00Z").toISOString(),
+    updatedAt: new Date("2024-01-08T12:00:00Z").toISOString(),
+  },
 ];
 
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
@@ -499,15 +529,11 @@ app.get("/orders", authMiddleware, (req, res) => {
   res.json({ success: true, data: userOrders });
 });
 
-// Derive payment_status from payment_type (card PAN/CVV never accepted).
-const derivePaymentStatus = (paymentType) => {
-  if (paymentType === "cod") return "cod_pending";
-  if (paymentType === "card") return "paid";
-  return null;
-};
-
 // POST /checkout  (user: place order)
 app.post("/checkout", authMiddleware, (req, res) => {
+  if (stripCardFieldsFromBody(req.body)) {
+    console.warn("Checkout request contained card fields; ignored.");
+  }
   const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });

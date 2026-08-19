@@ -7,7 +7,12 @@ import {
   TouchableOpacity,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors } from "../../constants";
+import {
+  colors,
+  getPaymentMethodLabel,
+  getPaymentStatusLabel,
+  resolvePaymentStatus,
+} from "../../constants";
 import * as api from "../../api";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
@@ -176,6 +181,27 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
               Delivered on {orderDetail?.deliveredOn}
             </Text>
           )}
+        </View>
+        <View style={styles.containerNameContainer}>
+          <View>
+            <Text style={styles.containerNameText} testID="view-order-detail-payment-heading">
+              Payment
+            </Text>
+          </View>
+        </View>
+        <View style={styles.orderInfoContainer}>
+          <View style={styles.orderItemContainer}>
+            <Text style={styles.orderItemText}>Method</Text>
+            <Text testID="view-order-detail-payment-method">
+              {getPaymentMethodLabel(orderDetail?.payment_type)}
+            </Text>
+          </View>
+          <View style={styles.orderItemContainer}>
+            <Text style={styles.orderItemText}>Payment status</Text>
+            <Text testID="view-order-detail-payment-status">
+              {getPaymentStatusLabel(resolvePaymentStatus(orderDetail))}
+            </Text>
+          </View>
         </View>
         <View style={styles.containerNameContainer}>
           <View>
