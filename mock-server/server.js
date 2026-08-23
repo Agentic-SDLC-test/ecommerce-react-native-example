@@ -285,6 +285,65 @@ let orders = [
   },
 ];
 
+// Verified-purchaser reviews. Seeds tie to existing purchases in `orders`:
+// user001 bought prod003 (order001); user002 bought prod005 (order002).
+// verifiedPurchase is always set by the server, never trusted from the client.
+let reviews = [
+  {
+    _id: "rev001",
+    productId: "prod003",
+    user: { _id: "user001", name: "John Doe" },
+    rating: 5,
+    comment: "Great sound and the noise cancellation is excellent.",
+    verifiedPurchase: true,
+    status: "visible",
+    createdAt: new Date("2024-01-20T10:00:00Z").toISOString(),
+    updatedAt: new Date("2024-01-20T10:00:00Z").toISOString(),
+  },
+  {
+    _id: "rev002",
+    productId: "prod005",
+    user: { _id: "user002", name: "Jane Smith" },
+    rating: 4,
+    comment: "Light, non-greasy, and the SPF is a nice bonus.",
+    verifiedPurchase: true,
+    status: "visible",
+    createdAt: new Date("2024-01-21T14:30:00Z").toISOString(),
+    updatedAt: new Date("2024-01-21T14:30:00Z").toISOString(),
+  },
+];
+
+// Only `visible` reviews count toward public aggregates (hidden/removed drop out).
+const MAX_REVIEW_LENGTH = 1000;
+const RECENT_REVIEWS_LIMIT = 20;
+
+// Default verified-purchase rule (Q-3 default): any order placed by this user
+// that contains this product, regardless of status. Tighten by adding a
+// status/payment_status predicate when the PO confirms the qualifying condition.
+const hasPurchased = (userId, productId) =>
+  orders.some(
+    (o) =>
+      o.user._id === userId &&
+      o.items.some((i) => i.productId._id === productId)
+  );
+
+const visibleReviews = (productId) =>
+  reviews.filter((r) => r.productId === productId && r.status === "visible");
+
+// Aggregate over the supplied (visible-only) list: average to 1 decimal,
+// total count, and a distribution keyed "1".."5".
+const computeAggregate = (list) => {
+  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  let sum = 0;
+  list.forEach((r) => {
+    distribution[r.rating] = (distribution[r.rating] || 0) + 1;
+    sum += r.rating;
+  });
+  const total = list.length;
+  const average = total === 0 ? 0 : Math.round((sum / total) * 10) / 10;
+  return { average, total, distribution };
+};
+
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
 const authMiddleware = (req, res, next) => {
   const token = req.headers["x-auth-token"];
@@ -592,6 +651,146 @@ app.post("/photos/upload", upload.single("photos"), (req, res) => {
   });
 });
 
+// ─── Reviews ────────────────────────────────────────────────────────────────
+
+// GET /products/reviews?productId=  (public: aggregate + recent visible reviews)
+app.get("/products/reviews", (req, res) => {
+  const { productId } = req.query;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "productId is required" });
+  }
+  const visible = visibleReviews(productId);
+  const { average, total, distribution } = computeAggregate(visible);
+  const recent = [...visible]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .slice(0, RECENT_REVIEWS_LIMIT);
+  res.json({ success: true, data: { average, total, distribution, reviews: recent } });
+});
+
+// GET /reviews/eligibility?productId=  (user: can this user review this product?)
+app.get("/reviews/eligibility", authMiddleware, (req, res) => {
+  const { productId } = req.query;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "productId is required" });
+  }
+  const existing = reviews.find(
+    (r) =>
+      r.productId === productId &&
+      r.user._id === req.user._id &&
+      r.status !== "removed"
+  );
+  const eligible = hasPurchased(req.user._id, productId);
+  res.json({
+    success: true,
+    data: { eligible, hasReviewed: !!existing, review: existing || null },
+  });
+});
+
+// Validate an incoming rating/comment. Returns an error message or null.
+const validateReviewInput = (rating, comment) => {
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return "Rating must be 1-5";
+  }
+  if (comment != null && String(comment).length > MAX_REVIEW_LENGTH) {
+    return `Review must be ${MAX_REVIEW_LENGTH} characters or fewer`;
+  }
+  return null;
+};
+
+// POST /review  (user: create one review per product, verified purchasers only)
+app.post("/review", authMiddleware, (req, res) => {
+  const { productId, rating, comment } = req.body;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "productId is required" });
+  }
+  const invalid = validateReviewInput(rating, comment);
+  if (invalid) {
+    return res.status(400).json({ success: false, message: invalid });
+  }
+  if (!hasPurchased(req.user._id, productId)) {
+    return res.status(403).json({ success: false, message: "Only verified purchasers can review" });
+  }
+  const existing = reviews.find(
+    (r) =>
+      r.productId === productId &&
+      r.user._id === req.user._id &&
+      r.status !== "removed"
+  );
+  if (existing) {
+    return res.status(409).json({ success: false, message: "You already reviewed this product" });
+  }
+  const now = new Date().toISOString();
+  const newReview = {
+    _id: uuidv4(),
+    productId,
+    user: { _id: req.user._id, name: req.user.name },
+    rating,
+    comment: comment || "",
+    verifiedPurchase: true,
+    status: "visible",
+    createdAt: now,
+    updatedAt: now,
+  };
+  reviews.push(newReview);
+  console.log(`review created productId=${productId} user=${req.user._id}`);
+  res.json({ success: true, message: "Review submitted", data: newReview });
+});
+
+// POST /update-review?id=  (user: edit own review)
+app.post("/update-review", authMiddleware, (req, res) => {
+  const { id } = req.query;
+  const review = reviews.find((r) => r._id === id);
+  if (!review || review.status === "removed") {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+  if (review.user._id !== req.user._id) {
+    return res.status(403).json({ success: false, message: "You can only edit your own review" });
+  }
+  const { rating, comment } = req.body;
+  const invalid = validateReviewInput(rating, comment);
+  if (invalid) {
+    return res.status(400).json({ success: false, message: invalid });
+  }
+  review.rating = rating;
+  review.comment = comment || "";
+  review.updatedAt = new Date().toISOString();
+  console.log(`review updated id=${id}`);
+  res.json({ success: true, message: "Review updated", data: review });
+});
+
+// GET /admin/reviews  (admin: all reviews, including hidden)
+app.get("/admin/reviews", adminMiddleware, (req, res) => {
+  const all = reviews.filter((r) => r.status !== "removed");
+  res.json({ success: true, data: all });
+});
+
+// GET /admin/review-visibility?id=&visible=  (admin: toggle visibility)
+app.get("/admin/review-visibility", adminMiddleware, (req, res) => {
+  const { id, visible } = req.query;
+  const review = reviews.find((r) => r._id === id);
+  if (!review || review.status === "removed") {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+  const nextStatus = visible === "true" ? "visible" : "hidden";
+  review.status = nextStatus;
+  review.updatedAt = new Date().toISOString();
+  console.log(`review moderated id=${id} action=${nextStatus === "visible" ? "show" : "hide"} admin=${req.user._id}`);
+  res.json({ success: true, message: `Review ${nextStatus === "visible" ? "shown" : "hidden"}`, data: review });
+});
+
+// GET /delete-review?id=  (admin: remove a review)
+app.get("/delete-review", adminMiddleware, (req, res) => {
+  const { id } = req.query;
+  const review = reviews.find((r) => r._id === id);
+  if (!review || review.status === "removed") {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+  review.status = "removed";
+  review.updatedAt = new Date().toISOString();
+  console.log(`review moderated id=${id} action=remove admin=${req.user._id}`);
+  res.json({ success: true, message: "Review removed" });
+});
+
 // ─── Fallback placeholder image for /uploads/* ────────────────────────────────
 // Returns a simple SVG placeholder when the requested image doesn't exist
 app.get("/uploads/:filename", (req, res) => {
@@ -630,6 +829,13 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
   console.log(`   GET    /orders               (user)`);
   console.log(`   POST   /checkout             (user)`);
+  console.log(`   GET    /products/reviews?productId=`);
+  console.log(`   GET    /reviews/eligibility?productId=       (user)`);
+  console.log(`   POST   /review               (user)`);
+  console.log(`   POST   /update-review?id=    (user)`);
+  console.log(`   GET    /admin/reviews        (admin)`);
+  console.log(`   GET    /admin/review-visibility?id=&visible= (admin)`);
+  console.log(`   GET    /delete-review?id=    (admin)`);
   console.log(`   GET    /delete-user?id=`);
   console.log(`   POST   /reset-password?id=`);
   console.log(`   POST   /photos/upload`);

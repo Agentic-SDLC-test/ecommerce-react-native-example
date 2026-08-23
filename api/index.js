@@ -49,6 +49,21 @@ export const addToWishlist = (productId, quantity = 1) =>
 export const removeFromWishlist = (productId) =>
   get(`/remove-from-wishlist?id=${q(productId)}`);
 
+// ---- Reviews ----
+// Public read of a product's aggregate + recent visible reviews; customer
+// writes go through authMiddleware; admin moderation through adminMiddleware.
+export const getProductReviews = (productId) =>
+  get(`/products/reviews?productId=${q(productId)}`);
+export const getReviewEligibility = (productId) =>
+  get(`/reviews/eligibility?productId=${q(productId)}`);
+export const submitReview = (payload) => post("/review", payload);
+export const updateReview = (id, payload) =>
+  post(`/update-review?id=${q(id)}`, payload);
+export const getAdminReviews = () => get("/admin/reviews");
+export const setReviewVisibility = (id, visible) =>
+  get(`/admin/review-visibility?id=${q(id)}&visible=${q(visible)}`);
+export const deleteReview = (id) => get(`/delete-review?id=${q(id)}`);
+
 // ---- Admin ----
 export const getDashboard = () => get("/dashboard");
 export const getUsers = () => get("/admin/users");

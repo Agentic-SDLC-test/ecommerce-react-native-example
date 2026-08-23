@@ -5,17 +5,22 @@ import {
   View,
   StatusBar,
   Text,
+  ScrollView,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import cartIcon from "../../assets/icons/cart_beg.png";
-import { colors, network } from "../../constants";
+import { colors, network, ENABLE_REVIEWS } from "../../constants";
 import CustomButton from "../../components/CustomButton";
 import { useSelector, useDispatch } from "react-redux";
 import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import * as api from "../../api";
+import * as session from "../../utils/session";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import RatingSummary from "../../components/RatingSummary/RatingSummary";
+import ReviewList from "../../components/ReviewList/ReviewList";
+import ReviewForm from "../../components/ReviewForm/ReviewForm";
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -37,6 +42,80 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const [error, setError] = useState("");
   const [isDisable, setIsDisbale] = useState(true);
   const [alertType, setAlertType] = useState("error");
+
+  // Reviews state
+  const [reviewSummary, setReviewSummary] = useState({
+    average: 0,
+    total: 0,
+    distribution: {},
+    reviews: [],
+  });
+  const [eligibility, setEligibility] = useState({
+    eligible: false,
+    hasReviewed: false,
+    review: null,
+  });
+  const [showReviewForm, setShowReviewForm] = useState(false);
+  const [submittingReview, setSubmittingReview] = useState(false);
+
+  //method to fetch a product's aggregate rating + recent visible reviews
+  const fetchReviews = async () => {
+    api
+      .getProductReviews(product?._id)
+      .then((result) => {
+        if (result.success) {
+          setReviewSummary(result.data);
+        }
+      })
+      .catch((error) => {
+        console.log("error", error);
+      });
+  };
+
+  //method to fetch whether the signed-in user may review this product
+  const fetchEligibility = async () => {
+    const user = await session.getUser();
+    if (!user) return;
+    api
+      .getReviewEligibility(product?._id)
+      .then((result) => {
+        if (result.success) {
+          setEligibility(result.data);
+        }
+      })
+      .catch((error) => {
+        console.log("error", error);
+      });
+  };
+
+  //method to submit a new review or update the existing one
+  const handleSubmitReview = (rating, comment) => {
+    setSubmittingReview(true);
+    const existingId = eligibility?.review?._id;
+    const request = eligibility.hasReviewed
+      ? api.updateReview(existingId, { rating, comment })
+      : api.submitReview({ productId: product?._id, rating, comment });
+    request
+      .then((result) => {
+        if (result.success) {
+          setError(result.message);
+          setAlertType("success");
+          setShowReviewForm(false);
+          fetchReviews();
+          fetchEligibility();
+        } else {
+          setError(result.message);
+          setAlertType("error");
+        }
+        setSubmittingReview(false);
+      })
+      .catch((error) => {
+        setError(error.message);
+        setAlertType("error");
+        setSubmittingReview(false);
+        console.log("error", error);
+      });
+  };
 
   //method to fetch wishlist from server using API call
   const fetchWishlist = async () => {
@@ -131,6 +210,10 @@ const ProductDetailScreen = ({ navigation, route }) => {
     setAvaiableQuantity(product.quantity);
     SetProductImage(`${network.serverip}/uploads/${product?.image}`);
     fetchWishlist();
+    if (ENABLE_REVIEWS) {
+      fetchReviews();
+      fetchEligibility();
+    }
   }, []);
 
   //render whenever the value of wishlistItems change
@@ -208,6 +291,40 @@ const ProductDetailScreen = ({ navigation, route }) => {
               <Text style={styles.secondaryTextSm} testID="product-detail-description-label">Description:</Text>
               <Text testID="product-detail-description">{product?.description}</Text>
             </View>
+            {ENABLE_REVIEWS && (
+              <ScrollView
+                style={styles.reviewsContainer}
+                testID="product-detail-reviews"
+                showsVerticalScrollIndicator={false}
+              >
+                <Text style={styles.reviewsHeading} testID="product-detail-reviews-heading">
+                  Ratings & Reviews
+                </Text>
+                <RatingSummary summary={reviewSummary} testID="product-detail-rating-summary" />
+                {eligibility.eligible && (
+                  <>
+                    {showReviewForm ? (
+                      <ReviewForm
+                        initial={eligibility.hasReviewed ? eligibility.review : null}
+                        onSubmit={handleSubmitReview}
+                        submitting={submittingReview}
+                        testID="product-detail-review-form"
+                      />
+                    ) : (
+                      <CustomButton
+                        text={eligibility.hasReviewed ? "Edit your review" : "Write a review"}
+                        onPress={() => setShowReviewForm(true)}
+                        testID="product-detail-write-review-btn"
+                      />
+                    )}
+                  </>
+                )}
+                <ReviewList
+                  reviews={reviewSummary.reviews}
+                  testID="product-detail-review-list"
+                />
+              </ScrollView>
+            )}
           </View>
           <View style={styles.productInfoBottomContainer}>
             <View style={styles.counterContainer}>
@@ -397,6 +514,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingLeft: 20,
     paddingRight: 20,
+  },
+  reviewsContainer: {
+    width: "100%",
+    maxHeight: 260,
+    paddingLeft: 20,
+    paddingRight: 20,
+    marginTop: 10,
+  },
+  reviewsHeading: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: colors.dark,
+    marginBottom: 8,
   },
   iconContainer: {
     display: "flex",
