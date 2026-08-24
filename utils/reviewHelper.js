@@ -13,6 +13,18 @@ export const calculateAverageRating = (reviewsList) => {
   return parseFloat((sum / reviewsList.length).toFixed(1));
 };
 
+export const calculateRatingDistribution = (reviewsList) => {
+  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  if (!reviewsList || reviewsList.length === 0) return distribution;
+  reviewsList.forEach((r) => {
+    const rating = r?.rating;
+    if (Number.isInteger(rating) && rating >= 1 && rating <= 5) {
+      distribution[rating] += 1;
+    }
+  });
+  return distribution;
+};
+
 export const truncateReviewComment = (comment, maxLength = 100) => {
   if (!comment) return "";
   if (comment.length <= maxLength) return comment;
