@@ -211,7 +211,6 @@ let orders = [
     amount: 129.97,
     discount: 0,
     payment_type: "cod",
-    payment_status: "cod_pending",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -241,7 +240,6 @@ let orders = [
     amount: 24.99,
     discount: 0,
     payment_type: "cod",
-    payment_status: "cod_pending",
     country: "Canada",
     city: "Vancouver",
     zipcode: "V6B 1A1",
@@ -272,7 +270,6 @@ let orders = [
     amount: 38.97,
     discount: 0,
     payment_type: "cod",
-    payment_status: "cod_pending",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -528,23 +525,11 @@ app.get("/orders", authMiddleware, (req, res) => {
   res.json({ success: true, data: userOrders });
 });
 
-// Derive payment_status from payment_type (card PAN/CVV never accepted).
-const derivePaymentStatus = (paymentType) => {
-  if (paymentType === "cod") return "cod_pending";
-  if (paymentType === "card") return "paid";
-  return null;
-};
-
 // POST /checkout  (user: place order)
 app.post("/checkout", authMiddleware, (req, res) => {
   const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
-  }
-  const resolvedPaymentType = payment_type || "cod";
-  const paymentStatus = derivePaymentStatus(resolvedPaymentType);
-  if (!paymentStatus) {
-    return res.status(400).json({ success: false, message: "Unsupported payment_type" });
   }
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
@@ -567,8 +552,7 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: resolvedPaymentType,
-    payment_status: paymentStatus,
+    payment_type: payment_type || "cod",
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",
