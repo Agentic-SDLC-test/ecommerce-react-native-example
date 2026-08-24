@@ -52,6 +52,8 @@ export const removeFromWishlist = (productId) =>
 // ---- Reviews ----
 export const getProductReviews = (productId) => get(`/products/${q(productId)}/reviews`);
 export const submitReview = (payload) => post("/reviews", payload);
+export const updateReview = (reviewId, payload) =>
+  post(`/reviews/${q(reviewId)}`, payload);
 export const getAdminReviews = () => get("/admin/reviews");
 export const updateReviewVisibility = (reviewId, visible) =>
   post(`/admin/reviews/${q(reviewId)}/visibility`, { visible });

@@ -1,6 +1,7 @@
 import {
   formatReviewerName,
   calculateAverageRating,
+  calculateRatingDistribution,
   truncateReviewComment,
 } from "../utils/reviewHelper";
 
@@ -43,6 +44,56 @@ describe("Review helper utilities", () => {
         { rating: 5 },
       ];
       expect(calculateAverageRating(reviews)).toBe(5.0);
+    });
+  });
+
+  describe("calculateRatingDistribution", () => {
+    it("counts occurrences of each integer star level", () => {
+      const reviews = [
+        { rating: 5 },
+        { rating: 5 },
+        { rating: 4 },
+        { rating: 1 },
+      ];
+      expect(calculateRatingDistribution(reviews)).toEqual({
+        1: 1,
+        2: 0,
+        3: 0,
+        4: 1,
+        5: 2,
+      });
+    });
+
+    it("returns an all-zero distribution for an empty or missing list", () => {
+      const zero = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      expect(calculateRatingDistribution([])).toEqual(zero);
+      expect(calculateRatingDistribution(null)).toEqual(zero);
+      expect(calculateRatingDistribution(undefined)).toEqual(zero);
+    });
+
+    it("ignores out-of-range, non-integer, and missing ratings", () => {
+      const reviews = [
+        { rating: 0 },
+        { rating: 6 },
+        { rating: 3.5 },
+        { rating: 3 },
+        {},
+        { rating: null },
+      ];
+      expect(calculateRatingDistribution(reviews)).toEqual({
+        1: 0,
+        2: 0,
+        3: 1,
+        4: 0,
+        5: 0,
+      });
+    });
+
+    it("distribution counts sum to the number of valid ratings", () => {
+      const reviews = [{ rating: 2 }, { rating: 2 }, { rating: 5 }];
+      const dist = calculateRatingDistribution(reviews);
+      const sum = Object.values(dist).reduce((a, b) => a + b, 0);
+      expect(sum).toBe(3);
     });
   });
 
