@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants";
+import { Ionicons } from "@expo/vector-icons";
 
 function getTime(date) {
   let t = new Date(date);
@@ -52,17 +53,38 @@ const OrderList = ({ item, onPress, testID }) => {
     );
   }, []);
 
+  // Get payment status style
+  const getPaymentStatusStyle = (status) => {
+    const styles = {
+      'completed': { color: '#28a745', icon: 'checkmark-circle' },
+      'pending': { color: '#ffc107', icon: 'time' },
+      'failed': { color: '#dc3545', icon: 'close-circle' }
+    };
+    return styles[status] || { color: colors.muted, icon: 'help-circle' };
+  };
+
   return (
     <View style={styles.container} testID={testID}>
       <View style={styles.innerRow}>
         <View>
           <Text style={styles.primaryText} testID={testID ? `${testID}-order-id` : undefined}>Order # {item?.orderId}</Text>
         </View>
-        <View style={styles.timeDateContainer}>
-          <Text style={styles.secondaryTextSm} testID={testID ? `${testID}-date` : undefined}>
-            {dateFormat(item?.createdAt)}
-          </Text>
-          <Text style={styles.secondaryTextSm}>{getTime(item?.createdAt)}</Text>
+        <View style={styles.headerRight}>
+          {item?.payment_status && (
+            <View style={[styles.paymentBadge, { backgroundColor: getPaymentStatusStyle(item.payment_status).color + '20' }]}>
+              <Ionicons 
+                name={getPaymentStatusStyle(item.payment_status).icon} 
+                size={12} 
+                color={getPaymentStatusStyle(item.payment_status).color}
+              />
+            </View>
+          )}
+          <View style={styles.timeDateContainer}>
+            <Text style={styles.secondaryTextSm} testID={testID ? `${testID}-date` : undefined}>
+              {dateFormat(item?.createdAt)}
+            </Text>
+            <Text style={styles.secondaryTextSm}>{getTime(item?.createdAt)}</Text>
+          </View>
         </View>
       </View>
       {item?.user?.name && (
@@ -130,6 +152,19 @@ const styles = StyleSheet.create({
   timeDateContainer: {
     display: "flex",
     flexDirection: "column",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  headerRight: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  paymentBadge: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     justifyContent: "center",
     alignItems: "center",
   },

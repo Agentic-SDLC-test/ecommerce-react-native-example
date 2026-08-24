@@ -6,6 +6,7 @@ import {
   Text,
   ScrollView,
   Modal,
+  Alert,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
@@ -18,6 +19,8 @@ import { bindActionCreators } from "redux";
 import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import ProgressDialog from "react-native-progress-dialog";
+import PaymentMethodSelector from "../../components/PaymentMethodSelector/PaymentMethodSelector";
+import CardPaymentModal from "../../components/CardPaymentModal/CardPaymentModal";
 
 const CheckoutScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -33,9 +36,55 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [city, setCity] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
+  
+  // Payment state
+  const [paymentMethod, setPaymentMethod] = useState("cod");
+  const [paymentStatus, setPaymentStatus] = useState("pending");
+  const [showCardModal, setShowCardModal] = useState(false);
 
   //method to handle checkout
   const handleCheckout = async () => {
+    console.log(`Payment method selected: ${paymentMethod}`);
+    
+    // If card payment is selected, open the card modal
+    if (paymentMethod === "card") {
+      setShowCardModal(true);
+      return;
+    }
+    
+    // For COD, proceed with checkout directly
+    proceedWithCheckout("cod", "pending");
+  };
+
+  // Handle payment completion from card modal
+  const handlePaymentComplete = (result) => {
+    setShowCardModal(false);
+    
+    if (result.success) {
+      console.log(`Payment successful: ${result.status}`);
+      proceedWithCheckout("card", result.status);
+    } else {
+      console.log(`Payment failed: ${result.status}, ${result.message}`);
+      Alert.alert(
+        "Payment Failed",
+        result.message || "Payment could not be processed. Please try again.",
+        [
+          {
+            text: "Try Again",
+            onPress: () => setShowCardModal(true),
+          },
+          {
+            text: "Cancel",
+            onPress: () => setPaymentMethod("cod"),
+            style: "cancel",
+          },
+        ]
+      );
+    }
+  };
+
+  // Proceed with checkout API call
+  const proceedWithCheckout = (payment_type, payment_status) => {
     setIsloading(true);
 
     var payload = [];
@@ -52,12 +101,15 @@ const CheckoutScreen = ({ navigation, route }) => {
       payload.push(obj);
     });
 
+    console.log(`Creating order with payment_type: ${payment_type}, payment_status: ${payment_status}`);
+
     api
       .checkout({
         items: payload,
         amount: totalamount,
         discount: 0,
-        payment_type: "cod",
+        payment_type: payment_type,
+        payment_status: payment_status,
         country: country,
         status: "pending",
         city: city,
@@ -69,7 +121,7 @@ const CheckoutScreen = ({ navigation, route }) => {
         if (result.success == true) {
           setIsloading(false);
           emptyCart("empty");
-          navigation.replace("orderconfirm");
+          navigation.replace("orderconfirm", { order: result.data });
         } else {
           setIsloading(false);
         }
@@ -187,13 +239,18 @@ const CheckoutScreen = ({ navigation, route }) => {
             </View>
           </TouchableOpacity>
         </View>
-        <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
-        <View style={styles.listContainer}>
-          <View style={styles.list}>
-            <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
-          </View>
-        </View>
+        <Text style={styles.primaryText} testID="checkout-payment-heading">Payment Method</Text>
+        <PaymentMethodSelector
+          selectedMethod={paymentMethod}
+          onMethodChange={(method) => {
+            console.log(`Payment method changed to: ${method}`);
+            setPaymentMethod(method);
+          }}
+          methods={[
+            { value: 'cod', label: 'Cash on Delivery' },
+            { value: 'card', label: 'Credit/Debit Card' }
+          ]}
+        />
 
         <View style={styles.emptyView}></View>
       </ScrollView>
@@ -374,3 +431,10 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
 });
+
+      <CardPaymentModal
+        visible={showCardModal}
+        onClose={() => setShowCardModal(false)}
+        onPaymentComplete={handlePaymentComplete}
+        amount={totalCost + deliveryCost}
+      />

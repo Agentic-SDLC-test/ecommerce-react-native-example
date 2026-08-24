@@ -79,6 +79,26 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
   };
 
   // set total cost, order detail, order status on initial render
+  // Get payment method label
+  const getPaymentMethodLabel = (method) => {
+    const labels = {
+      'cod': 'Cash on Delivery',
+      'card': 'Credit/Debit Card',
+      'wallet': 'Digital Wallet'
+    };
+    return labels[method] || method;
+  };
+
+  // Get payment status style
+  const getPaymentStatusStyle = (status) => {
+    const styles = {
+      'completed': { color: '#28a745', icon: 'checkmark-circle' },
+      'pending': { color: '#ffc107', icon: 'time' },
+      'failed': { color: '#dc3545', icon: 'close-circle' }
+    };
+    return styles[status] || { color: colors.muted, icon: 'help-circle' };
+  };
+
   useEffect(() => {
     setError("");
     setAlertType("error");
@@ -152,6 +172,43 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
           <Text style={styles.secondarytextSm} testID="my-order-detail-address">{address}</Text>
           <Text style={styles.secondarytextSm} testID="my-order-detail-zipcode">{orderDetail?.zipcode}</Text>
         </View>
+        
+        {orderDetail?.payment_type && (
+          <>
+            <View style={styles.containerNameContainer}>
+              <View>
+                <Text style={styles.containerNameText} testID="my-order-detail-payment-heading">Payment Information</Text>
+              </View>
+            </View>
+            <View style={styles.ShipingInfoContainer}>
+              <View style={styles.paymentRow}>
+                <Text style={styles.secondarytextSm} testID="my-order-detail-payment-method-label">Payment Method:</Text>
+                <Text style={styles.secondarytextMedian} testID="my-order-detail-payment-method-value">
+                  {getPaymentMethodLabel(orderDetail.payment_type)}
+                </Text>
+              </View>
+              {orderDetail?.payment_status && (
+                <View style={styles.paymentRow}>
+                  <Text style={styles.secondarytextSm} testID="my-order-detail-payment-status-label">Payment Status:</Text>
+                  <View style={styles.paymentStatusContainer}>
+                    <Ionicons 
+                      name={getPaymentStatusStyle(orderDetail.payment_status).icon} 
+                      size={16} 
+                      color={getPaymentStatusStyle(orderDetail.payment_status).color}
+                      testID="my-order-detail-payment-status-icon"
+                    />
+                    <Text 
+                      style={[styles.paymentStatusText, { color: getPaymentStatusStyle(orderDetail.payment_status).color }]}
+                      testID="my-order-detail-payment-status-value"
+                    >
+                      {orderDetail.payment_status.charAt(0).toUpperCase() + orderDetail.payment_status.slice(1)}
+                    </Text>
+                  </View>
+                </View>
+              )}
+            </View>
+          </>
+        )}
         <View>
           <Text style={styles.containerNameText} testID="my-order-detail-order-info-heading">Order Info</Text>
         </View>
@@ -367,5 +424,21 @@ const styles = StyleSheet.create({
   },
   emptyView: {
     height: 20,
+  },
+  paymentRow: {
+    width: "100%",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginVertical: 5,
+  },
+  paymentStatusContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  paymentStatusText: {
+    fontSize: 13,
+    fontWeight: "bold",
+    marginLeft: 5,
   },
 });
