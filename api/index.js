@@ -1,5 +1,4 @@
 import { get, post } from "./client";
-import { matchProductByCode } from "../utils/scanMatch";
 
 // The backend seam: named operations screens call instead of building fetch.
 // Each returns the parsed response body ({ success, data / categories, message,
@@ -21,27 +20,10 @@ export const deleteUser = (userId) => get(`/delete-user?id=${q(userId)}`);
 // ---- Products ----
 export const getProducts = (search) =>
   get(`/products${search ? `?search=${q(search)}` : ""}`);
-export const getProductByCode = (code) => get(`/products/lookup?code=${q(code)}`);
 export const createProduct = (payload) => post("/product", payload);
 export const updateProduct = (id, payload) =>
   post(`/update-product?id=${q(id)}`, payload);
 export const deleteProduct = (id) => get(`/delete-product?id=${q(id)}`);
-
-// Resolve a scanned barcode/QR value to a single catalog product.
-// The backend has no lookup-by-code endpoint, so this fetches the catalog
-// once via getProducts() and matches client-side (sku, then _id). success is
-// false only when the underlying fetch failed; a valid fetch with no match
-// resolves { success: true, match: null }. Rejections propagate to the
-// caller's .catch(), consistent with the rest of the seam.
-export const resolveProductByCode = async (code) => {
-  if (!code || String(code).trim() === "") {
-    return { success: false, match: null, message: "Empty code" };
-  }
-  const result = await getProducts();
-  if (!result.success) return result;
-  const match = matchProductByCode(result.data, code);
-  return { success: true, match };
-};
 
 // ---- Categories ----
 export const getCategories = () => get("/categories");

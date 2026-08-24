@@ -44,11 +44,6 @@ const HomeScreen = ({ navigation, route }) => {
     navigation.navigate("productdetail", { product: product });
   };
 
-  //method to open the barcode/QR scan screen
-  const handleScanPress = () => {
-    navigation.navigate("scan");
-  };
-
   //method to add to cart (redux)
   const handleAddToCat = (product) => {
     addCartItem(product);
@@ -98,7 +93,6 @@ const HomeScreen = ({ navigation, route }) => {
         <SearchBar
           searchItems={searchItems}
           handleProductPress={handleProductPress}
-          onScanPress={handleScanPress}
         />
         <ScrollView nestedScrollEnabled={true} testID="home-scroll">
           <PromotionSlider slides={slides} />

@@ -105,7 +105,6 @@ let products = [
     _id: "prod003",
     title: "Wireless Bluetooth Headphones",
     sku: "ELC-001",
-    externalId: "0123456789012",
     price: 89.99,
     quantity: 20,
     description: "High-quality wireless headphones with noise cancellation.",
@@ -158,7 +157,6 @@ let products = [
     _id: "prod007",
     title: "Organic Basmati Rice (5kg)",
     sku: "GRO-001",
-    externalId: "SHARED-2000",
     price: 12.99,
     quantity: 200,
     description: "Premium organic basmati rice, long grain and aromatic.",
@@ -172,7 +170,6 @@ let products = [
     _id: "prod008",
     title: "Extra Virgin Olive Oil (1L)",
     sku: "GRO-002",
-    externalId: "SHARED-2000",
     price: 18.99,
     quantity: 80,
     description: "Cold-pressed extra virgin olive oil from Mediterranean farms.",
@@ -378,32 +375,6 @@ app.post("/login", (req, res) => {
 // GET /products
 app.get("/products", (req, res) => {
   res.json({ success: true, data: products });
-});
-
-// GET /products/lookup?code=  (scan-to-product: resolve a single product by SKU or external ID)
-app.get("/products/lookup", (req, res) => {
-  const { code } = req.query;
-  if (!code || !code.trim()) {
-    return res.status(400).json({ success: false, message: "code query parameter is required" });
-  }
-  const norm = (v) => (v || "").trim().toUpperCase();
-  const normalized = norm(code);
-  const matches = products.filter(
-    (p) => norm(p.sku) === normalized || norm(p.externalId) === normalized
-  );
-  if (matches.length === 1) {
-    return res.json({ success: true, data: matches[0] });
-  }
-  if (matches.length === 0) {
-    return res.json({ success: true, data: null });
-  }
-  // more than one product shares the code -> ambiguous; return full products so
-  // the chooser can navigate to productdetail without a second fetch-by-id
-  res.json({
-    success: true,
-    data: null,
-    matches: matches,
-  });
 });
 
 // POST /product  (admin: add product)
