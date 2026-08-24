@@ -24,7 +24,16 @@ export const PAYMENT_STATUS_LABELS = {
   failed: "Payment failed",
 };
 
-/** Card numbers ending with this suffix simulate local demo failure. */
+/**
+ * Card numbers ending with this suffix simulate local demo failure.
+ * 
+ * Demo card validation rules:
+ * - Card number must be at least 12 digits (after removing non-digit characters)
+ * - Expiry and CVV fields must be non-empty
+ * - Cards ending with "0000" will trigger a simulated payment failure
+ * - All other valid card formats will simulate successful payment
+ * - Card details are validated client-side only and never sent to the backend
+ */
 export const DEMO_CARD_FAIL_SUFFIX = "0000";
 
 export const getPaymentMethodLabel = (type) => {
