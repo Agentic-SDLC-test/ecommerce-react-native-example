@@ -56,3 +56,28 @@ export const resolvePaymentStatus = (order) => {
   }
   return PAYMENT_STATUSES.PENDING;
 };
+
+/**
+ * Local demo-card validation (fail-closed). Never sends card secrets to the API.
+ * @param {{ cardNumber?: string, cardExpiry?: string, cardCvv?: string }} fields
+ * @returns {{ ok: boolean, message?: string }}
+ */
+export const validateDemoCard = ({ cardNumber, cardExpiry, cardCvv }) => {
+  const numberDigits = String(cardNumber ?? "").replace(/\D/g, "");
+  const expiry = String(cardExpiry ?? "").trim();
+  const cvv = String(cardCvv ?? "").trim();
+  if (!numberDigits || !expiry || !cvv) {
+    return { ok: false, message: "Enter demo card number, expiry, and CVV." };
+  }
+  if (numberDigits.length < 12) {
+    return { ok: false, message: "Demo card number must be at least 12 digits." };
+  }
+  if (numberDigits.endsWith(DEMO_CARD_FAIL_SUFFIX)) {
+    return {
+      ok: false,
+      message:
+        "Demo card payment failed. Try another test card (do not end with 0000).",
+    };
+  }
+  return { ok: true };
+};

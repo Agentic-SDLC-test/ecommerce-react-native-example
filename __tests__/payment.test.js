@@ -2,6 +2,7 @@ import {
   getPaymentMethodLabel,
   getPaymentStatusLabel,
   resolvePaymentStatus,
+  validateDemoCard,
   PAYMENT_TYPES,
   PAYMENT_STATUSES,
   DEMO_CARD_FAIL_SUFFIX,
@@ -48,5 +49,77 @@ describe("Payment constants", () => {
     expect(
       resolvePaymentStatus({ payment_type: "card", payment_status: "paid" })
     ).toBe("paid");
+  });
+});
+
+describe("validateDemoCard", () => {
+  it("accepts a valid demo card", () => {
+    expect(
+      validateDemoCard({
+        cardNumber: "4111111111111111",
+        cardExpiry: "12/30",
+        cardCvv: "123",
+      })
+    ).toEqual({ ok: true });
+  });
+
+  it("rejects missing fields", () => {
+    expect(
+      validateDemoCard({
+        cardNumber: "",
+        cardExpiry: "12/30",
+        cardCvv: "123",
+      })
+    ).toEqual({
+      ok: false,
+      message: "Enter demo card number, expiry, and CVV.",
+    });
+    expect(
+      validateDemoCard({
+        cardNumber: "4111111111111111",
+        cardExpiry: "",
+        cardCvv: "123",
+      })
+    ).toEqual({
+      ok: false,
+      message: "Enter demo card number, expiry, and CVV.",
+    });
+    expect(
+      validateDemoCard({
+        cardNumber: "4111111111111111",
+        cardExpiry: "12/30",
+        cardCvv: "",
+      })
+    ).toEqual({
+      ok: false,
+      message: "Enter demo card number, expiry, and CVV.",
+    });
+  });
+
+  it("rejects short card numbers", () => {
+    expect(
+      validateDemoCard({
+        cardNumber: "41111111111",
+        cardExpiry: "12/30",
+        cardCvv: "123",
+      })
+    ).toEqual({
+      ok: false,
+      message: "Demo card number must be at least 12 digits.",
+    });
+  });
+
+  it("rejects demo fail suffix without placing an order", () => {
+    expect(
+      validateDemoCard({
+        cardNumber: "4111111111110000",
+        cardExpiry: "12/30",
+        cardCvv: "123",
+      })
+    ).toEqual({
+      ok: false,
+      message:
+        "Demo card payment failed. Try another test card (do not end with 0000).",
+    });
   });
 });

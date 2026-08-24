@@ -286,6 +286,67 @@ let orders = [
     createdAt: new Date("2024-01-09T08:00:00Z").toISOString(),
     updatedAt: new Date("2024-01-12T16:00:00Z").toISOString(),
   },
+  {
+    _id: "order004",
+    orderId: "ORD-2024-004",
+    user: {
+      _id: "user001",
+      name: "John Doe",
+      email: "user@easybuy.com",
+    },
+    items: [
+      {
+        productId: {
+          _id: "prod001",
+          title: "Classic White T-Shirt",
+        },
+        price: 19.99,
+        quantity: 1,
+      },
+    ],
+    amount: 19.99,
+    discount: 0,
+    payment_type: "card",
+    payment_status: "paid",
+    country: "Canada",
+    city: "Toronto",
+    zipcode: "M5V 3A8",
+    shippingAddress: "123 Main Street",
+    status: "pending",
+    createdAt: new Date("2024-01-18T11:00:00Z").toISOString(),
+    updatedAt: new Date("2024-01-18T11:00:00Z").toISOString(),
+  },
+  {
+    // Legacy-shaped seed: payment_type only — client resolvePaymentStatus infers cod_pending.
+    _id: "order005",
+    orderId: "ORD-2024-005",
+    user: {
+      _id: "user001",
+      name: "John Doe",
+      email: "user@easybuy.com",
+    },
+    items: [
+      {
+        productId: {
+          _id: "prod003",
+          title: "Wireless Bluetooth Headphones",
+        },
+        price: 89.99,
+        quantity: 1,
+      },
+    ],
+    amount: 89.99,
+    discount: 0,
+    payment_type: "cod",
+    country: "Canada",
+    city: "Toronto",
+    zipcode: "M5V 3A8",
+    shippingAddress: "123 Main Street",
+    status: "shipped",
+    shippedOn: "2024-01-19",
+    createdAt: new Date("2024-01-18T15:00:00Z").toISOString(),
+    updatedAt: new Date("2024-01-19T09:00:00Z").toISOString(),
+  },
 ];
 
 let reviews = [
