@@ -7,13 +7,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import {
-  colors,
-  network,
-  getPaymentMethodLabel,
-  getPaymentStatusLabel,
-  resolvePaymentStatus,
-} from "../../constants";
+import { colors, network } from "../../constants";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
@@ -157,27 +151,6 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
         <View style={styles.ShipingInfoContainer}>
           <Text style={styles.secondarytextSm} testID="my-order-detail-address">{address}</Text>
           <Text style={styles.secondarytextSm} testID="my-order-detail-zipcode">{orderDetail?.zipcode}</Text>
-        </View>
-        <View style={styles.containerNameContainer}>
-          <View>
-            <Text style={styles.containerNameText} testID="my-order-detail-payment-heading">
-              Payment
-            </Text>
-          </View>
-        </View>
-        <View style={styles.orderInfoContainer}>
-          <View style={styles.orderItemContainer}>
-            <Text style={styles.orderItemText}>Method</Text>
-            <Text testID="my-order-detail-payment-method">
-              {getPaymentMethodLabel(orderDetail?.payment_type)}
-            </Text>
-          </View>
-          <View style={styles.orderItemContainer}>
-            <Text style={styles.orderItemText}>Payment status</Text>
-            <Text testID="my-order-detail-payment-status">
-              {getPaymentStatusLabel(resolvePaymentStatus(orderDetail))}
-            </Text>
-          </View>
         </View>
         <View>
           <Text style={styles.containerNameText} testID="my-order-detail-order-info-heading">Order Info</Text>
