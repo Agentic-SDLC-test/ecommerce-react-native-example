@@ -7,7 +7,12 @@ import {
   TouchableOpacity,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
+import {
+  getPaymentMethodLabel,
+  getPaymentStatusLabel,
+  PAYMENT_STATUSES,
+} from "../../constants/payment";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
@@ -76,6 +81,16 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
     const newDate = `${date}-${month}-${year}, ${time}`;
 
     return newDate;
+  };
+
+  const getPaymentStatusDisplay = () => {
+    if (orderDetail?.payment_status) {
+      return getPaymentStatusLabel(orderDetail.payment_status);
+    }
+    if (orderDetail?.payment_type === "cod") {
+      return getPaymentStatusLabel(PAYMENT_STATUSES.PAY_ON_DELIVERY);
+    }
+    return "—";
   };
 
   // set total cost, order detail, order status on initial render
@@ -181,6 +196,25 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
               labels={labels}
             />
           </View>
+        </View>
+
+        <View style={styles.containerNameContainer}>
+          <View>
+            <Text style={styles.containerNameText} testID="my-order-detail-payment-heading">Payment Info</Text>
+          </View>
+        </View>
+        <View style={styles.orderInfoContainer}>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-method">
+            Method: {getPaymentMethodLabel(orderDetail?.payment_type)}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-status">
+            Status: {getPaymentStatusDisplay()}
+          </Text>
+          {orderDetail?.payment_type === "cod" && (
+            <Text style={styles.secondarytextSm}>
+              You will pay when your order is delivered.
+            </Text>
+          )}
         </View>
 
         <View style={styles.containerNameContainer}>

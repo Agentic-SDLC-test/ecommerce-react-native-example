@@ -13,6 +13,7 @@ import ViewProductScreen from "../screens/admin/ViewProductScreen";
 import Tabs from "./tabs/Tabs";
 import CartScreen from "../screens/user/CartScreen";
 import CheckoutScreen from "../screens/user/CheckoutScreen.js";
+import WalletPaymentScreen from "../screens/user/WalletPaymentScreen";
 import OrderConfirmScreen from "../screens/user/OrderConfirmScreen";
 import ProductDetailScreen from "../screens/user/ProductDetailScreen";
 import EditProductScreen from "../screens/admin/EditProductScreen";
@@ -51,6 +52,7 @@ const Routes = () => {
         <Stack.Screen name="tab" component={Tabs} />
         <Stack.Screen name="cart" component={CartScreen} />
         <Stack.Screen name="checkout" component={CheckoutScreen} />
+        <Stack.Screen name="walletpayment" component={WalletPaymentScreen} />
         <Stack.Screen name="orderconfirm" component={OrderConfirmScreen} />
         <Stack.Screen name="productdetail" component={ProductDetailScreen} />
         <Stack.Screen name="vieworder" component={ViewOrdersScreen} />
