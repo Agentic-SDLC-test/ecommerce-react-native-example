@@ -1,6 +1,11 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants";
+import {
+  getPaymentMethodLabel,
+  getPaymentStatusLabel,
+  PAYMENT_STATUSES,
+} from "../../constants/payment";
 
 function getTime(date) {
   let t = new Date(date);
@@ -38,6 +43,16 @@ const dateFormat = (datex) => {
 const OrderList = ({ item, onPress, testID }) => {
   const [totalCost, setTotalCost] = useState(0);
   const [quantity, setQuantity] = useState(0);
+
+  const getPaymentStatusDisplay = () => {
+    if (item?.payment_status) {
+      return getPaymentStatusLabel(item.payment_status);
+    }
+    if (item?.payment_type === "cod") {
+      return getPaymentStatusLabel(PAYMENT_STATUSES.PAY_ON_DELIVERY);
+    }
+    return "—";
+  };
 
   useEffect(() => {
     let packageItems = 0;
@@ -78,6 +93,14 @@ const OrderList = ({ item, onPress, testID }) => {
       <View style={styles.innerRow}>
         <Text style={styles.secondaryText} testID={testID ? `${testID}-quantity` : undefined}>Quantity : {quantity}</Text>
         <Text style={styles.secondaryText} testID={testID ? `${testID}-total` : undefined}>Total Amount : {totalCost}$</Text>
+      </View>
+      <View style={styles.innerRow}>
+        <Text style={styles.secondaryTextSm} testID={testID ? `${testID}-payment-method` : undefined}>
+          Payment: {getPaymentMethodLabel(item?.payment_type)} ·{" "}
+          <Text testID={testID ? `${testID}-payment-status` : undefined}>
+            {getPaymentStatusDisplay()}
+          </Text>
+        </Text>
       </View>
       <View style={styles.innerRow}>
         <TouchableOpacity style={styles.detailButton} onPress={onPress} testID={testID ? `${testID}-details-btn` : undefined}>
