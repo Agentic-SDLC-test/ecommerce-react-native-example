@@ -18,6 +18,12 @@ import { bindActionCreators } from "redux";
 import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import ProgressDialog from "react-native-progress-dialog";
+import {
+  PAYMENT_METHOD,
+  PAYMENT_STATUS,
+  PAYMENT_DIGITAL_ENABLED,
+  methodLabel,
+} from "../../utils/payment";
 
 const CheckoutScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -33,13 +39,13 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [city, setCity] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
+  const [selectedMethod, setSelectedMethod] = useState(PAYMENT_METHOD.COD);
 
-  //method to handle checkout
-  const handleCheckout = async () => {
-    setIsloading(true);
-
-    var payload = [];
-    var totalamount = 0;
+  // build the checkout body from the cart, minus the payment fields (those are
+  // decided by the chosen method / the payment step).
+  const buildOrderPayload = () => {
+    let payload = [];
+    let totalamount = 0;
 
     // fetch the cart items from redux and set the total cost
     cartproduct.forEach((product) => {
@@ -52,24 +58,41 @@ const CheckoutScreen = ({ navigation, route }) => {
       payload.push(obj);
     });
 
+    return {
+      items: payload,
+      amount: totalamount,
+      discount: 0,
+      country: country,
+      status: "pending",
+      city: city,
+      zipcode: zipcode,
+      shippingAddress: streetAddress,
+    };
+  };
+
+  //method to handle checkout: COD checks out directly; a digital method routes
+  //to the self-contained payment step, which creates the order only on success.
+  const handleCheckout = (method) => {
+    const orderPayload = buildOrderPayload();
+
+    if (method !== PAYMENT_METHOD.COD) {
+      navigation.navigate("payment", { orderPayload, method });
+      return;
+    }
+
+    setIsloading(true);
     api
       .checkout({
-        items: payload,
-        amount: totalamount,
-        discount: 0,
-        payment_type: "cod",
-        country: country,
-        status: "pending",
-        city: city,
-        zipcode: zipcode,
-        shippingAddress: streetAddress,
+        ...orderPayload,
+        payment_type: PAYMENT_METHOD.COD,
+        payment_status: PAYMENT_STATUS.COD_PENDING,
       }) //API call
       .then((result) => {
         console.log("Checkout=>", result);
         if (result.success == true) {
           setIsloading(false);
           emptyCart("empty");
-          navigation.replace("orderconfirm");
+          navigation.replace("orderconfirm", { order: result.data });
         } else {
           setIsloading(false);
         }
@@ -189,10 +212,32 @@ const CheckoutScreen = ({ navigation, route }) => {
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
         <View style={styles.listContainer}>
-          <View style={styles.list}>
-            <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
-          </View>
+          {(PAYMENT_DIGITAL_ENABLED
+            ? [PAYMENT_METHOD.COD, PAYMENT_METHOD.CARD, PAYMENT_METHOD.WALLET]
+            : [PAYMENT_METHOD.COD]
+          ).map((method) => (
+            <TouchableOpacity
+              key={method}
+              testID={`checkout-method-${method}`}
+              style={[
+                styles.methodRow,
+                selectedMethod === method && styles.methodRowSelected,
+              ]}
+              onPress={() => setSelectedMethod(method)}
+            >
+              <Text style={styles.secondaryTextSm} testID={`checkout-method-${method}-label`}>
+                {methodLabel(method)}
+              </Text>
+              {selectedMethod === method && (
+                <Ionicons
+                  name="checkmark-circle"
+                  size={20}
+                  color={colors.primary}
+                  testID={`checkout-method-${method}-check`}
+                />
+              )}
+            </TouchableOpacity>
+          ))}
         </View>
 
         <View style={styles.emptyView}></View>
@@ -202,9 +247,8 @@ const CheckoutScreen = ({ navigation, route }) => {
           <CustomButton
             testID="checkout-submit-btn"
             text={"Submit Order"}
-            // onPress={() => navigation.replace("orderconfirm")}
             onPress={() => {
-              handleCheckout();
+              handleCheckout(selectedMethod);
             }}
           />
         ) : (
@@ -343,6 +387,21 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 10,
     padding: 10,
+  },
+  methodRow: {
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    height: 50,
+    padding: 10,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.light,
+    marginBottom: 8,
+  },
+  methodRowSelected: {
+    borderColor: colors.primary,
   },
   buttomContainer: {
     width: "100%",

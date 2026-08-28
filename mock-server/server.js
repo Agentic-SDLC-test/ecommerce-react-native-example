@@ -211,6 +211,7 @@ let orders = [
     amount: 129.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "cod_pending",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -270,6 +271,7 @@ let orders = [
     amount: 38.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "cod_pending",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -527,7 +529,7 @@ app.get("/orders", authMiddleware, (req, res) => {
 
 // POST /checkout  (user: place order)
 app.post("/checkout", authMiddleware, (req, res) => {
-  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
+  const { items, amount, discount, payment_type, payment_status, country, city, zipcode, shippingAddress, status } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
   }
@@ -553,6 +555,7 @@ app.post("/checkout", authMiddleware, (req, res) => {
     amount: amount || 0,
     discount: discount || 0,
     payment_type: payment_type || "cod",
+    payment_status: payment_status || "cod_pending",
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",

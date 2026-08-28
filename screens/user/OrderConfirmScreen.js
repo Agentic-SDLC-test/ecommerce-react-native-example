@@ -4,9 +4,11 @@ import { colors } from "../../constants";
 import SuccessImage from "../../assets/image/success.png";
 import CustomButton from "../../components/CustomButton";
 import * as session from "../../utils/session";
+import { methodLabel, statusLabel, resolvePaymentStatus } from "../../utils/payment";
 
-const OrderConfirmScreen = ({ navigation }) => {
+const OrderConfirmScreen = ({ navigation, route }) => {
   const [user, setUser] = useState({});
+  const order = route?.params?.order;
 
   //method to get authUser from session
   const getUserData = async () => {
@@ -26,6 +28,19 @@ const OrderConfirmScreen = ({ navigation }) => {
         <Image source={SuccessImage} style={styles.Image} testID="order-confirm-image" />
       </View>
       <Text style={styles.secondaryText} testID="order-confirm-text">Order has be confirmed</Text>
+      <View style={styles.paymentInfo}>
+        {order?.orderId && (
+          <Text style={styles.paymentLine} testID="order-confirm-order-id">
+            Order # {order.orderId}
+          </Text>
+        )}
+        <Text style={styles.paymentLine} testID="order-confirm-method">
+          Payment Method: {order ? methodLabel(order.payment_type) : methodLabel("cod")}
+        </Text>
+        <Text style={styles.paymentLine} testID="order-confirm-payment-status">
+          Payment Status: {statusLabel(resolvePaymentStatus(order))}
+        </Text>
+      </View>
       <View>
         <CustomButton
           testID="order-confirm-home-btn"
@@ -59,5 +74,14 @@ const styles = StyleSheet.create({
   secondaryText: {
     fontSize: 20,
     fontWeight: "bold",
+  },
+  paymentInfo: {
+    alignItems: "center",
+    marginTop: 10,
+  },
+  paymentLine: {
+    fontSize: 15,
+    color: colors.muted,
+    marginTop: 4,
   },
 });
