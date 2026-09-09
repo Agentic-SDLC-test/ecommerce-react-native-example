@@ -20,7 +20,7 @@ import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import * as api from "../../api";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
-import { formatReviewerName } from "../../utils/reviewHelper";
+import { formatReviewerName, calculateRatingDistribution } from "../../utils/reviewHelper";
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -50,12 +50,15 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const [hasReviewed, setHasReviewed] = useState(false);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [myReview, setMyReview] = useState(null);
+  const [ratingDistribution, setRatingDistribution] = useState({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
 
   // Review submission state
   const [userRating, setUserRating] = useState(0);
   const [userComment, setUserComment] = useState("");
   const [submittingReview, setSubmittingReview] = useState(false);
   const [submitError, setSubmitError] = useState("");
+  const [editMode, setEditMode] = useState(false);
 
   //method to fetch wishlist from server using API call
   const fetchWishlist = async () => {
@@ -156,6 +159,11 @@ const ProductDetailScreen = ({ navigation, route }) => {
           setTotalCount(result.totalCount ?? 0);
           setIsEligible(result.isEligible ?? false);
           setHasReviewed(result.hasReviewed ?? false);
+          setMyReview(result.myReview ?? null);
+          setRatingDistribution(
+            result.ratingDistribution ??
+              calculateRatingDistribution(result.reviews || [])
+          );
         }
       })
       .catch((err) => {
@@ -166,7 +174,17 @@ const ProductDetailScreen = ({ navigation, route }) => {
       });
   };
 
-  // method to submit a review
+  // method to open the review modal in edit mode, prefilled from myReview
+  const openEditModal = () => {
+    if (!myReview) return;
+    setEditMode(true);
+    setUserRating(myReview.rating ?? 0);
+    setUserComment(myReview.comment ?? "");
+    setSubmitError("");
+    setShowReviewModal(true);
+  };
+
+  // method to submit or update a review
   const handleSubmitReview = async () => {
     if (userRating < 1 || userRating > 5) {
       setSubmitError("Please select a star rating (1 to 5 stars)");
@@ -174,22 +192,35 @@ const ProductDetailScreen = ({ navigation, route }) => {
     }
     setSubmitError("");
     setSubmittingReview(true);
-    api
-      .submitReview({
-        productId: product?._id,
-        rating: userRating,
-        comment: userComment,
-      })
+    const request = editMode
+      ? api.updateReview(myReview._id, {
+          rating: userRating,
+          comment: userComment,
+        })
+      : api.submitReview({
+          productId: product?._id,
+          rating: userRating,
+          comment: userComment,
+        });
+    request
       .then((result) => {
         if (result.success) {
-          setError("Review submitted successfully");
+          setError(
+            editMode
+              ? "Review updated successfully"
+              : "Review submitted successfully"
+          );
           setAlertType("success");
           setShowReviewModal(false);
+          setEditMode(false);
           setUserRating(0);
           setUserComment("");
           fetchReviews(); // reload reviews
         } else {
-          setSubmitError(result.message || "Failed to submit review");
+          setSubmitError(
+            result.message ||
+              (editMode ? "Failed to update review" : "Failed to submit review")
+          );
         }
       })
       .catch((err) => {
@@ -284,6 +315,34 @@ const ProductDetailScreen = ({ navigation, route }) => {
               </Text>
             </View>
 
+            {/* Rating Distribution */}
+            {totalCount > 0 ? (
+              <View style={styles.distributionContainer} testID="product-detail-distribution">
+                {[5, 4, 3, 2, 1].map((star) => {
+                  const count = ratingDistribution[star] ?? 0;
+                  const ratio = totalCount > 0 ? count / totalCount : 0;
+                  return (
+                    <View
+                      key={star}
+                      style={styles.distributionRow}
+                      testID={`product-detail-distribution-row-${star}`}
+                    >
+                      <Text style={styles.distributionLabel}>{star} ★</Text>
+                      <View style={styles.distributionBarTrack}>
+                        <View
+                          style={[
+                            styles.distributionBarFill,
+                            { width: `${ratio * 100}%` },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.distributionCount}>{count}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
+
             <View style={styles.infoButtonContainer}>
               <View style={styles.wishlistButtonContainer}>
                 <TouchableOpacity
@@ -314,14 +373,29 @@ const ProductDetailScreen = ({ navigation, route }) => {
               <Text testID="product-detail-description">{product?.description}</Text>
             </View>
 
-            {/* Write Review Button */}
+            {/* Write / Edit Review Button */}
             {isEligible && !hasReviewed ? (
               <TouchableOpacity
                 style={styles.writeReviewBtn}
-                onPress={() => setShowReviewModal(true)}
+                onPress={() => {
+                  setEditMode(false);
+                  setUserRating(0);
+                  setUserComment("");
+                  setSubmitError("");
+                  setShowReviewModal(true);
+                }}
                 testID="product-detail-write-review-btn"
               >
                 <Text style={styles.writeReviewBtnText}>Write a Review</Text>
+              </TouchableOpacity>
+            ) : null}
+            {isEligible && hasReviewed ? (
+              <TouchableOpacity
+                style={styles.writeReviewBtn}
+                onPress={openEditModal}
+                testID="product-detail-edit-review-btn"
+              >
+                <Text style={styles.writeReviewBtnText}>Edit Your Review</Text>
               </TouchableOpacity>
             ) : null}
 
@@ -355,6 +429,15 @@ const ProductDetailScreen = ({ navigation, route }) => {
                         />
                       ))}
                     </View>
+                    {rev.verifiedPurchase ? (
+                      <View
+                        style={styles.verifiedBadge}
+                        testID={`product-detail-review-verified-${rev._id}`}
+                      >
+                        <Ionicons name="checkmark-circle" size={14} color={colors.success} />
+                        <Text style={styles.verifiedBadgeText}>Verified Purchase</Text>
+                      </View>
+                    ) : null}
                     {rev.comment ? (
                       <Text style={styles.reviewComment} testID="product-detail-review-comment">
                         {rev.comment}
@@ -416,7 +499,9 @@ const ProductDetailScreen = ({ navigation, route }) => {
       >
         <View style={styles.modalBackground}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle} testID="product-detail-review-modal-title">Write a Review</Text>
+            <Text style={styles.modalTitle} testID="product-detail-review-modal-title">
+              {editMode ? "Edit Your Review" : "Write a Review"}
+            </Text>
             
             <View style={styles.interactiveStarsContainer}>
               {[1, 2, 3, 4, 5].map((star) => (
@@ -464,6 +549,7 @@ const ProductDetailScreen = ({ navigation, route }) => {
                 style={[styles.modalButton, styles.cancelButton]}
                 onPress={() => {
                   setShowReviewModal(false);
+                  setEditMode(false);
                   setUserRating(0);
                   setUserComment("");
                   setSubmitError("");
@@ -717,6 +803,52 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.muted,
     fontWeight: "600",
+  },
+  distributionContainer: {
+    width: "100%",
+    paddingHorizontal: 20,
+    marginTop: 5,
+    marginBottom: 5,
+  },
+  distributionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  distributionLabel: {
+    fontSize: 12,
+    color: colors.muted,
+    width: 30,
+  },
+  distributionBarTrack: {
+    flex: 1,
+    height: 8,
+    backgroundColor: colors.shadow,
+    borderRadius: 4,
+    marginHorizontal: 8,
+    overflow: "hidden",
+  },
+  distributionBarFill: {
+    height: 8,
+    backgroundColor: "#ffc107",
+    borderRadius: 4,
+  },
+  distributionCount: {
+    fontSize: 12,
+    color: colors.muted,
+    width: 24,
+    textAlign: "right",
+  },
+  verifiedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  verifiedBadgeText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: colors.success,
+    marginLeft: 4,
   },
   writeReviewBtn: {
     backgroundColor: colors.primary,
