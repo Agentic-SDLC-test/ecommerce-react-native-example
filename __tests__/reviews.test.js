@@ -1,6 +1,7 @@
 import {
   formatReviewerName,
   calculateAverageRating,
+  calculateRatingDistribution,
   truncateReviewComment,
 } from "../utils/reviewHelper";
 
@@ -43,6 +44,47 @@ describe("Review helper utilities", () => {
         { rating: 5 },
       ];
       expect(calculateAverageRating(reviews)).toBe(5.0);
+    });
+  });
+
+  describe("calculateRatingDistribution", () => {
+    it("returns an all-zero 1..5 map for an empty or missing list", () => {
+      const zero = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+      expect(calculateRatingDistribution([])).toEqual(zero);
+      expect(calculateRatingDistribution(null)).toEqual(zero);
+      expect(calculateRatingDistribution(undefined)).toEqual(zero);
+    });
+
+    it("buckets ratings correctly across the five star levels", () => {
+      const reviews = [
+        { rating: 5 },
+        { rating: 5 },
+        { rating: 4 },
+        { rating: 3 },
+        { rating: 1 },
+      ];
+      expect(calculateRatingDistribution(reviews)).toEqual({
+        1: 1,
+        2: 0,
+        3: 1,
+        4: 1,
+        5: 2,
+      });
+    });
+
+    it("ignores out-of-range ratings defensively", () => {
+      const reviews = [
+        { rating: 0 },
+        { rating: 6 },
+        { rating: 3 },
+      ];
+      expect(calculateRatingDistribution(reviews)).toEqual({
+        1: 0,
+        2: 0,
+        3: 1,
+        4: 0,
+        5: 0,
+      });
     });
   });
 
