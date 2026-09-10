@@ -211,6 +211,8 @@ let orders = [
     amount: 129.97,
     discount: 0,
     payment_type: "cod",
+    // COD orders stay awaiting payment even once delivered — cash is collected on delivery.
+    payment_status: "awaiting_payment",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -240,6 +242,7 @@ let orders = [
     amount: 24.99,
     discount: 0,
     payment_type: "cod",
+    payment_status: "awaiting_payment",
     country: "Canada",
     city: "Vancouver",
     zipcode: "V6B 1A1",
@@ -270,6 +273,7 @@ let orders = [
     amount: 38.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "awaiting_payment",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -527,7 +531,7 @@ app.get("/orders", authMiddleware, (req, res) => {
 
 // POST /checkout  (user: place order)
 app.post("/checkout", authMiddleware, (req, res) => {
-  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
+  const { items, amount, discount, payment_type, payment_status, country, city, zipcode, shippingAddress, status } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
   }
@@ -553,6 +557,8 @@ app.post("/checkout", authMiddleware, (req, res) => {
     amount: amount || 0,
     discount: discount || 0,
     payment_type: payment_type || "cod",
+    payment_status:
+      payment_status || (payment_type === "card" ? "paid" : "awaiting_payment"),
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",
@@ -562,6 +568,11 @@ app.post("/checkout", authMiddleware, (req, res) => {
     updatedAt: new Date().toISOString(),
   };
   orders.push(newOrder);
+  console.log("checkout", {
+    orderId: newOrder.orderId,
+    payment_type: newOrder.payment_type,
+    payment_status: newOrder.payment_status,
+  });
   res.json({ success: true, message: "Order placed successfully", data: newOrder });
 });
 
