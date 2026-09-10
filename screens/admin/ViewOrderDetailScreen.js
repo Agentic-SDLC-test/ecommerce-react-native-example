@@ -15,6 +15,10 @@ import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import CustomButton from "../../components/CustomButton";
 import DropDownPicker from "react-native-dropdown-picker";
+import {
+  getPaymentMethodLabel,
+  getPaymentStatusLabel,
+} from "../../utils/payment";
 
 const ViewOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -176,6 +180,20 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
               Delivered on {orderDetail?.deliveredOn}
             </Text>
           )}
+        </View>
+        <View>
+          <Text style={styles.containerNameText} testID="view-order-detail-payment-heading">Payment</Text>
+        </View>
+        <View style={styles.orderInfoContainer}>
+          <Text style={styles.secondarytextMedian} testID="view-order-detail-payment-method">
+            {getPaymentMethodLabel(orderDetail?.payment_type)}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="view-order-detail-payment-status">
+            {getPaymentStatusLabel(
+              orderDetail?.payment_status,
+              orderDetail?.payment_type
+            )}
+          </Text>
         </View>
         <View style={styles.containerNameContainer}>
           <View>
