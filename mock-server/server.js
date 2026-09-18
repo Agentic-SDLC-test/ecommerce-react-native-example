@@ -294,7 +294,9 @@ let reviews = [
     rating: 5,
     comment: "Incredible quality and fit!",
     visible: true,
-    createdAt: "2026-08-21T12:00:00Z"
+    verifiedPurchase: true,
+    createdAt: "2026-08-21T12:00:00Z",
+    updatedAt: "2026-08-21T12:00:00Z"
   },
   {
     _id: "rev002",
@@ -307,7 +309,9 @@ let reviews = [
     rating: 4,
     comment: "Pretty good sound, battery life is amazing.",
     visible: true,
-    createdAt: "2026-08-21T13:00:00Z"
+    verifiedPurchase: true,
+    createdAt: "2026-08-21T13:00:00Z",
+    updatedAt: "2026-08-21T13:00:00Z"
   }
 ];
 
@@ -644,23 +648,34 @@ app.get("/products/:id/reviews", (req, res) => {
   // Sort by createdAt descending
   const sortedReviews = [...productReviews].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
 
+  // Rating distribution: count of reviews at each star level (1-5)
+  const ratingDistribution = productReviews.reduce((acc, r) => {
+    acc[r.rating] = (acc[r.rating] || 0) + 1;
+    return acc;
+  }, { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 });
+
   // If token is provided, check eligibility and if reviewed
   let isEligible = false;
   let hasReviewed = false;
+  let myReview = null;
 
   const token = req.headers["x-auth-token"];
   if (token) {
     const user = users.find(u => u.token === token);
     if (user) {
       // Check if user has a delivered order with this productId
-      isEligible = orders.some(o => 
-        o.user._id === user._id && 
-        o.status === "delivered" && 
+      isEligible = orders.some(o =>
+        o.user._id === user._id &&
+        o.status === "delivered" &&
         o.items.some(item => item.productId._id === id)
       );
 
       // Check if user has already reviewed this product
       hasReviewed = reviews.some(r => r.productId === id && r.user._id === user._id);
+
+      // Look up the user's own review, regardless of moderation visibility,
+      // so they can always see and edit it even if an admin hid it
+      myReview = reviews.find(r => r.productId === id && r.user._id === user._id) || null;
     }
   }
 
@@ -669,8 +684,10 @@ app.get("/products/:id/reviews", (req, res) => {
     reviews: sortedReviews,
     averageRating,
     totalCount,
+    ratingDistribution,
     isEligible,
-    hasReviewed
+    hasReviewed,
+    myReview
   });
 });
 
@@ -710,6 +727,7 @@ app.post("/reviews", authMiddleware, (req, res) => {
     return res.status(400).json({ success: false, message: "You have already reviewed this product" });
   }
 
+  const now = new Date().toISOString();
   const newReview = {
     _id: `rev-${uuidv4()}`,
     productId,
@@ -721,13 +739,49 @@ app.post("/reviews", authMiddleware, (req, res) => {
     rating: numericRating,
     comment: comment || "",
     visible: true,
-    createdAt: new Date().toISOString()
+    verifiedPurchase: true,
+    createdAt: now,
+    updatedAt: now
   };
 
   reviews.push(newReview);
   console.log('Review created for product:', productId);
 
   res.json({ success: true, message: "Review submitted successfully", data: newReview });
+});
+
+app.post("/update-review", authMiddleware, (req, res) => {
+  const { id } = req.query;
+  const { rating, comment } = req.body;
+
+  const review = reviews.find(r => r._id === id);
+  if (!review) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+
+  if (review.user._id !== req.user._id) {
+    return res.status(403).json({ success: false, message: "You can only edit your own review" });
+  }
+
+  if (rating !== undefined) {
+    const numericRating = parseInt(rating);
+    if (isNaN(numericRating) || numericRating < 1 || numericRating > 5) {
+      return res.status(400).json({ success: false, message: "Rating must be an integer between 1 and 5" });
+    }
+    review.rating = numericRating;
+  }
+
+  if (comment !== undefined) {
+    if (comment && comment.length > 500) {
+      return res.status(400).json({ success: false, message: "Comment must be at most 500 characters" });
+    }
+    review.comment = comment || "";
+  }
+
+  review.updatedAt = new Date().toISOString();
+  console.log('Review updated:', id, 'by user', req.user._id);
+
+  res.json({ success: true, message: "Review updated successfully", data: review });
 });
 
 app.get("/admin/reviews", adminMiddleware, (req, res) => {
@@ -791,6 +845,12 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   POST   /reset-password?id=`);
   console.log(`   POST   /photos/upload`);
   console.log(`   GET    /uploads/:filename`);
+  console.log(`   GET    /products/:id/reviews`);
+  console.log(`   POST   /reviews              (user)`);
+  console.log(`   POST   /update-review?id=    (user)`);
+  console.log(`   GET    /admin/reviews        (admin)`);
+  console.log(`   POST   /admin/reviews/:id/visibility  (admin)`);
+  console.log(`   POST   /admin/reviews/:id/delete      (admin)`);
   console.log(`\n🔑 Test tokens:`);
   console.log(`   Admin token : mock-admin-token-001`);
   console.log(`   User token  : mock-user-token-001`);
