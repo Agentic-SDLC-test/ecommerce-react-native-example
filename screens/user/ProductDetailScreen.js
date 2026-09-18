@@ -20,7 +20,7 @@ import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import * as api from "../../api";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
-import { formatReviewerName } from "../../utils/reviewHelper";
+import { formatReviewerName, getRatingDistributionPercentage } from "../../utils/reviewHelper";
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -46,10 +46,13 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const [reviewsList, setReviewsList] = useState([]);
   const [averageRating, setAverageRating] = useState(0.0);
   const [totalCount, setTotalCount] = useState(0);
+  const [ratingDistribution, setRatingDistribution] = useState({ 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
   const [isEligible, setIsEligible] = useState(false);
   const [hasReviewed, setHasReviewed] = useState(false);
+  const [myReview, setMyReview] = useState(null);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
 
   // Review submission state
   const [userRating, setUserRating] = useState(0);
@@ -154,8 +157,10 @@ const ProductDetailScreen = ({ navigation, route }) => {
           setReviewsList(result.reviews || []);
           setAverageRating(result.averageRating ?? 0.0);
           setTotalCount(result.totalCount ?? 0);
+          setRatingDistribution(result.ratingDistribution ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 });
           setIsEligible(result.isEligible ?? false);
           setHasReviewed(result.hasReviewed ?? false);
+          setMyReview(result.myReview ?? null);
         }
       })
       .catch((err) => {
@@ -166,7 +171,22 @@ const ProductDetailScreen = ({ navigation, route }) => {
       });
   };
 
-  // method to submit a review
+  // method to open the review modal, pre-filling it when the user already has a review
+  const openReviewModal = () => {
+    if (myReview) {
+      setIsEditMode(true);
+      setUserRating(myReview.rating);
+      setUserComment(myReview.comment || "");
+    } else {
+      setIsEditMode(false);
+      setUserRating(0);
+      setUserComment("");
+    }
+    setSubmitError("");
+    setShowReviewModal(true);
+  };
+
+  // method to submit or update a review
   const handleSubmitReview = async () => {
     if (userRating < 1 || userRating > 5) {
       setSubmitError("Please select a star rating (1 to 5 stars)");
@@ -174,15 +194,17 @@ const ProductDetailScreen = ({ navigation, route }) => {
     }
     setSubmitError("");
     setSubmittingReview(true);
-    api
-      .submitReview({
-        productId: product?._id,
-        rating: userRating,
-        comment: userComment,
-      })
+    const request = isEditMode
+      ? api.updateReview(myReview._id, { rating: userRating, comment: userComment })
+      : api.submitReview({
+          productId: product?._id,
+          rating: userRating,
+          comment: userComment,
+        });
+    request
       .then((result) => {
         if (result.success) {
-          setError("Review submitted successfully");
+          setError(isEditMode ? "Review updated successfully" : "Review submitted successfully");
           setAlertType("success");
           setShowReviewModal(false);
           setUserRating(0);
@@ -284,6 +306,26 @@ const ProductDetailScreen = ({ navigation, route }) => {
               </Text>
             </View>
 
+            {/* Rating Distribution */}
+            {totalCount > 0 ? (
+              <View style={styles.ratingDistributionContainer} testID="product-detail-rating-distribution">
+                {[5, 4, 3, 2, 1].map((star) => (
+                  <View key={star} style={styles.ratingDistributionRow} testID={`product-detail-rating-distribution-row-${star}`}>
+                    <Text style={styles.ratingDistributionLabel}>{star} ★</Text>
+                    <View style={styles.ratingDistributionBarTrack}>
+                      <View
+                        style={[
+                          styles.ratingDistributionBarFill,
+                          { width: `${getRatingDistributionPercentage(ratingDistribution[star], totalCount)}%` },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.ratingDistributionCount}>{ratingDistribution[star] || 0}</Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
             <View style={styles.infoButtonContainer}>
               <View style={styles.wishlistButtonContainer}>
                 <TouchableOpacity
@@ -314,14 +356,22 @@ const ProductDetailScreen = ({ navigation, route }) => {
               <Text testID="product-detail-description">{product?.description}</Text>
             </View>
 
-            {/* Write Review Button */}
+            {/* Write / Edit Review Button */}
             {isEligible && !hasReviewed ? (
               <TouchableOpacity
                 style={styles.writeReviewBtn}
-                onPress={() => setShowReviewModal(true)}
+                onPress={openReviewModal}
                 testID="product-detail-write-review-btn"
               >
                 <Text style={styles.writeReviewBtnText}>Write a Review</Text>
+              </TouchableOpacity>
+            ) : hasReviewed && myReview ? (
+              <TouchableOpacity
+                style={styles.writeReviewBtn}
+                onPress={openReviewModal}
+                testID="product-detail-edit-review-btn"
+              >
+                <Text style={styles.writeReviewBtnText}>Edit Your Review</Text>
               </TouchableOpacity>
             ) : null}
 
@@ -337,9 +387,17 @@ const ProductDetailScreen = ({ navigation, route }) => {
                 reviewsList.slice(0, 5).map((rev) => (
                   <View key={rev._id} style={styles.reviewCard} testID={`product-detail-review-card-${rev._id}`}>
                     <View style={styles.reviewHeader}>
-                      <Text style={styles.reviewUser} testID="product-detail-review-username">
-                        {formatReviewerName(rev.user?.name)}
-                      </Text>
+                      <View style={styles.reviewUserRow}>
+                        <Text style={styles.reviewUser} testID="product-detail-review-username">
+                          {formatReviewerName(rev.user?.name)}
+                        </Text>
+                        {rev.verifiedPurchase ? (
+                          <View style={styles.verifiedBadge} testID={`product-detail-review-verified-badge-${rev._id}`}>
+                            <Ionicons name="checkmark-circle" size={12} color={colors.success} />
+                            <Text style={styles.verifiedBadgeText}>Verified Purchase</Text>
+                          </View>
+                        ) : null}
+                      </View>
                       <Text style={styles.reviewDate} testID="product-detail-review-date">
                         {formatDate(rev.createdAt)}
                       </Text>
@@ -416,7 +474,9 @@ const ProductDetailScreen = ({ navigation, route }) => {
       >
         <View style={styles.modalBackground}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle} testID="product-detail-review-modal-title">Write a Review</Text>
+            <Text style={styles.modalTitle} testID="product-detail-review-modal-title">
+              {isEditMode ? "Edit Your Review" : "Write a Review"}
+            </Text>
             
             <View style={styles.interactiveStarsContainer}>
               {[1, 2, 3, 4, 5].map((star) => (
@@ -717,6 +777,55 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.muted,
     fontWeight: "600",
+  },
+  ratingDistributionContainer: {
+    width: "100%",
+    paddingHorizontal: 20,
+    marginBottom: 10,
+  },
+  ratingDistributionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  ratingDistributionLabel: {
+    width: 32,
+    fontSize: 12,
+    color: colors.muted,
+  },
+  ratingDistributionBarTrack: {
+    flex: 1,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.light,
+    marginHorizontal: 8,
+    overflow: "hidden",
+  },
+  ratingDistributionBarFill: {
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#ffc107",
+  },
+  ratingDistributionCount: {
+    width: 24,
+    fontSize: 12,
+    color: colors.muted,
+    textAlign: "right",
+  },
+  reviewUserRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  verifiedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  verifiedBadgeText: {
+    fontSize: 11,
+    color: colors.success,
+    fontWeight: "600",
+    marginLeft: 3,
   },
   writeReviewBtn: {
     backgroundColor: colors.primary,

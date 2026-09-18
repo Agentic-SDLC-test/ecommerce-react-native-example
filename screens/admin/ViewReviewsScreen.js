@@ -214,9 +214,17 @@ const ViewReviewsScreen = ({ navigation }) => {
               </View>
 
               <View style={styles.reviewerRow}>
-                <Text style={styles.reviewerName} testID={`view-reviews-item-username-${index}`}>
-                  By: {item.user?.name || "Anonymous"}
-                </Text>
+                <View style={styles.reviewerNameRow}>
+                  <Text style={styles.reviewerName} testID={`view-reviews-item-username-${index}`}>
+                    By: {item.user?.name || "Anonymous"}
+                  </Text>
+                  {item.verifiedPurchase ? (
+                    <View style={styles.verifiedBadge} testID={`view-reviews-item-verified-badge-${index}`}>
+                      <Ionicons name="checkmark-circle" size={12} color={colors.success} />
+                      <Text style={styles.verifiedBadgeText}>Verified Purchase</Text>
+                    </View>
+                  ) : null}
+                </View>
                 <View style={styles.starsContainer}>
                   {[1, 2, 3, 4, 5].map((star) => (
                     <Ionicons
@@ -340,10 +348,25 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginBottom: 10,
   },
+  reviewerNameRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
   reviewerName: {
     fontSize: 13,
     color: colors.muted,
     fontWeight: "600",
+  },
+  verifiedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginLeft: 8,
+  },
+  verifiedBadgeText: {
+    fontSize: 11,
+    color: colors.success,
+    fontWeight: "600",
+    marginLeft: 3,
   },
   starsContainer: {
     flexDirection: "row",
