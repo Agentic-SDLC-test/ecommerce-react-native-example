@@ -18,6 +18,11 @@ import { bindActionCreators } from "redux";
 import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import ProgressDialog from "react-native-progress-dialog";
+import {
+  PAYMENT_METHODS,
+  PAYMENT_OPTIONS,
+  getCheckoutPaymentStatus,
+} from "../../utils/payment";
 
 const CheckoutScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -33,6 +38,13 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [city, setCity] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
+  const [selectedPaymentType, setSelectedPaymentType] = useState(PAYMENT_METHODS.COD);
+
+  const handleSelectPayment = (paymentType) => {
+    if (PAYMENT_OPTIONS.some((option) => option.value === paymentType)) {
+      setSelectedPaymentType(paymentType);
+    }
+  };
 
   //method to handle checkout
   const handleCheckout = async () => {
@@ -52,12 +64,15 @@ const CheckoutScreen = ({ navigation, route }) => {
       payload.push(obj);
     });
 
+    const paymentStatus = getCheckoutPaymentStatus(selectedPaymentType);
+
     api
       .checkout({
         items: payload,
         amount: totalamount,
         discount: 0,
-        payment_type: "cod",
+        payment_type: selectedPaymentType,
+        payment_status: paymentStatus,
         country: country,
         status: "pending",
         city: city,
@@ -69,7 +84,7 @@ const CheckoutScreen = ({ navigation, route }) => {
         if (result.success == true) {
           setIsloading(false);
           emptyCart("empty");
-          navigation.replace("orderconfirm");
+          navigation.replace("orderconfirm", { order: result.data });
         } else {
           setIsloading(false);
         }
@@ -189,10 +204,35 @@ const CheckoutScreen = ({ navigation, route }) => {
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
         <View style={styles.listContainer}>
-          <View style={styles.list}>
-            <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
-          </View>
+          {PAYMENT_OPTIONS.map((option) => {
+            const selected = selectedPaymentType === option.value;
+            const optionId = option.value === PAYMENT_METHODS.COD ? "cod" : "mock-wallet";
+
+            return (
+              <TouchableOpacity
+                key={option.value}
+                testID={`checkout-payment-option-${optionId}`}
+                style={[styles.paymentOption, selected && styles.paymentOptionSelected]}
+                onPress={() => handleSelectPayment(option.value)}
+              >
+                <View style={styles.paymentOptionTextContainer}>
+                  <Text style={styles.secondaryTextSm}>{option.label}</Text>
+                  <Text style={styles.paymentDescription}>{option.description}</Text>
+                  {option.value === PAYMENT_METHODS.MOCK_WALLET && (
+                    <Text style={styles.paymentDescription}>
+                      Demo payment - no real wallet credentials required.
+                    </Text>
+                  )}
+                </View>
+                <Text
+                  style={selected ? styles.primaryTextSm : styles.paymentUnselectedText}
+                  testID={selected ? `checkout-payment-selected-${optionId}` : undefined}
+                >
+                  {selected ? "Selected" : "Select"}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
 
         <View style={styles.emptyView}></View>
@@ -343,6 +383,34 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: 10,
     padding: 10,
+  },
+  paymentOption: {
+    display: "flex",
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.light,
+    padding: 10,
+  },
+  paymentOptionSelected: {
+    borderColor: colors.primary,
+    borderWidth: 1,
+    borderRadius: 8,
+  },
+  paymentOptionTextContainer: {
+    flex: 1,
+    paddingRight: 10,
+  },
+  paymentDescription: {
+    fontSize: 12,
+    color: colors.muted,
+    marginTop: 3,
+  },
+  paymentUnselectedText: {
+    fontSize: 13,
+    color: colors.muted,
   },
   buttomContainer: {
     width: "100%",
