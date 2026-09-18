@@ -18,3 +18,8 @@ export const truncateReviewComment = (comment, maxLength = 100) => {
   if (comment.length <= maxLength) return comment;
   return comment.substring(0, maxLength) + "...";
 };
+
+export const getRatingDistributionPercentage = (count, total) => {
+  if (!total) return 0;
+  return Math.round((count / total) * 100);
+};

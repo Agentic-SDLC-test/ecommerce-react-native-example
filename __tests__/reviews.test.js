@@ -2,6 +2,7 @@ import {
   formatReviewerName,
   calculateAverageRating,
   truncateReviewComment,
+  getRatingDistributionPercentage,
 } from "../utils/reviewHelper";
 
 describe("Review helper utilities", () => {
@@ -59,6 +60,22 @@ describe("Review helper utilities", () => {
     it("handles empty comments gracefully", () => {
       expect(truncateReviewComment("")).toBe("");
       expect(truncateReviewComment(undefined)).toBe("");
+    });
+  });
+
+  describe("getRatingDistributionPercentage", () => {
+    it("returns 0 when total is zero, null, or undefined", () => {
+      expect(getRatingDistributionPercentage(0, 0)).toBe(0);
+      expect(getRatingDistributionPercentage(2, null)).toBe(0);
+      expect(getRatingDistributionPercentage(2, undefined)).toBe(0);
+    });
+
+    it("calculates a rounded partial percentage", () => {
+      expect(getRatingDistributionPercentage(1, 3)).toBe(33);
+    });
+
+    it("returns 100 when all reviews are at that star level", () => {
+      expect(getRatingDistributionPercentage(5, 5)).toBe(100);
     });
   });
 });
