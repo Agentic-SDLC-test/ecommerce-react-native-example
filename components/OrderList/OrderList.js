@@ -143,6 +143,11 @@ const styles = StyleSheet.create({
     color: colors.muted,
     fontWeight: "bold",
   },
+  paymentStatus: {
+    fontSize: 14,
+    color: colors.primary,
+    fontWeight: "bold",
+  },
   timeDateContainer: {
     display: "flex",
     flexDirection: "column",

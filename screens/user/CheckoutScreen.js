@@ -18,6 +18,10 @@ import { bindActionCreators } from "redux";
 import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import ProgressDialog from "react-native-progress-dialog";
+import PaymentMethodSelector from "../../components/PaymentMethodSelector";
+import SimulatedPaymentModal from "../../components/SimulatedPaymentModal";
+import { DEFAULT_METHOD } from "../../constants/payments";
+import { isDigitalMethod, resolvePaymentStatus } from "../../utils/payment";
 
 const CheckoutScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -34,9 +38,12 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [city, setCity] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
+  const [paymentMethod, setPaymentMethod] = useState(DEFAULT_METHOD);
+  const [paymentModalVisible, setPaymentModalVisible] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
 
-  //method to handle checkout
-  const handleCheckout = async () => {
+  //method to place the order once a payment status has been resolved
+  const placeOrder = async (paymentStatus) => {
     setIsloading(true);
 
     var payload = [];
@@ -67,7 +74,7 @@ const CheckoutScreen = ({ navigation, route }) => {
       }) //API call
       .then((result) => {
         console.log("Checkout=>", result);
-        if (result.success == true) {
+        if (result.success === true) {
           setIsloading(false);
           emptyCart("empty");
           navigation.replace("orderconfirm", { order: result.data });
@@ -79,6 +86,30 @@ const CheckoutScreen = ({ navigation, route }) => {
         setIsloading(false);
         console.log("error", error);
       });
+  };
+
+  //method to handle checkout: digital methods run a simulated payment first,
+  //COD posts immediately as awaiting payment
+  const handleCheckout = () => {
+    setPaymentError("");
+    if (isDigitalMethod(paymentMethod)) {
+      setPaymentModalVisible(true);
+      return;
+    }
+    placeOrder(resolvePaymentStatus(paymentMethod, {}));
+  };
+
+  //method to handle the simulated payment outcome
+  const handlePaymentResult = ({ success }) => {
+    const paymentStatus = resolvePaymentStatus(paymentMethod, { success });
+    console.log("payment", { method: paymentMethod, status: paymentStatus });
+    setPaymentModalVisible(false);
+    if (!success) {
+      // keep the user on the screen so they can retry or switch to COD (BR-8)
+      setPaymentError("Payment failed — try again or choose another method");
+      return;
+    }
+    placeOrder(paymentStatus);
   };
 
   // set the address and total cost on initital render
@@ -288,6 +319,13 @@ const CheckoutScreen = ({ navigation, route }) => {
           </View>
         </View>
       </Modal>
+      <SimulatedPaymentModal
+        testID="checkout-payment-modal"
+        visible={paymentModalVisible}
+        method={paymentMethod}
+        onPay={handlePaymentResult}
+        onCancel={() => setPaymentModalVisible(false)}
+      />
     </View>
   );
 };
@@ -378,6 +416,12 @@ const styles = StyleSheet.create({
   emptyView: {
     width: "100%",
     height: 20,
+  },
+  paymentError: {
+    color: colors.danger,
+    fontSize: 13,
+    fontWeight: "bold",
+    padding: 10,
   },
   modelBody: {
     flex: 1,

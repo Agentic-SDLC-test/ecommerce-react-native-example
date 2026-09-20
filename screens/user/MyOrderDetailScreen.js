@@ -205,6 +205,20 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
           </View>
         </View>
 
+        <View>
+          <Text style={styles.containerNameText} testID="my-order-detail-payment-heading">Payment</Text>
+        </View>
+        <View style={styles.orderInfoContainer}>
+          <Text style={styles.secondarytextMedian} testID="my-order-detail-payment-method">
+            {getPaymentMethodLabel(orderDetail?.payment_type)}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-status">
+            {getPaymentStatusLabel(
+              orderDetail?.payment_status,
+              orderDetail?.payment_type
+            )}
+          </Text>
+        </View>
         <View style={styles.containerNameContainer}>
           <View>
             <Text style={styles.containerNameText} testID="my-order-detail-package-heading">Package Details</Text>
