@@ -26,6 +26,7 @@ import { isDigitalMethod, resolvePaymentStatus } from "../../utils/payment";
 const CheckoutScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [isloading, setIsloading] = useState(false);
+  const [paymentMethod, setPaymentMethod] = useState("cod");
   const cartproduct = useSelector((state) => state.product);
   const dispatch = useDispatch();
   const { emptyCart } = bindActionCreators(actionCreaters, dispatch);
@@ -65,7 +66,6 @@ const CheckoutScreen = ({ navigation, route }) => {
         amount: totalamount,
         discount: 0,
         payment_type: paymentMethod,
-        payment_status: paymentStatus,
         country: country,
         status: "pending",
         city: city,
@@ -221,16 +221,29 @@ const CheckoutScreen = ({ navigation, route }) => {
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
         <View style={styles.listContainer}>
-          <PaymentMethodSelector
-            testID="checkout-payment-selector"
-            selected={paymentMethod}
-            onSelect={setPaymentMethod}
-          />
-          {paymentError !== "" && (
-            <Text style={styles.paymentError} testID="checkout-payment-error">
-              {paymentError}
-            </Text>
-          )}
+          <TouchableOpacity
+            testID="checkout-method-cod"
+            style={styles.list}
+            onPress={() => setPaymentMethod("cod")}
+          >
+            <Text style={styles.secondaryTextSm}>Cash on Delivery</Text>
+            {paymentMethod === "cod" && (
+              <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+            )}
+          </TouchableOpacity>
+          <TouchableOpacity
+            testID="checkout-method-wallet"
+            style={styles.list}
+            onPress={() => setPaymentMethod("wallet")}
+          >
+            <View>
+              <Text style={styles.secondaryTextSm}>Pay with Wallet (Demo)</Text>
+              <Text style={styles.paymentCaption}>Demo payment — no real charge</Text>
+            </View>
+            {paymentMethod === "wallet" && (
+              <Ionicons name="checkmark-circle" size={20} color={colors.primary} />
+            )}
+          </TouchableOpacity>
         </View>
 
         <View style={styles.emptyView}></View>
@@ -383,6 +396,11 @@ const styles = StyleSheet.create({
   secondaryTextSm: {
     fontSize: 15,
     fontWeight: "bold",
+  },
+  paymentCaption: {
+    fontSize: 11,
+    color: colors.muted,
+    marginTop: 2,
   },
   listContainer: {
     backgroundColor: colors.white,

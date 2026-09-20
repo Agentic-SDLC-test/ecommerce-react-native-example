@@ -7,7 +7,8 @@ import * as session from "../../utils/session";
 import {
   getPaymentMethodLabel,
   getPaymentStatusLabel,
-} from "../../utils/payment";
+  getPaymentStatusColor,
+} from "../../utils/paymentHelper";
 
 const OrderConfirmScreen = ({ navigation, route }) => {
   const [user, setUser] = useState({});
@@ -31,12 +32,22 @@ const OrderConfirmScreen = ({ navigation, route }) => {
         <Image source={SuccessImage} style={styles.Image} testID="order-confirm-image" />
       </View>
       <Text style={styles.secondaryText} testID="order-confirm-text">Order has be confirmed</Text>
-      {order && (
-        <Text style={styles.paymentText} testID="order-confirm-payment">
-          {getPaymentMethodLabel(order?.payment_type)} —{" "}
-          {getPaymentStatusLabel(order?.payment_status, order?.payment_type)}
+      <View style={styles.paymentInfoContainer}>
+        <Text testID="order-confirm-payment-method">
+          {getPaymentMethodLabel(order?.payment_type)}
         </Text>
-      )}
+        <Text
+          testID="order-confirm-payment-status"
+          style={{ color: getPaymentStatusColor(order?.payment_status, colors) }}
+        >
+          {getPaymentStatusLabel(order?.payment_status)}
+        </Text>
+        {order?.payment_status === "failed" && (
+          <Text testID="order-confirm-payment-failed-note" style={{ color: colors.danger }}>
+            Your payment didn't go through. The order is saved with a failed payment status — you can retry payment or contact support.
+          </Text>
+        )}
+      </View>
       <View>
         <CustomButton
           testID="order-confirm-home-btn"
@@ -71,10 +82,8 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "bold",
   },
-  paymentText: {
-    fontSize: 15,
-    fontWeight: "bold",
-    color: colors.muted,
+  paymentInfoContainer: {
+    alignItems: "center",
     marginTop: 10,
   },
 });

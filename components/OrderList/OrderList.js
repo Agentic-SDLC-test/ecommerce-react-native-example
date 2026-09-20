@@ -4,7 +4,8 @@ import { colors } from "../../constants";
 import {
   getPaymentMethodLabel,
   getPaymentStatusLabel,
-} from "../../utils/payment";
+  getPaymentStatusColor,
+} from "../../utils/paymentHelper";
 
 function getTime(date) {
   let t = new Date(date);
@@ -84,11 +85,14 @@ const OrderList = ({ item, onPress, testID }) => {
         <Text style={styles.secondaryText} testID={testID ? `${testID}-total` : undefined}>Total Amount : {totalCost}$</Text>
       </View>
       <View style={styles.innerRow}>
-        <Text style={styles.secondaryText} testID={testID ? `${testID}-payment-method` : undefined}>
+        <Text style={styles.secondaryTextSm} testID={testID ? `${testID}-payment-method` : undefined}>
           {getPaymentMethodLabel(item?.payment_type)}
         </Text>
-        <Text style={styles.paymentStatus} testID={testID ? `${testID}-payment-status` : undefined}>
-          {getPaymentStatusLabel(item?.payment_status, item?.payment_type)}
+        <Text
+          style={[styles.secondaryTextSm, { color: getPaymentStatusColor(item?.payment_status, colors) }]}
+          testID={testID ? `${testID}-payment-status` : undefined}
+        >
+          {getPaymentStatusLabel(item?.payment_status)}
         </Text>
       </View>
       <View style={styles.innerRow}>

@@ -18,7 +18,8 @@ import DropDownPicker from "react-native-dropdown-picker";
 import {
   getPaymentMethodLabel,
   getPaymentStatusLabel,
-} from "../../utils/payment";
+  getPaymentStatusColor,
+} from "../../utils/paymentHelper";
 
 const ViewOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -159,6 +160,23 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
           </Text>
           <Text style={styles.secondarytextSm} testID="view-order-detail-address">{address}</Text>
           <Text style={styles.secondarytextSm} testID="view-order-detail-zipcode">{orderDetail?.zipcode}</Text>
+        </View>
+        <View style={styles.containerNameContainer}>
+          <Text style={styles.containerNameText} testID="view-order-detail-payment-heading">Payment Info</Text>
+        </View>
+        <View style={styles.orderInfoContainer}>
+          <Text style={styles.secondarytextMedian} testID="view-order-detail-payment-method">
+            {getPaymentMethodLabel(orderDetail?.payment_type)}
+          </Text>
+          <Text
+            style={[
+              styles.secondarytextSm,
+              { color: getPaymentStatusColor(orderDetail?.payment_status, colors) },
+            ]}
+            testID="view-order-detail-payment-status"
+          >
+            {getPaymentStatusLabel(orderDetail?.payment_status)}
+          </Text>
         </View>
         <View>
           <Text style={styles.containerNameText} testID="view-order-detail-order-info-heading">Order Info</Text>
