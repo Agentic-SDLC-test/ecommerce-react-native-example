@@ -13,6 +13,11 @@ import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import StepIndicator from "react-native-step-indicator";
+import {
+  getPaymentMethodLabel,
+  getPaymentStatusLabel,
+  getPaymentStatusColor,
+} from "../../utils/paymentHelper";
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -151,6 +156,23 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
         <View style={styles.ShipingInfoContainer}>
           <Text style={styles.secondarytextSm} testID="my-order-detail-address">{address}</Text>
           <Text style={styles.secondarytextSm} testID="my-order-detail-zipcode">{orderDetail?.zipcode}</Text>
+        </View>
+        <View style={styles.containerNameContainer}>
+          <Text style={styles.containerNameText} testID="my-order-detail-payment-heading">Payment Info</Text>
+        </View>
+        <View style={styles.orderInfoContainer}>
+          <Text style={styles.secondarytextMedian} testID="my-order-detail-payment-method">
+            {getPaymentMethodLabel(orderDetail?.payment_type)}
+          </Text>
+          <Text
+            style={[
+              styles.secondarytextSm,
+              { color: getPaymentStatusColor(orderDetail?.payment_status, colors) },
+            ]}
+            testID="my-order-detail-payment-status"
+          >
+            {getPaymentStatusLabel(orderDetail?.payment_status)}
+          </Text>
         </View>
         <View>
           <Text style={styles.containerNameText} testID="my-order-detail-order-info-heading">Order Info</Text>
