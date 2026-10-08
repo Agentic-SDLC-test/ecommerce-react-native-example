@@ -10,14 +10,16 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
-import { colors } from "../../constants";
+import { colors, ENABLE_DIGITAL_PAYMENT, PAYMENT_TYPES } from "../../constants";
 import CustomButton from "../../components/CustomButton";
 import { useSelector, useDispatch } from "react-redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import { bindActionCreators } from "redux";
 import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
+import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
+import { buildCheckoutPayload, validateDemoCard } from "../../utils/payment";
 
 const CheckoutScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -33,9 +35,40 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [city, setCity] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
+  const [paymentType, setPaymentType] = useState(PAYMENT_TYPES.COD);
+  const [cardName, setCardName] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCvv, setCardCvv] = useState("");
+  const [alertMessage, setAlertMessage] = useState("");
+  const [alertType, setAlertType] = useState("error");
+
+  const selectPaymentType = (nextType) => {
+    setPaymentType(nextType);
+    setAlertMessage("");
+  };
 
   //method to handle checkout
   const handleCheckout = async () => {
+    const resolvedPaymentType = ENABLE_DIGITAL_PAYMENT
+      ? paymentType
+      : PAYMENT_TYPES.COD;
+
+    if (resolvedPaymentType === PAYMENT_TYPES.CARD) {
+      const cardCheck = validateDemoCard({
+        name: cardName,
+        number: cardNumber,
+        expiry: cardExpiry,
+        cvv: cardCvv,
+      });
+      if (cardCheck.ok === false) {
+        setAlertMessage(cardCheck.message);
+        setAlertType("error");
+        console.info("[payment]", { event: "checkout_declined_local" });
+        return;
+      }
+    }
+
     setIsloading(true);
 
     var payload = [];
@@ -52,31 +85,57 @@ const CheckoutScreen = ({ navigation, route }) => {
       payload.push(obj);
     });
 
+    const checkoutBody = buildCheckoutPayload({
+      items: payload,
+      amount: totalamount,
+      discount: 0,
+      paymentType: resolvedPaymentType,
+      country: country,
+      city: city,
+      zipcode: zipcode,
+      shippingAddress: streetAddress,
+    });
+
+    console.info("[payment]", {
+      event: "checkout_submit",
+      payment_type: checkoutBody.payment_type,
+    });
+
     api
-      .checkout({
-        items: payload,
-        amount: totalamount,
-        discount: 0,
-        payment_type: "cod",
-        country: country,
-        status: "pending",
-        city: city,
-        zipcode: zipcode,
-        shippingAddress: streetAddress,
-      }) //API call
+      .checkout(checkoutBody) //API call
       .then((result) => {
-        console.log("Checkout=>", result);
-        if (result.success == true) {
+        const placed =
+          result.success == true &&
+          result.data &&
+          result.data.payment_type &&
+          result.data.payment_status;
+        if (placed) {
+          console.info("[payment]", {
+            event: "checkout_success",
+            orderId: result.data.orderId,
+            payment_type: result.data.payment_type,
+            payment_status: result.data.payment_status,
+          });
           setIsloading(false);
           emptyCart("empty");
-          navigation.replace("orderconfirm");
+          navigation.replace("orderconfirm", { order: result.data });
         } else {
+          const message =
+            result.success == true
+              ? "Could not place the order. You can retry."
+              : result.message;
           setIsloading(false);
+          setAlertMessage(message);
+          setAlertType("error");
+          console.error("[payment]", { event: "checkout_failed", message });
         }
       })
-      .catch((error) => {
+      .catch(() => {
+        const message = "Could not place the order. You can retry.";
         setIsloading(false);
-        console.log("error", error);
+        setAlertMessage(message);
+        setAlertType("error");
+        console.error("[payment]", { event: "checkout_failed", message });
       });
   };
 
@@ -189,11 +248,83 @@ const CheckoutScreen = ({ navigation, route }) => {
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
         <View style={styles.listContainer}>
-          <View style={styles.list}>
-            <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
-          </View>
+          <TouchableOpacity
+            testID="checkout-method-cod"
+            style={styles.list}
+            onPress={() => selectPaymentType(PAYMENT_TYPES.COD)}
+          >
+            <Text
+              style={
+                paymentType === PAYMENT_TYPES.COD || !ENABLE_DIGITAL_PAYMENT
+                  ? styles.primaryTextSm
+                  : styles.secondaryTextSm
+              }
+            >
+              Cash on Delivery
+            </Text>
+          </TouchableOpacity>
+          {ENABLE_DIGITAL_PAYMENT ? (
+            <TouchableOpacity
+              testID="checkout-method-card"
+              style={styles.list}
+              onPress={() => selectPaymentType(PAYMENT_TYPES.CARD)}
+            >
+              <Text
+                style={
+                  paymentType === PAYMENT_TYPES.CARD
+                    ? styles.primaryTextSm
+                    : styles.secondaryTextSm
+                }
+              >
+                Card (demo)
+              </Text>
+            </TouchableOpacity>
+          ) : null}
+          {ENABLE_DIGITAL_PAYMENT ? (
+            <Text style={styles.demoNote} testID="checkout-card-demo-note">
+              Example only — no real charge.
+            </Text>
+          ) : null}
         </View>
+        {ENABLE_DIGITAL_PAYMENT && paymentType === PAYMENT_TYPES.CARD ? (
+          <View>
+            <CustomInput
+              testID="checkout-card-name"
+              value={cardName}
+              setValue={setCardName}
+              placeholder={"Cardholder name"}
+            />
+            <CustomInput
+              testID="checkout-card-number"
+              value={cardNumber}
+              setValue={setCardNumber}
+              placeholder={"Card number"}
+              keyboardType={"number-pad"}
+              maxLength={19}
+            />
+            <CustomInput
+              testID="checkout-card-expiry"
+              value={cardExpiry}
+              setValue={setCardExpiry}
+              placeholder={"MM/YY"}
+              maxLength={5}
+            />
+            <CustomInput
+              testID="checkout-card-cvv"
+              value={cardCvv}
+              setValue={setCardCvv}
+              placeholder={"CVV"}
+              secureTextEntry
+              keyboardType={"number-pad"}
+              maxLength={3}
+            />
+          </View>
+        ) : null}
+        <CustomAlert
+          message={alertMessage}
+          type={alertType}
+          testID="checkout-alert"
+        />
 
         <View style={styles.emptyView}></View>
       </ScrollView>
@@ -353,6 +484,12 @@ const styles = StyleSheet.create({
   emptyView: {
     width: "100%",
     height: 20,
+  },
+  demoNote: {
+    fontSize: 13,
+    marginTop: 8,
+    marginBottom: 4,
+    color: colors.muted,
   },
   modelBody: {
     flex: 1,
