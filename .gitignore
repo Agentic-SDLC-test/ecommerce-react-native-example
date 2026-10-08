@@ -151,3 +151,5 @@ docs/pages/versions/*/react-native/*.diff
 /ios/Pods
 /ios/build
 **/ios/.xcode.env.local
+# Local subagent progress (not part of the app)
+.superpowers/

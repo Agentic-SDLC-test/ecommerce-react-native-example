@@ -1,4 +1,5 @@
 import * as authStorage from "./authStorage";
+import { UserType } from "@agentic-sdlc-test/easybuy-api-client/domain";
 
 // The one place that owns the authenticated user + token lifecycle.
 // Everything else asks this module for identity instead of reading storage
@@ -35,5 +36,5 @@ export async function clearSession() {
 
 export async function isAdmin() {
   const user = await getUser();
-  return user?.userType === "ADMIN";
+  return user?.userType === UserType.ADMIN;
 }

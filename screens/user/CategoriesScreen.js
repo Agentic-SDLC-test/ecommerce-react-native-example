@@ -14,7 +14,7 @@ import React, { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import cartIcon from "../../assets/icons/cart_beg.png";
 import emptyBox from "../../assets/image/emptybox.png";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import * as api from "../../api";
 import { useSelector, useDispatch } from "react-redux";
 import { bindActionCreators } from "redux";
@@ -253,7 +253,7 @@ const CategoriesScreen = ({ navigation, route }) => {
                   testID={`categories-product-${product._id}`}
                   cardSize={"large"}
                   name={product.title}
-                  image={`${network.serverip}/uploads/${product.image}`}
+                  image={api.imageUrl(product.image)}
                   price={product.price}
                   quantity={product.quantity}
                   onPress={() => handleProductPress(product)}

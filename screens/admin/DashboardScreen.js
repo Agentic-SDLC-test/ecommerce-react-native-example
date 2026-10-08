@@ -209,16 +209,6 @@ const DashboardScreen = ({ navigation, route }) => {
               }
               type="morden"
             />
-            <OptionList
-              testID="dashboard-reviews-option"
-              text={"Reviews"}
-              Icon={Ionicons}
-              iconName={"star"}
-              onPress={() =>
-                navigation.navigate("viewreviews", { authUser: user })
-              }
-              type="morden"
-            />
 
             <View style={{ height: 20 }}></View>
           </ScrollView>

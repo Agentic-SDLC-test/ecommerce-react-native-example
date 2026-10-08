@@ -17,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
 import * as api from "../../api";
+import { validateSignup, UserType } from "@agentic-sdlc-test/easybuy-api-client/domain";
 
 const SignupScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
@@ -27,29 +28,17 @@ const SignupScreen = ({ navigation }) => {
 
   //method to post the user data to server for user signup using API call
   const signUpHandle = () => {
-    if (email == "") {
-      return setError("Please enter your email");
-    }
-    if (name == "") {
-      return setError("Please enter your name");
-    }
-    if (password == "") {
-      return setError("Please enter your password");
-    }
-    if (!email.includes("@")) {
-      return setError("Email is not valid");
-    }
-    if (email.length < 6) {
-      return setError("Email is too short");
-    }
-    if (password.length < 5) {
-      return setError("Password must be 6 characters long");
-    }
-    if (password != confirmPassword) {
-      return setError("password does not match");
+    const validationError = validateSignup({
+      email,
+      name,
+      password,
+      confirmPassword,
+    });
+    if (validationError) {
+      return setError(validationError);
     }
     api
-      .register({ email, password, name, userType: "USER" }) // API call
+      .register({ email, password, name, userType: UserType.USER }) // API call
       .then((result) => {
         console.log(result);
         if (result.data?.email == email) {

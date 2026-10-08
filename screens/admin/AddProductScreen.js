@@ -11,6 +11,7 @@ import {
 import React, { useState } from "react";
 import { colors } from "../../constants";
 import * as api from "../../api";
+import { validateProduct, OrderStatus } from "@agentic-sdlc-test/easybuy-api-client/domain";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import { Ionicons } from "@expo/vector-icons";
@@ -39,9 +40,9 @@ const AddProductScreen = ({ navigation, route }) => {
   const [value, setValue] = useState(null);
   const [statusDisable, setStatusDisable] = useState(false);
   const [items, setItems] = useState([
-    { label: "Pending", value: "pending" },
-    { label: "Shipped", value: "shipped" },
-    { label: "Delivered", value: "delivered" },
+    { label: "Pending", value: OrderStatus.PENDING },
+    { label: "Shipped", value: OrderStatus.SHIPPED },
+    { label: "Delivered", value: OrderStatus.DELIVERED },
   ]);
   //Method : Fetch category data from using API call and store for later you in code
   const fetchCategories = () => {
@@ -108,21 +109,11 @@ const AddProductScreen = ({ navigation, route }) => {
   const addProductHandle = () => {
     setIsloading(true);
 
-    //[check validation] -- Start
-    if (title == "") {
-      setError("Please enter the product title");
-      setIsloading(false);
-    } else if (price == 0) {
-      setError("Please enter the product price");
-      setIsloading(false);
-    } else if (quantity <= 0) {
-      setError("Quantity must be greater then 1");
-      setIsloading(false);
-    } else if (image == null) {
-      setError("Please upload the product image");
+    const validationError = validateProduct({ title, price, quantity, image });
+    if (validationError) {
+      setError(validationError);
       setIsloading(false);
     } else {
-      //[check validation] -- End
       api
         .createProduct({
           title: title,

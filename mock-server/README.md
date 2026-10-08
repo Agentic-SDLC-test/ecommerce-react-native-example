@@ -58,13 +58,14 @@ Pass the token in the `x-auth-token` header for protected routes.
 
 ## Using with a Physical Device
 
-If you're running the app on a physical device (not a simulator), replace `localhost` with your Mac's local IP address in `constants/Network.js`:
+If you're running the app on a physical device (not a simulator), set `EXPO_PUBLIC_API_URL` to your Mac's LAN address and the mock server port, then restart Expo:
 
-```js
-serverip: "http://192.168.1.X:3001",  // replace with your actual local IP
+```bash
+EXPO_PUBLIC_API_URL=http://<LAN-IP>:3002
 ```
 
 Find your local IP with:
+
 ```bash
 ipconfig getifaddr en0
 ```

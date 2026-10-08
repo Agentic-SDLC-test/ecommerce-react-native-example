@@ -1,7 +1,8 @@
 import React from "react";
 import { View, Text, FlatList, StyleSheet, RefreshControl } from "react-native";
 import ProductCard from "../ProductCard/ProductCard";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
+import * as api from "../../api";
 
 const NewArrivals = ({
   products,
@@ -42,7 +43,7 @@ const NewArrivals = ({
                 <ProductCard
                   testID={`new-arrivals-product-${index}`}
                   name={item.title}
-                  image={`${network.serverip}/uploads/${item.image}`}
+                  image={api.imageUrl(item.image)}
                   price={item.price}
                   quantity={item.quantity}
                   onPress={() => handleProductPress(item)}

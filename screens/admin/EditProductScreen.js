@@ -9,8 +9,9 @@ import {
   TouchableOpacity,
 } from "react-native";
 import React, { useEffect, useState } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import * as api from "../../api";
+import { validateProduct } from "@agentic-sdlc-test/easybuy-api-client/domain";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import { Ionicons } from "@expo/vector-icons";
@@ -51,17 +52,9 @@ const EditProductScreen = ({ navigation, route }) => {
   //Method for imput validation and post data to server to edit product using API call
   const editProductHandle = () => {
     setIsloading(true);
-    if (title == "") {
-      setError("Please enter the product title");
-      setIsloading(false);
-    } else if (price == 0) {
-      setError("Please enter the product price");
-      setIsloading(false);
-    } else if (quantity <= 0) {
-      setError("Quantity must be greater then 1");
-      setIsloading(false);
-    } else if (image == null) {
-      setError("Please upload the product image");
+    const validationError = validateProduct({ title, price, quantity, image });
+    if (validationError) {
+      setError(validationError);
       setIsloading(false);
     } else {
       api
@@ -94,7 +87,7 @@ const EditProductScreen = ({ navigation, route }) => {
 
   // set all the input fields and image on initial render
   useEffect(() => {
-    setImage(`${network.serverip}/uploads/${product?.image}`);
+    setImage(api.imageUrl(product?.image));
     setTitle(product.title);
     setSku(product.sku);
     setQuantity(product.quantity.toString());
