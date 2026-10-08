@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants";
+import { displayPayment } from "../../utils/payment";
 
 function getTime(date) {
   let t = new Date(date);
@@ -38,6 +39,7 @@ const dateFormat = (datex) => {
 const OrderList = ({ item, onPress, testID }) => {
   const [totalCost, setTotalCost] = useState(0);
   const [quantity, setQuantity] = useState(0);
+  const { methodLabel, statusLabel } = displayPayment(item);
 
   useEffect(() => {
     let packageItems = 0;
@@ -84,6 +86,16 @@ const OrderList = ({ item, onPress, testID }) => {
           <Text>Details</Text>
         </TouchableOpacity>
         <Text style={styles.secondaryText} testID={testID ? `${testID}-status` : undefined}>{item?.status}</Text>
+      </View>
+      <View style={styles.innerRow}>
+        <Text style={styles.secondaryText} testID={testID ? `${testID}-payment-method` : undefined}>
+          Payment method: {methodLabel}
+        </Text>
+      </View>
+      <View style={styles.innerRow}>
+        <Text style={styles.secondaryText} testID={testID ? `${testID}-payment-status` : undefined}>
+          Payment status: {statusLabel}
+        </Text>
       </View>
     </View>
   );

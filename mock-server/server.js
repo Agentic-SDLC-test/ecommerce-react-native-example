@@ -211,6 +211,7 @@ let orders = [
     amount: 129.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "unpaid",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -240,6 +241,7 @@ let orders = [
     amount: 24.99,
     discount: 0,
     payment_type: "cod",
+    payment_status: "unpaid",
     country: "Canada",
     city: "Vancouver",
     zipcode: "V6B 1A1",
@@ -270,6 +272,7 @@ let orders = [
     amount: 38.97,
     discount: 0,
     payment_type: "cod",
+    payment_status: "unpaid",
     country: "Canada",
     city: "Toronto",
     zipcode: "M5V 3A8",
@@ -279,6 +282,36 @@ let orders = [
     deliveredOn: "2024-01-12",
     createdAt: new Date("2024-01-09T08:00:00Z").toISOString(),
     updatedAt: new Date("2024-01-12T16:00:00Z").toISOString(),
+  },
+  {
+    _id: "order004",
+    orderId: "ORD-2024-004",
+    user: {
+      _id: "user001",
+      name: "John Doe",
+      email: "user@easybuy.com",
+    },
+    items: [
+      {
+        productId: {
+          _id: "prod002",
+          title: "Blue Denim Jeans",
+        },
+        price: 49.99,
+        quantity: 1,
+      },
+    ],
+    amount: 49.99,
+    discount: 0,
+    payment_type: "card",
+    payment_status: "paid",
+    country: "Canada",
+    city: "Toronto",
+    zipcode: "M5V 3A8",
+    shippingAddress: "123 Main Street",
+    status: "pending",
+    createdAt: new Date("2024-02-01T12:00:00Z").toISOString(),
+    updatedAt: new Date("2024-02-01T12:00:00Z").toISOString(),
   },
 ];
 
@@ -525,11 +558,62 @@ app.get("/orders", authMiddleware, (req, res) => {
   res.json({ success: true, data: userOrders });
 });
 
+const FORBIDDEN_CARD_KEYS = [
+  "cardNumber",
+  "card_number",
+  "cvv",
+  "cvc",
+  "expiry",
+  "pan",
+  "cardholder",
+  "nameOnCard",
+];
+
+/**
+ * Derive stored payment_type and payment_status from a checkout body.
+ * Ignores client-supplied payment_status. Rejects card secrets and unknown methods.
+ */
+function resolveCheckoutPayment(body) {
+  const source = body && typeof body === "object" ? body : {};
+  for (let i = 0; i < FORBIDDEN_CARD_KEYS.length; i += 1) {
+    const key = FORBIDDEN_CARD_KEYS[i];
+    if (Object.prototype.hasOwnProperty.call(source, key) && source[key] !== "") {
+      return { error: "Card details must not be sent" };
+    }
+  }
+  const rawType = source.payment_type;
+  const paymentType =
+    rawType === undefined || rawType === null || rawType === "" ? "cod" : rawType;
+  if (paymentType === "cod") {
+    return { payment_type: "cod", payment_status: "unpaid" };
+  }
+  if (paymentType === "card") {
+    return { payment_type: "card", payment_status: "paid" };
+  }
+  return { error: "Invalid payment_type" };
+}
+
+function rejectCheckout(res, message) {
+  console.error("[payment]", { event: "checkout_rejected", reason: message });
+  return res.status(400).json({ success: false, message });
+}
+
 // POST /checkout  (user: place order)
 app.post("/checkout", authMiddleware, (req, res) => {
-  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
+  const body = req.body || {};
+  const { items, amount, discount, country, city, zipcode, shippingAddress } = body;
   if (!items || items.length === 0) {
-    return res.status(400).json({ success: false, message: "Cart is empty" });
+    return rejectCheckout(res, "Cart is empty");
+  }
+  const countryOk = typeof country === "string" && country.trim() !== "";
+  const cityOk = typeof city === "string" && city.trim() !== "";
+  const addressOk = typeof shippingAddress === "string" && shippingAddress.trim() !== "";
+  if (!countryOk || !cityOk || !addressOk) {
+    return rejectCheckout(res, "Country, city, and street address are required");
+  }
+  const payment = resolveCheckoutPayment(body);
+  if (payment.error) {
+    return rejectCheckout(res, payment.error);
   }
   const orderItems = items.map((item) => {
     const product = products.find((p) => p._id === item.productId);
@@ -552,16 +636,25 @@ app.post("/checkout", authMiddleware, (req, res) => {
     items: orderItems,
     amount: amount || 0,
     discount: discount || 0,
-    payment_type: payment_type || "cod",
+    payment_type: payment.payment_type,
+    payment_status: payment.payment_status,
     country: country || "",
     city: city || "",
     zipcode: zipcode || "",
     shippingAddress: shippingAddress || "",
-    status: status || "pending",
+    status: "pending",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
   orders.push(newOrder);
+  console.info("[payment]", {
+    event: "order_placed",
+    orderId: newOrder.orderId,
+    userId: req.user._id,
+    payment_type: newOrder.payment_type,
+    payment_status: newOrder.payment_status,
+    time: newOrder.createdAt,
+  });
   res.json({ success: true, message: "Order placed successfully", data: newOrder });
 });
 
