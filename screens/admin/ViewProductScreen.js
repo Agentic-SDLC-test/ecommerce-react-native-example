@@ -9,7 +9,7 @@ import {
   Alert,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import * as api from "../../api";
 import { Ionicons } from "@expo/vector-icons";
 import { AntDesign } from "@expo/vector-icons";
@@ -183,7 +183,7 @@ const ViewProductScreen = ({ navigation, route }) => {
               <ProductList
                 testID={`view-products-item-${index}`}
                 key={index}
-                image={`${network.serverip}/uploads/${product?.image}`}
+                image={api.imageUrl(product?.image)}
                 title={product?.title}
                 category={product?.category?.title}
                 price={product?.price}

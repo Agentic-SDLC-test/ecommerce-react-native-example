@@ -11,6 +11,7 @@ import {
 import React, { useState } from "react";
 import { colors } from "../../constants";
 import * as api from "../../api";
+import { validateCategory } from "@agentic-sdlc-test/easybuy-api-client/domain";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import { Ionicons } from "@expo/vector-icons";
@@ -32,18 +33,11 @@ const AddCategoryScreen = ({ navigation, route }) => {
   //Method for imput validation post data to server to insert category using API call
   const addCategoryHandle = () => {
     setIsloading(true);
-    //[check validation] -- Start
-    if (title == "") {
-      setError("Please enter the product title");
-      setIsloading(false);
-    } else if (description == "") {
-      setError("Please upload the product image");
-      setIsloading(false);
-    } else if (image == null) {
-      setError("Please upload the Catergory image");
+    const validationError = validateCategory({ title, description, image });
+    if (validationError) {
+      setError(validationError);
       setIsloading(false);
     } else {
-      //[check validation] -- End
       api
         .createCategory({ title, image, description }) //API call
         .then((result) => {

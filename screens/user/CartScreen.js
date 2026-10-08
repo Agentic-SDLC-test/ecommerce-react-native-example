@@ -10,7 +10,8 @@ import {
 import React, { useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import cartIcon from "../../assets/icons/cart_beg_active.png";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
+import * as api from "../../api";
 import CartProductList from "../../components/CartProductList/CartProductList";
 import CustomButton from "../../components/CustomButton";
 import { MaterialIcons } from "@expo/vector-icons";
@@ -100,7 +101,7 @@ const CartScreen = ({ navigation }) => {
               testID={`cart-product-${index}`}
               key={index}
               index={index}
-              image={`${network.serverip}/uploads/${item.image}`}
+              image={api.imageUrl(item.image)}
               title={item.title}
               price={item.price}
               quantity={item.quantity}

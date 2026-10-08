@@ -8,7 +8,7 @@ import {
   RefreshControl,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
@@ -142,7 +142,7 @@ const MyWishlistScreen = ({ navigation, route }) => {
             return (
               <WishList
                 testID={`my-wishlist-item-${index}`}
-                image={`${network.serverip}/uploads/${list?.productId?.image}`}
+                image={api.imageUrl(list?.productId?.image)}
                 title={list?.productId?.title}
                 description={list?.productId?.description}
                 key={index}

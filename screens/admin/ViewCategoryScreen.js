@@ -9,7 +9,7 @@ import {
   Alert,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import * as api from "../../api";
 import { Ionicons } from "@expo/vector-icons";
 import { AntDesign } from "@expo/vector-icons";
@@ -187,7 +187,7 @@ const ViewCategoryScreen = ({ navigation, route }) => {
           foundItems.map((item, index) => (
             <CategoryList
               testID={`view-categories-item-${index}`}
-              icon={`${network.serverip}/uploads/${item?.icon}`}
+              icon={api.imageUrl(item?.icon)}
               key={index}
               title={item?.title}
               description={item?.description}
