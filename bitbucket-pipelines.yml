@@ -1,0 +1,277 @@
+image: node:20
+
+definitions:
+  caches:
+    npm: ~/.npm
+  steps:
+    - step: &lint
+        name: Lint
+        caches:
+          - npm
+        script:
+          - npm ci
+          - export EXPO_NO_TELEMETRY=1
+          - npm run lint
+    - step: &test
+        name: Test
+        caches:
+          - npm
+        script:
+          - npm ci
+          - npm ci --prefix mock-server
+          - npm test -- --ci
+    - step: &build-android
+        name: Build Android
+        caches:
+          - npm
+        artifacts:
+          upload:
+            # capture-on: always keeps each artifact even if a later command in
+            # this step fails, so a broken build still leaves its output behind.
+            - name: eas-build-output
+              capture-on: always
+              paths:
+                - eas-build-output.json
+            - name: android-staging-apk
+              capture-on: always
+              paths:
+                - build-artifacts/*.apk
+            - name: eas-app-config
+              capture-on: always
+              paths:
+                - eas-config.json
+        script:
+          - npm ci
+          - export EXPO_NO_TELEMETRY=1
+          - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl jq
+          - npm install -g eas-cli@latest
+          - eas --version
+          - |
+            if [ -z "${EXPO_TOKEN:-}" ]; then
+              echo "EXPO_TOKEN must be configured as a secured Bitbucket repository variable."
+              exit 1
+            fi
+          - |
+            # EAS CLI automatically uses the EXPO_TOKEN environment variable.
+            eas whoami || {
+              echo "Failed to authenticate with EAS. Please check the EXPO_TOKEN repository variable."
+              exit 1
+            }
+          - |
+            echo "Starting EAS build: eas build --platform android --profile staging --non-interactive --json"
+
+            # With --json the structured result goes to stdout while progress logs go to stderr,
+            # so redirecting stdout captures clean JSON we can both archive and parse.
+            eas build --platform android --profile staging --non-interactive --json > eas-build-output.json || {
+              echo "EAS build command failed. Captured output:"
+              cat eas-build-output.json || true
+              exit 1
+            }
+
+            echo "Raw EAS build output:"
+            cat eas-build-output.json
+          - |
+            # eas build --json returns an array of build objects.
+            if jq '.' eas-build-output.json > /dev/null 2>&1; then
+              APP_VERSION=$(jq -r '.[0].appVersion // "unknown"' eas-build-output.json)
+              BUILD_VERSION=$(jq -r '.[0].appBuildVersion // "unknown"' eas-build-output.json)
+              BUILD_ID=$(jq -r '.[0].id // "unknown"' eas-build-output.json)
+              # Prefer the direct application archive URL, fall back to the build page artifact URL.
+              BUILD_URL=$(jq -r '.[0].artifacts.applicationArchiveUrl // .[0].artifacts.buildUrl // ""' eas-build-output.json)
+            else
+              echo "Warning: EAS build output is not valid JSON; cannot parse artifact URL."
+              APP_VERSION="unknown"; BUILD_VERSION="unknown"; BUILD_ID="unknown"; BUILD_URL=""
+            fi
+
+            echo "App version : $APP_VERSION"
+            echo "Build number: $BUILD_VERSION"
+            echo "Build ID    : $BUILD_ID"
+            echo "Artifact URL: $BUILD_URL"
+
+            if [ -n "$BUILD_URL" ]; then
+              mkdir -p build-artifacts
+
+              # Descriptive name, e.g. EasyBuy_staging_1_0_0_42.apk
+              VERSION_UNDERSCORE=$(echo "$APP_VERSION" | tr '.' '_')
+              APK_FILE="build-artifacts/EasyBuy_staging_${VERSION_UNDERSCORE}_${BUILD_VERSION}.apk"
+
+              echo "Downloading build artifact from: $BUILD_URL"
+              curl -fL "$BUILD_URL" -o "$APK_FILE" || {
+                echo "Failed to download build artifact from $BUILD_URL"
+                exit 1
+              }
+
+              echo "Downloaded $APK_FILE ($(du -h "$APK_FILE" | cut -f1))"
+            else
+              echo "No artifact URL in the build output; skipping download."
+            fi
+          - |
+            echo "Exporting configuration: eas config --platform android --profile staging --non-interactive --json"
+
+            # Combines app.json (Expo config) and eas.json (build profile) into one resolved JSON document.
+            eas config --platform android --profile staging --non-interactive --json > eas-config.json || {
+              echo "eas config command failed. Captured output:"
+              cat eas-config.json || true
+              exit 1
+            }
+
+            echo "Resolved configuration:"
+            cat eas-config.json
+    # The binary is built and hosted by EAS, which deletes artifacts after 90 days,
+    # and step artifacts expire after 14 days. When PUBLISH_BUILDS is "yes" this step
+    # makes the build durable and traceable: the build record goes to the workspace
+    # package registry, the binary is archived in Downloads, the commit is tagged,
+    # and a build status links the commit back to the real build on expo.dev.
+    #
+    # Bitbucket Cloud has no Releases object (BCLOUD-11404), so the package version
+    # plus the tag is the closest equivalent to the GitHub release this repo also
+    # publishes.
+    - step: &publish-build-record
+        name: Publish build record
+        script:
+          - |
+            # Later commands load build-record.env and stop if it is absent, which is
+            # what makes the skip below apply to the whole step.
+            rm -f build-record.env
+
+            if [ "${PUBLISH_BUILDS:-}" != "yes" ]; then
+              echo "PUBLISH_BUILDS is not set to 'yes'; skipping publication of the build record."
+              echo "The build outputs remain available as step artifacts for 14 days."
+              exit 0
+            fi
+
+            if [ -z "${BITBUCKET_ACCESS_TOKEN:-}" ]; then
+              echo "BITBUCKET_ACCESS_TOKEN must be configured as a secured Bitbucket repository variable."
+              echo "Create a repository access token with the Repositories read and write scopes."
+              exit 1
+            fi
+
+            APK_FILE=$(ls build-artifacts/*.apk 2>/dev/null | head -n 1 || true)
+            WORKSPACE_SLUG=$(echo "$BITBUCKET_WORKSPACE" | tr '[:upper:]' '[:lower:]')
+
+            node scripts/eas-build-manifest.mjs \
+              --build-output eas-build-output.json \
+              --eas-config eas-config.json \
+              ${APK_FILE:+--apk "$APK_FILE"} \
+              --platform android \
+              --profile staging \
+              --provider bitbucket-pipelines \
+              --commit "$BITBUCKET_COMMIT" \
+              --branch "$BITBUCKET_BRANCH" \
+              --run-url "https://bitbucket.org/$BITBUCKET_REPO_FULL_NAME/pipelines/results/$BITBUCKET_BUILD_NUMBER" \
+              --package-name "@$WORKSPACE_SLUG/easybuy-android-build" \
+              --package-registry "https://npm.apkg.io/$WORKSPACE_SLUG/"
+
+            echo "Build record:"
+            cat build-manifest.json
+          - |
+            . ./build-record.env 2>/dev/null || exit 0
+
+            UPLOAD_URL="https://api.bitbucket.org/2.0/repositories/$BITBUCKET_REPO_OWNER/$BITBUCKET_REPO_SLUG/downloads"
+
+            cd build-record-package
+            TARBALL=$(npm pack --silent)
+
+            # Pipelines injects BITBUCKET_PACKAGES_USERNAME and BITBUCKET_PACKAGES_TOKEN
+            # into every step, so publishing to the workspace registry needs no
+            # configured credentials. The registry wants HTTP basic auth with the
+            # token base64 encoded, which is why the npm-publish pipe cannot be used
+            # here: it only knows how to send a bearer _authToken.
+            REGISTRY_HOST="npm.apkg.io/$(echo "$BITBUCKET_WORKSPACE" | tr '[:upper:]' '[:lower:]')"
+            {
+              echo "//$REGISTRY_HOST/:username=$BITBUCKET_PACKAGES_USERNAME"
+              echo "//$REGISTRY_HOST/:_password=$(echo -n "$BITBUCKET_PACKAGES_TOKEN" | base64 -w 0)"
+            } > .npmrc
+
+            if npm publish; then
+              echo "Published the build record to https://$REGISTRY_HOST/"
+            else
+              # The registry needs a Standard/Premium team-managed workspace. Without
+              # one, keep the same tarball in Downloads so the record is still durable.
+              echo "Registry publish failed; uploading $TARBALL to Downloads instead."
+              curl -fsS -X POST "$UPLOAD_URL" \
+                -H "Authorization: Bearer $BITBUCKET_ACCESS_TOKEN" \
+                --form files=@"$TARBALL" || {
+                echo "Failed to upload $TARBALL"
+                exit 1
+              }
+            fi
+
+            cd ..
+
+            # Packages must not carry binaries, and EAS deletes the real artifact after
+            # 90 days, so the APK is archived in Downloads under its versioned name.
+            if [ -n "$ARCHIVED_ARTIFACT_FILE" ]; then
+              echo "Uploading $ARCHIVED_ARTIFACT_FILE to Downloads"
+              curl -fsS -X POST "$UPLOAD_URL" \
+                -H "Authorization: Bearer $BITBUCKET_ACCESS_TOKEN" \
+                --form files=@"build-artifacts/$ARCHIVED_ARTIFACT_FILE" || {
+                echo "Failed to upload $ARCHIVED_ARTIFACT_FILE"
+                exit 1
+              }
+            fi
+          - |
+            . ./build-record.env 2>/dev/null || exit 0
+
+            # Tag through the REST API rather than git push, so the whole step runs on
+            # one scoped token instead of also needing an SSH key for push-back.
+            cat > tag-request.json <<EOF
+            {"name": "$BUILD_RECORD_TAG", "target": {"hash": "$BITBUCKET_COMMIT"}}
+            EOF
+
+            echo "Creating tag $BUILD_RECORD_TAG on $BITBUCKET_COMMIT"
+            curl -fsS -X POST \
+              "https://api.bitbucket.org/2.0/repositories/$BITBUCKET_REPO_OWNER/$BITBUCKET_REPO_SLUG/refs/tags" \
+              -H "Authorization: Bearer $BITBUCKET_ACCESS_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d @tag-request.json || {
+              echo "Failed to create tag $BUILD_RECORD_TAG (it may already exist)."
+              exit 1
+            }
+          - |
+            . ./build-record.env 2>/dev/null || exit 0
+
+            if [ -z "$EAS_BUILD_PAGE_URL" ]; then
+              echo "No expo.dev build page URL in the build record; skipping the build status link."
+              exit 0
+            fi
+
+            # A build status carries a URL, which is how Bitbucket links a commit and
+            # its pull request to an artifact hosted outside Bitbucket.
+            cat > build-status.json <<EOF
+            {
+              "key": "eas-$APP_PLATFORM-$APP_PROFILE",
+              "state": "SUCCESSFUL",
+              "name": "EAS $APP_PLATFORM $APP_PROFILE $BUILD_RECORD_VERSION",
+              "url": "$EAS_BUILD_PAGE_URL",
+              "description": "EAS build $EAS_BUILD_ID, app $APP_VERSION build $APP_BUILD_NUMBER"
+            }
+            EOF
+
+            echo "Linking commit $BITBUCKET_COMMIT to $EAS_BUILD_PAGE_URL"
+            curl -fsS -X POST \
+              "https://api.bitbucket.org/2.0/repositories/$BITBUCKET_REPO_OWNER/$BITBUCKET_REPO_SLUG/commit/$BITBUCKET_COMMIT/statuses/build" \
+              -H "Authorization: Bearer $BITBUCKET_ACCESS_TOKEN" \
+              -H "Content-Type: application/json" \
+              -d @build-status.json
+
+pipelines:
+  # Runs when a pull request is created or updated, for any source branch.
+  # Lint runs first, then test; a lint failure is reported but does not stop test.
+  pull-requests:
+    "**":
+      - step:
+          <<: *lint
+          on-fail:
+            strategy: ignore
+      - step: *test
+
+  # Runs when a pull request is merged into main or develop (the merge commit is
+  # pushed to the destination branch): lint, then test, then build, then publish.
+  branches:
+    main: &lint-test-build
+      - step: *lint
+      - step: *test
+      - step: *build-android
+      - step: *publish-build-record
+    develop: *lint-test-build
