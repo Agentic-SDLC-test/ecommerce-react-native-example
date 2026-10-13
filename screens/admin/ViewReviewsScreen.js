@@ -16,6 +16,8 @@ import { AntDesign } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import CustomInput from "../../components/CustomInput/";
 import ProgressDialog from "react-native-progress-dialog";
+import RatingStars from "../../components/RatingStars";
+import { formatReviewDate } from "../../utils/reviewHelper";
 
 const ViewReviewsScreen = ({ navigation }) => {
   const [isloading, setIsloading] = useState(false);
@@ -139,15 +141,6 @@ const ViewReviewsScreen = ({ navigation }) => {
     );
   };
 
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "";
-    const d = new Date(dateStr);
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}-${month}-${year}`;
-  };
-
   return (
     <View style={styles.container} testID="view-reviews-screen">
       <ProgressDialog visible={isloading} label={label} />
@@ -209,7 +202,7 @@ const ViewReviewsScreen = ({ navigation }) => {
                   {item.productTitle || "Unknown Product"}
                 </Text>
                 <Text style={styles.reviewDate}>
-                  {formatDate(item.createdAt)}
+                  {formatReviewDate(item.createdAt)}
                 </Text>
               </View>
 
@@ -217,22 +210,25 @@ const ViewReviewsScreen = ({ navigation }) => {
                 <Text style={styles.reviewerName} testID={`view-reviews-item-username-${index}`}>
                   By: {item.user?.name || "Anonymous"}
                 </Text>
-                <View style={styles.starsContainer}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Ionicons
-                      key={star}
-                      name={star <= item.rating ? "star" : "star-outline"}
-                      size={14}
-                      color={star <= item.rating ? "#ffc107" : colors.muted}
-                      style={{ marginRight: 2 }}
-                    />
-                  ))}
-                </View>
+                <RatingStars rating={item.rating} />
+              </View>
+
+              <View style={styles.statusRow}>
+                {!item.visible ? (
+                  <View style={styles.statusChip} testID={`view-reviews-item-hidden-${index}`}>
+                    <Text style={styles.statusChipText}>Hidden</Text>
+                  </View>
+                ) : null}
+                {item.edited ? (
+                  <View style={[styles.statusChip, styles.editedChip]} testID={`view-reviews-item-edited-${index}`}>
+                    <Text style={styles.statusChipText}>Edited</Text>
+                  </View>
+                ) : null}
               </View>
 
               {item.comment ? (
                 <Text style={styles.commentText} testID={`view-reviews-item-comment-${index}`}>
-                  "{item.comment}"
+                  &quot;{item.comment}&quot;
                 </Text>
               ) : null}
 
@@ -347,6 +343,25 @@ const styles = StyleSheet.create({
   },
   starsContainer: {
     flexDirection: "row",
+  },
+  statusRow: {
+    flexDirection: "row",
+    marginBottom: 8,
+  },
+  statusChip: {
+    backgroundColor: colors.danger,
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginRight: 6,
+  },
+  editedChip: {
+    backgroundColor: colors.muted,
+  },
+  statusChipText: {
+    color: colors.white,
+    fontSize: 11,
+    fontWeight: "bold",
   },
   commentText: {
     fontSize: 14,

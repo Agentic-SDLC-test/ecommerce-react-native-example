@@ -51,6 +51,9 @@ jobs:
       - name: Install mock-server dependencies
         run: npm ci --prefix mock-server
 
+      - name: Test mock-server
+        run: npm test --prefix mock-server
+
       - name: Test
         run: npm test -- --ci
 

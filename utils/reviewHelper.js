@@ -18,3 +18,33 @@ export const truncateReviewComment = (comment, maxLength = 100) => {
   if (comment.length <= maxLength) return comment;
   return comment.substring(0, maxLength) + "...";
 };
+
+export const REVIEW_COMMENT_MAX_LENGTH = 500;
+
+export const formatReviewDate = (dateStr) => {
+  if (!dateStr) return "";
+  const d = new Date(dateStr);
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}-${month}-${year}`;
+};
+
+export const formatAverageRating = (avg) => Number(avg || 0).toFixed(1);
+
+export const formatStarsLabel = (rating) => `${rating} out of 5 stars`;
+
+export const buildDistributionRows = (distribution, totalCount) => {
+  const stars = [5, 4, 3, 2, 1];
+  return stars.map((star) => {
+    const count = Number(distribution?.[String(star)]) || 0;
+    const percent = totalCount > 0 ? Math.round((count / totalCount) * 100) : 0;
+    return { stars: star, count, percent };
+  });
+};
+
+export const getReviewAction = ({ isEligible, hasReviewed, myReview }) => {
+  if (myReview) return "edit";
+  if (isEligible && !hasReviewed) return "write";
+  return null;
+};

@@ -294,7 +294,9 @@ let reviews = [
     rating: 5,
     comment: "Incredible quality and fit!",
     visible: true,
-    createdAt: "2026-08-21T12:00:00Z"
+    editedAt: null,
+    createdAt: "2026-08-21T12:00:00Z",
+    updatedAt: "2026-08-21T12:00:00Z"
   },
   {
     _id: "rev002",
@@ -307,9 +309,116 @@ let reviews = [
     rating: 4,
     comment: "Pretty good sound, battery life is amazing.",
     visible: true,
-    createdAt: "2026-08-21T13:00:00Z"
+    editedAt: null,
+    createdAt: "2026-08-21T13:00:00Z",
+    updatedAt: "2026-08-21T13:00:00Z"
   }
 ];
+
+// ─── Review helpers (mirrors backend src/utils/reviewRules.js) ────────────────
+const MAX_COMMENT_LENGTH = 500;
+const RECENT_REVIEWS_LIMIT = 5;
+
+function formatReviewerName(fullName) {
+  if (!fullName) return "Anonymous";
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  const firstName = parts[0];
+  const lastInitial = parts[parts.length - 1][0];
+  return `${firstName} ${lastInitial}.`;
+}
+
+function validateReviewInput({ rating, comment }) {
+  if (typeof rating === "boolean" || Array.isArray(rating) || (typeof rating === "object" && rating !== null)) {
+    return { error: "Rating must be an integer between 1 and 5" };
+  }
+  const numericRating = Number(rating);
+  if (
+    rating === undefined ||
+    rating === null ||
+    rating === "" ||
+    !Number.isInteger(numericRating) ||
+    numericRating < 1 ||
+    numericRating > 5
+  ) {
+    return { error: "Rating must be an integer between 1 and 5" };
+  }
+
+  let normalizedComment = comment;
+  if (normalizedComment === undefined || normalizedComment === null) {
+    normalizedComment = "";
+  } else if (typeof normalizedComment !== "string") {
+    return { error: "Comment must be text" };
+  } else {
+    normalizedComment = normalizedComment.trim();
+  }
+  if (normalizedComment.length > MAX_COMMENT_LENGTH) {
+    return { error: `Comment must be at most ${MAX_COMMENT_LENGTH} characters` };
+  }
+
+  return { rating: numericRating, comment: normalizedComment };
+}
+
+function buildRatingSummary(list) {
+  const distribution = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+  let totalCount = 0;
+  let ratingSum = 0;
+  for (const r of list) {
+    distribution[String(r.rating)] = (distribution[String(r.rating)] || 0) + 1;
+    totalCount += 1;
+    ratingSum += r.rating;
+  }
+  const averageRating = totalCount ? parseFloat((ratingSum / totalCount).toFixed(1)) : 0;
+  return { averageRating, totalCount, distribution };
+}
+
+function toPublicReview(r) {
+  return {
+    _id: r._id,
+    rating: r.rating,
+    comment: r.comment || "",
+    createdAt: r.createdAt,
+    edited: Boolean(r.editedAt),
+    verifiedPurchase: true,
+    user: { name: formatReviewerName(r.user?.name) },
+  };
+}
+
+function toOwnReview(r) {
+  return { ...toPublicReview(r), visible: r.visible };
+}
+
+function toAdminReview(r) {
+  return {
+    _id: r._id,
+    productId: r.productId,
+    productTitle: r.productTitle,
+    user: { _id: r.user?._id, name: r.user?.name },
+    rating: r.rating,
+    comment: r.comment || "",
+    visible: r.visible,
+    edited: Boolean(r.editedAt),
+    editedAt: r.editedAt || null,
+    verifiedPurchase: true,
+    createdAt: r.createdAt,
+    updatedAt: r.updatedAt,
+  };
+}
+
+function getUserFromToken(req) {
+  const token = req.headers["x-auth-token"];
+  if (!token) return null;
+  return users.find((u) => u.token === token) || null;
+}
+
+function isEligibleFor(userId, productId) {
+  return orders.some(
+    (o) =>
+      o.user._id === userId &&
+      o.status === "delivered" &&
+      o.items.some((item) => item.productId._id === productId)
+  );
+}
 
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
 const authMiddleware = (req, res, next) => {
@@ -627,50 +736,36 @@ app.get("/uploads/:filename", (req, res) => {
 app.get("/products/:id/reviews", (req, res) => {
   const { id } = req.params;
 
-  // Verify product exists
-  const productExists = products.some(p => p._id === id);
+  const productExists = products.some((p) => p._id === id);
   if (!productExists) {
     return res.status(404).json({ success: false, message: "Product not found" });
   }
 
-  // Get visible reviews for this product
-  const productReviews = reviews.filter(r => r.productId === id && r.visible === true);
+  const visibleReviews = reviews.filter((r) => r.productId === id && r.visible === true);
+  const summary = buildRatingSummary(visibleReviews);
 
-  // Calculate average rating and total count
-  const totalCount = productReviews.length;
-  const sum = productReviews.reduce((acc, r) => acc + r.rating, 0);
-  const averageRating = totalCount > 0 ? parseFloat((sum / totalCount).toFixed(1)) : 0.0;
+  const sortedReviews = [...visibleReviews].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  const recent = sortedReviews.slice(0, RECENT_REVIEWS_LIMIT).map(toPublicReview);
 
-  // Sort by createdAt descending
-  const sortedReviews = [...productReviews].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
-
-  // If token is provided, check eligibility and if reviewed
   let isEligible = false;
   let hasReviewed = false;
+  let myReview = null;
 
-  const token = req.headers["x-auth-token"];
-  if (token) {
-    const user = users.find(u => u.token === token);
-    if (user) {
-      // Check if user has a delivered order with this productId
-      isEligible = orders.some(o => 
-        o.user._id === user._id && 
-        o.status === "delivered" && 
-        o.items.some(item => item.productId._id === id)
-      );
-
-      // Check if user has already reviewed this product
-      hasReviewed = reviews.some(r => r.productId === id && r.user._id === user._id);
-    }
+  const user = getUserFromToken(req);
+  if (user) {
+    isEligible = isEligibleFor(user._id, id);
+    const mine = reviews.find((r) => r.productId === id && r.user._id === user._id);
+    hasReviewed = Boolean(mine);
+    myReview = mine ? toOwnReview(mine) : null;
   }
 
   res.json({
     success: true,
-    reviews: sortedReviews,
-    averageRating,
-    totalCount,
+    reviews: recent,
+    ...summary,
     isEligible,
-    hasReviewed
+    hasReviewed,
+    myReview,
   });
 });
 
@@ -681,122 +776,161 @@ app.post("/reviews", authMiddleware, (req, res) => {
     return res.status(400).json({ success: false, message: "productId and rating are required" });
   }
 
-  const numericRating = parseInt(rating);
-  if (isNaN(numericRating) || numericRating < 1 || numericRating > 5) {
-    return res.status(400).json({ success: false, message: "Rating must be an integer between 1 and 5" });
+  const validated = validateReviewInput({ rating, comment });
+  if (validated.error) {
+    return res.status(400).json({ success: false, message: validated.error });
   }
 
-  if (comment && comment.length > 500) {
-    return res.status(400).json({ success: false, message: "Comment must be at most 500 characters" });
-  }
-
-  const product = products.find(p => p._id === productId);
+  const product = products.find((p) => p._id === productId);
   if (!product) {
     return res.status(404).json({ success: false, message: "Product not found" });
   }
 
-  const isEligible = orders.some(o => 
-    o.user._id === req.user._id && 
-    o.status === "delivered" && 
-    o.items.some(item => item.productId._id === productId)
-  );
-
+  const isEligible = isEligibleFor(req.user._id, productId);
   if (!isEligible) {
-    return res.status(400).json({ success: false, message: "You are not eligible to review this product" });
+    console.log("review.create_rejected", { productId, userId: req.user._id, reason: "not_eligible" });
+    return res.status(403).json({ success: false, message: "You are not eligible to review this product" });
   }
 
-  const hasReviewed = reviews.some(r => r.productId === productId && r.user._id === req.user._id);
+  const hasReviewed = reviews.some((r) => r.productId === productId && r.user._id === req.user._id);
   if (hasReviewed) {
-    return res.status(400).json({ success: false, message: "You have already reviewed this product" });
+    console.log("review.create_rejected", { productId, userId: req.user._id, reason: "duplicate" });
+    return res.status(409).json({
+      success: false,
+      message: "You have already reviewed this product. Edit your existing review instead.",
+    });
   }
 
+  const now = new Date().toISOString();
   const newReview = {
     _id: `rev-${uuidv4()}`,
     productId,
     productTitle: product.title,
     user: {
       _id: req.user._id,
-      name: req.user.name
+      name: req.user.name,
     },
-    rating: numericRating,
-    comment: comment || "",
+    rating: validated.rating,
+    comment: validated.comment,
     visible: true,
-    createdAt: new Date().toISOString()
+    editedAt: null,
+    createdAt: now,
+    updatedAt: now,
   };
 
   reviews.push(newReview);
-  console.log('Review created for product:', productId);
+  console.log("review.created", { reviewId: newReview._id, productId, userId: req.user._id, rating: newReview.rating });
 
-  res.json({ success: true, message: "Review submitted successfully", data: newReview });
+  res.json({ success: true, message: "Review submitted successfully", data: toOwnReview(newReview) });
+});
+
+app.post("/reviews/:id/update", authMiddleware, (req, res) => {
+  const { id } = req.params;
+  const { rating, comment } = req.body;
+
+  const review = reviews.find((r) => r._id === id);
+  if (!review) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+
+  if (review.user._id !== req.user._id) {
+    return res.status(403).json({ success: false, message: "You can only edit your own review" });
+  }
+
+  const validated = validateReviewInput({ rating, comment });
+  if (validated.error) {
+    return res.status(400).json({ success: false, message: validated.error });
+  }
+
+  const wasVisible = review.visible;
+  review.rating = validated.rating;
+  review.comment = validated.comment;
+  review.editedAt = new Date().toISOString();
+  review.updatedAt = review.editedAt;
+
+  console.log("review.updated", { reviewId: review._id, productId: review.productId, userId: req.user._id, rating: review.rating, wasVisible });
+
+  res.json({ success: true, message: "Review updated successfully", data: toOwnReview(review) });
 });
 
 app.get("/admin/reviews", adminMiddleware, (req, res) => {
-  res.json({ success: true, data: reviews });
+  const sorted = [...reviews].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  res.json({ success: true, message: "all reviews", data: sorted.map(toAdminReview) });
 });
 
 app.post("/admin/reviews/:id/visibility", adminMiddleware, (req, res) => {
   const { id } = req.params;
   const { visible } = req.body;
 
-  if (visible === undefined) {
-    return res.status(400).json({ success: false, message: "visible parameter is required" });
+  if (typeof visible !== "boolean") {
+    return res.status(400).json({ success: false, message: "visible must be a boolean" });
   }
 
-  const review = reviews.find(r => r._id === id);
+  const review = reviews.find((r) => r._id === id);
   if (!review) {
     return res.status(404).json({ success: false, message: "Review not found" });
   }
 
-  review.visible = !!visible;
-  console.log('Admin toggled review visibility:', id, review.visible);
+  review.visible = visible;
+  console.log("review.visibility_changed", { reviewId: id, adminId: req.user._id, visible });
 
-  res.json({ success: true, message: "Visibility updated successfully", data: review });
+  res.json({ success: true, message: "Visibility updated successfully", data: toAdminReview(review) });
 });
 
 app.post("/admin/reviews/:id/delete", adminMiddleware, (req, res) => {
   const { id } = req.params;
 
-  const reviewIndex = reviews.findIndex(r => r._id === id);
+  const reviewIndex = reviews.findIndex((r) => r._id === id);
   if (reviewIndex === -1) {
     return res.status(404).json({ success: false, message: "Review not found" });
   }
 
   reviews.splice(reviewIndex, 1);
-  console.log('Admin deleted review:', id);
+  console.log("review.deleted", { reviewId: id, adminId: req.user._id });
 
   res.json({ success: true, message: "Review deleted successfully" });
 });
 
 // ─── Start server ─────────────────────────────────────────────────────────────
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`\n🚀 EasyBuy Mock Server running at http://localhost:${PORT}`);
-  console.log(`\n📋 Available endpoints:`);
-  console.log(`   POST   /register`);
-  console.log(`   POST   /login`);
-  console.log(`   GET    /products`);
-  console.log(`   POST   /product              (admin)`);
-  console.log(`   POST   /update-product?id=   (admin)`);
-  console.log(`   GET    /delete-product?id=   (admin)`);
-  console.log(`   GET    /categories`);
-  console.log(`   POST   /category             (admin)`);
-  console.log(`   POST   /update-category?id=  (admin)`);
-  console.log(`   GET    /delete-category?id=  (admin)`);
-  console.log(`   GET    /dashboard            (admin)`);
-  console.log(`   GET    /admin/orders         (admin)`);
-  console.log(`   GET    /admin/users          (admin)`);
-  console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
-  console.log(`   GET    /orders               (user)`);
-  console.log(`   POST   /checkout             (user)`);
-  console.log(`   GET    /delete-user?id=`);
-  console.log(`   POST   /reset-password?id=`);
-  console.log(`   POST   /photos/upload`);
-  console.log(`   GET    /uploads/:filename`);
-  console.log(`\n🔑 Test tokens:`);
-  console.log(`   Admin token : mock-admin-token-001`);
-  console.log(`   User token  : mock-user-token-001`);
-  console.log(`\n👤 Test credentials:`);
-  console.log(`   Admin  → email: admin@easybuy.com  | password: admin123`);
-  console.log(`   User   → email: user@easybuy.com   | password: user123\n`);
-});
+if (require.main === module) {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`\n🚀 EasyBuy Mock Server running at http://localhost:${PORT}`);
+    console.log(`\n📋 Available endpoints:`);
+    console.log(`   POST   /register`);
+    console.log(`   POST   /login`);
+    console.log(`   GET    /products`);
+    console.log(`   POST   /product              (admin)`);
+    console.log(`   POST   /update-product?id=   (admin)`);
+    console.log(`   GET    /delete-product?id=   (admin)`);
+    console.log(`   GET    /categories`);
+    console.log(`   POST   /category             (admin)`);
+    console.log(`   POST   /update-category?id=  (admin)`);
+    console.log(`   GET    /delete-category?id=  (admin)`);
+    console.log(`   GET    /dashboard            (admin)`);
+    console.log(`   GET    /admin/orders         (admin)`);
+    console.log(`   GET    /admin/users          (admin)`);
+    console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
+    console.log(`   GET    /orders               (user)`);
+    console.log(`   POST   /checkout             (user)`);
+    console.log(`   GET    /delete-user?id=`);
+    console.log(`   POST   /reset-password?id=`);
+    console.log(`   GET    /products/:id/reviews`);
+    console.log(`   POST   /reviews              (user)`);
+    console.log(`   POST   /reviews/:id/update   (user)`);
+    console.log(`   GET    /admin/reviews        (admin)`);
+    console.log(`   POST   /admin/reviews/:id/visibility  (admin)`);
+    console.log(`   POST   /admin/reviews/:id/delete      (admin)`);
+    console.log(`   POST   /photos/upload`);
+    console.log(`   GET    /uploads/:filename`);
+    console.log(`\n🔑 Test tokens:`);
+    console.log(`   Admin token : mock-admin-token-001`);
+    console.log(`   User token  : mock-user-token-001`);
+    console.log(`\n👤 Test credentials:`);
+    console.log(`   Admin  → email: admin@easybuy.com  | password: admin123`);
+    console.log(`   User   → email: user@easybuy.com   | password: user123\n`);
+  });
+}
+
+module.exports = app;
 
 // Made with Bob

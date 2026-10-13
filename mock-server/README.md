@@ -1,6 +1,6 @@
 # EasyBuy Mock API Server
 
-In-memory Express stand-in for the EasyBuy API. Same paths and `x-auth-token` header as [ecommerce-backend-node-example](https://github.com/Agentic-SDLC-test/ecommerce-backend-node-example). Wishlist routes are on that backend only. Data resets when the process restarts.
+In-memory Express stand-in for the EasyBuy API. Same paths and `x-auth-token` header as [ecommerce-backend-node-example](https://github.com/Agentic-SDLC-test/ecommerce-backend-node-example). Wishlist routes are on that backend only; review routes are served by both, following the same shared contract. Data resets when the process restarts.
 
 ## Setup & Start
 
@@ -10,6 +10,8 @@ npm install       # only needed once
 npm start         # starts server on http://localhost:3002
 # or
 npm run dev       # starts with nodemon (auto-restart on file changes)
+# or
+npm test          # runs the review contract test suite (node:test)
 ```
 
 ## Endpoints
@@ -34,6 +36,12 @@ npm run dev       # starts with nodemon (auto-restart on file changes)
 | POST | `/checkout` | User | Place an order |
 | GET | `/delete-user?id=` | — | Delete a user account |
 | POST | `/reset-password?id=` | — | Update password |
+| GET | `/products/:id/reviews` | — (optional auth) | Rating summary, distribution, recent reviews and (when authenticated) the caller's own review |
+| POST | `/reviews` | User | Submit a review (verified purchasers only, one per product) |
+| POST | `/reviews/:id/update` | User | Edit your own review (visibility stays unchanged) |
+| GET | `/admin/reviews` | Admin | All reviews, visible and hidden |
+| POST | `/admin/reviews/:id/visibility` | Admin | Hide or show a review |
+| POST | `/admin/reviews/:id/delete` | Admin | Permanently delete a review |
 | POST | `/photos/upload` | — | Upload an image |
 | GET | `/uploads/:filename` | — | Serve uploaded images (SVG placeholder if not found) |
 
@@ -79,5 +87,8 @@ The server starts with pre-seeded data:
 - **8 products**: 2 per category
 - **3 users**: 1 admin + 2 regular users
 - **3 orders**: in various statuses (pending, shipped, delivered)
+- **2 reviews**: `rev001` on `prod001` by `user001`, `rev002` on `prod003` by `user002`
+
+Review eligibility fixture: `user001` has a `delivered` order (`order003`) containing `prod007`, so `mock-user-token-001` is eligible to review `prod007`. `user002` has no delivered orders and is not eligible to review anything.
 
 All data is stored in-memory and resets when the server restarts.
