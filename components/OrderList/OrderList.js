@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants";
+import { methodLabel, statusLabel, resolvePaymentStatus } from "../../utils/payment";
 
 function getTime(date) {
   let t = new Date(date);
@@ -80,6 +81,11 @@ const OrderList = ({ item, onPress, testID }) => {
         <Text style={styles.secondaryText} testID={testID ? `${testID}-total` : undefined}>Total Amount : {totalCost}$</Text>
       </View>
       <View style={styles.innerRow}>
+        <Text style={styles.paymentBadge} testID={testID ? `${testID}-payment` : undefined}>
+          {methodLabel(item?.payment_type)} · {statusLabel(resolvePaymentStatus(item))}
+        </Text>
+      </View>
+      <View style={styles.innerRow}>
         <TouchableOpacity style={styles.detailButton} onPress={onPress} testID={testID ? `${testID}-details-btn` : undefined}>
           <Text>Details</Text>
         </TouchableOpacity>
@@ -126,6 +132,12 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.muted,
     fontWeight: "bold",
+  },
+  paymentBadge: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: "bold",
+    marginTop: 4,
   },
   timeDateContainer: {
     display: "flex",
