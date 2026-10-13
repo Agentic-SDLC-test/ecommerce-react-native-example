@@ -13,6 +13,12 @@ import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import StepIndicator from "react-native-step-indicator";
+import {
+  getPaymentMethodLabel,
+  getPaymentStatusDescription,
+  getPaymentStatusLabel,
+  normalizePaymentStatus,
+} from "../../utils/payment";
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -26,6 +32,7 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
   const [statusDisable, setStatusDisable] = useState(false);
   const labels = ["Processing", "Shipping", "Delivery"];
   const [trackingState, setTrackingState] = useState(1);
+  const paymentStatus = normalizePaymentStatus(orderDetail);
   const customStyles = {
     stepIndicatorSize: 25,
     currentStepIndicatorSize: 30,
@@ -181,6 +188,29 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
               labels={labels}
             />
           </View>
+        </View>
+
+        <View style={styles.containerNameContainer}>
+          <View>
+            <Text style={styles.containerNameText} testID="my-order-detail-payment-heading">Payment Details</Text>
+          </View>
+        </View>
+        <View style={styles.orderInfoContainer}>
+          <View style={styles.orderItemContainer}>
+            <Text style={styles.orderItemText}>Method</Text>
+            <Text style={styles.secondarytextSm} testID="my-order-detail-payment-method">
+              {getPaymentMethodLabel(orderDetail?.payment_type)}
+            </Text>
+          </View>
+          <View style={styles.orderItemContainer}>
+            <Text style={styles.orderItemText}>Payment Status</Text>
+            <Text style={styles.secondarytextSm} testID="my-order-detail-payment-status">
+              {getPaymentStatusLabel(paymentStatus)}
+            </Text>
+          </View>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-description">
+            {getPaymentStatusDescription(orderDetail?.payment_type, paymentStatus)}
+          </Text>
         </View>
 
         <View style={styles.containerNameContainer}>
