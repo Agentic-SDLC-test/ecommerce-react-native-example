@@ -1,6 +1,6 @@
 import { StyleSheet, Text, TouchableOpacity, View, Image } from "react-native";
 import React from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import { Ionicons } from "@expo/vector-icons";
 
 const ProductCard = ({

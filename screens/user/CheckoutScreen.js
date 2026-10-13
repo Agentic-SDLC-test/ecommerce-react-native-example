@@ -18,6 +18,7 @@ import { bindActionCreators } from "redux";
 import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import ProgressDialog from "react-native-progress-dialog";
+import { OrderStatus, PaymentType } from "@agentic-sdlc-test/easybuy-api-client/domain";
 
 const CheckoutScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -57,9 +58,9 @@ const CheckoutScreen = ({ navigation, route }) => {
         items: payload,
         amount: totalamount,
         discount: 0,
-        payment_type: "cod",
+        payment_type: PaymentType.COD,
         country: country,
-        status: "pending",
+        status: OrderStatus.PENDING,
         city: city,
         zipcode: zipcode,
         shippingAddress: streetAddress,

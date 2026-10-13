@@ -15,6 +15,7 @@ import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import CustomButton from "../../components/CustomButton";
 import DropDownPicker from "react-native-dropdown-picker";
+import { OrderStatus } from "@agentic-sdlc-test/easybuy-api-client/domain";
 
 const ViewOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -28,9 +29,9 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
   const [value, setValue] = useState(null);
   const [statusDisable, setStatusDisable] = useState(false);
   const [items, setItems] = useState([
-    { label: "Pending", value: "pending" },
-    { label: "Shipped", value: "shipped" },
-    { label: "Delivered", value: "delivered" },
+    { label: "Pending", value: OrderStatus.PENDING },
+    { label: "Shipped", value: OrderStatus.SHIPPED },
+    { label: "Delivered", value: OrderStatus.DELIVERED },
   ]);
 
   //method to convert the time into AM PM format
@@ -88,7 +89,7 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
   useEffect(() => {
     setError("");
     setAlertType("error");
-    if (orderDetail?.status == "delivered") {
+    if (orderDetail?.status == OrderStatus.DELIVERED) {
       setStatusDisable(true);
     } else {
       setStatusDisable(false);

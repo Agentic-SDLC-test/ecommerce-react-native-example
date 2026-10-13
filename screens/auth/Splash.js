@@ -3,6 +3,7 @@ import React, { useEffect } from "react";
 import { colors } from "../../constants";
 import logo from "../../assets/logo/logo_white.png";
 import * as session from "../../utils/session";
+import { UserType } from "@agentic-sdlc-test/easybuy-api-client/domain";
 
 const Splash = ({ navigation }) => {
   const goToLogin = () => {
@@ -16,7 +17,7 @@ const Splash = ({ navigation }) => {
     try {
       const user = await session.getUser();
       if (user) {
-        if (user.userType === "ADMIN") {
+        if (user.userType === UserType.ADMIN) {
           setTimeout(() => {
             navigation.replace("dashboard", { authUser: user }); // navigate to Admin dashboard
           }, 2000);

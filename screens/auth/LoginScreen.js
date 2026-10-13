@@ -18,6 +18,7 @@ import ProgressDialog from "react-native-progress-dialog";
 import ConnectionAlert from "../../components/ConnectionAlert/ConnectionAlert";
 import * as api from "../../api";
 import * as session from "../../utils/session";
+import { validateLogin, UserType } from "@agentic-sdlc-test/easybuy-api-client/domain";
 
 const LoginScreen = ({ navigation }) => {
   const [email, setEmail] = useState("");
@@ -28,28 +29,11 @@ const LoginScreen = ({ navigation }) => {
   //method to validate the user credentials and navigate to Home Screen / Dashboard
   const loginHandle = async () => {
     setIsloading(true);
-    //[check validation] -- Start
-    if (email == "") {
+    const validationError = validateLogin({ email, password });
+    if (validationError) {
       setIsloading(false);
-      return setError("Please enter your email");
+      return setError(validationError);
     }
-    if (password == "") {
-      setIsloading(false);
-      return setError("Please enter your password");
-    }
-    if (!email.includes("@")) {
-      setIsloading(false);
-      return setError("Email is not valid");
-    }
-    if (email.length < 6) {
-      setIsloading(false);
-      return setError("Email is too short");
-    }
-    if (password.length < 6) {
-      setIsloading(false);
-      return setError("Password must be 6 characters long");
-    }
-    //[check validation] -- End
 
     // Authenticate against the backend (real JWT). Works against either the
     // Node backend or the mock-server via the shared /login contract.
@@ -59,7 +43,7 @@ const LoginScreen = ({ navigation }) => {
         const user = result.data;
         await session.setSession(user);
         setIsloading(false);
-        if (user.userType === "ADMIN") {
+        if (user.userType === UserType.ADMIN) {
           navigation.replace("dashboard", { authUser: user });
         } else {
           navigation.replace("tab", { user: user });

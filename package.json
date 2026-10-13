@@ -21,6 +21,7 @@
     ]
   },
   "dependencies": {
+    "@agentic-sdlc-test/easybuy-api-client": "0.1.0",
     "@expo/metro-config": "~55.0.9",
     "@expo/vector-icons": "^15.0.2",
     "@react-native-async-storage/async-storage": "^2.2.0",

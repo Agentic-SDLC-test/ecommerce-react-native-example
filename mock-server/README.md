@@ -58,8 +58,10 @@ Pass the token in the `x-auth-token` header for protected routes.
 
 ## Using with a physical device
 
-The app reads `EXPO_PUBLIC_API_URL` (see `.env.example` in the app root). Simulators can use `http://localhost:3002`. A phone cannot. Set the URL to your machine's LAN IP and restart Expo:
+If you're running the app on a physical device (not a simulator), set `EXPO_PUBLIC_API_URL` to your Mac's LAN address and the mock server port, then restart Expo:
 
+```bash
+EXPO_PUBLIC_API_URL=http://<LAN-IP>:3002
 ```
 EXPO_PUBLIC_API_URL=http://192.168.1.X:3002
 ```
@@ -67,6 +69,8 @@ EXPO_PUBLIC_API_URL=http://192.168.1.X:3002
 Android emulators get `localhost` rewritten to `10.0.2.2` by `api/config.js`.
 
 Find your LAN IP with:
+
+Find your local IP with:
 
 ```bash
 ipconfig getifaddr en0

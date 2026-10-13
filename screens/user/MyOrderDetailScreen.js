@@ -7,12 +7,13 @@ import {
   TouchableOpacity,
 } from "react-native";
 import React, { useState, useEffect } from "react";
-import { colors, network } from "../../constants";
+import { colors } from "../../constants";
 import { Ionicons } from "@expo/vector-icons";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import StepIndicator from "react-native-step-indicator";
+import { OrderStatus } from "@agentic-sdlc-test/easybuy-api-client/domain";
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -82,7 +83,7 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
   useEffect(() => {
     setError("");
     setAlertType("error");
-    if (orderDetail?.status == "delivered") {
+    if (orderDetail?.status == OrderStatus.DELIVERED) {
       setStatusDisable(true);
     } else {
       setStatusDisable(false);
@@ -100,9 +101,9 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
         return (accumulator + object.price) * object.quantity;
       }, 0)
     );
-    if (orderDetail?.status === "pending") {
+    if (orderDetail?.status === OrderStatus.PENDING) {
       setTrackingState(1);
-    } else if (orderDetail?.status === "shipped") {
+    } else if (orderDetail?.status === OrderStatus.SHIPPED) {
       setTrackingState(2);
     } else {
       setTrackingState(3);

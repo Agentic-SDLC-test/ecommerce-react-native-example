@@ -35,8 +35,3 @@ export function getBaseUrl() {
 
   return `http://${defaultHost()}:${DEFAULT_PORT}`;
 }
-
-// Compose the URL for an uploaded image served at /uploads/<filename>.
-export function imageUrl(filename) {
-  return `${getBaseUrl()}/uploads/${filename}`;
-}

@@ -11,6 +11,7 @@ import {
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants";
 import * as api from "../../api";
+import { validateCategory } from "@agentic-sdlc-test/easybuy-api-client/domain";
 import CustomInput from "../../components/CustomInput";
 import CustomButton from "../../components/CustomButton";
 import { Ionicons } from "@expo/vector-icons";
@@ -32,18 +33,11 @@ const EditCategoryScreen = ({ navigation, route }) => {
   //Method to post the data to server to edit the category using API call
   const editCategoryHandle = (id) => {
     setIsloading(true);
-    //[check validations] -- Start
-    if (title == "") {
-      setError("Please enter the product title");
-      setIsloading(false);
-    } else if (description == "") {
-      setError("Please upload the product image");
-      setIsloading(false);
-    } else if (image == null) {
-      setError("Please upload the Catergory image");
+    const validationError = validateCategory({ title, description, image });
+    if (validationError) {
+      setError(validationError);
       setIsloading(false);
     } else {
-      //[check validations] -- End
       api
         .updateCategory(id, { title, image, description })
         .then((result) => {
