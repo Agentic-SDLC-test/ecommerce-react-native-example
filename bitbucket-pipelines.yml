@@ -19,6 +19,7 @@ definitions:
         script:
           - npm ci
           - npm ci --prefix mock-server
+          - npm test --prefix mock-server
           - npm test -- --ci
     - step: &build-android
         name: Build Android

@@ -20,7 +20,14 @@ import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import * as api from "../../api";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
-import { formatReviewerName } from "../../utils/reviewHelper";
+import {
+  formatAverageRating,
+  getReviewAction,
+  REVIEW_COMMENT_MAX_LENGTH,
+} from "../../utils/reviewHelper";
+import RatingStars from "../../components/RatingStars";
+import RatingDistribution from "../../components/RatingDistribution";
+import ReviewCard from "../../components/ReviewCard";
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -46,10 +53,13 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const [reviewsList, setReviewsList] = useState([]);
   const [averageRating, setAverageRating] = useState(0.0);
   const [totalCount, setTotalCount] = useState(0);
+  const [distribution, setDistribution] = useState(null);
   const [isEligible, setIsEligible] = useState(false);
   const [hasReviewed, setHasReviewed] = useState(false);
+  const [myReview, setMyReview] = useState(null);
   const [reviewsLoading, setReviewsLoading] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewModalMode, setReviewModalMode] = useState("write");
 
   // Review submission state
   const [userRating, setUserRating] = useState(0);
@@ -154,8 +164,10 @@ const ProductDetailScreen = ({ navigation, route }) => {
           setReviewsList(result.reviews || []);
           setAverageRating(result.averageRating ?? 0.0);
           setTotalCount(result.totalCount ?? 0);
+          setDistribution(result.distribution ?? null);
           setIsEligible(result.isEligible ?? false);
           setHasReviewed(result.hasReviewed ?? false);
+          setMyReview(result.myReview ?? null);
         }
       })
       .catch((err) => {
@@ -166,7 +178,25 @@ const ProductDetailScreen = ({ navigation, route }) => {
       });
   };
 
-  // method to submit a review
+  // method to open the modal for a new review
+  const openWriteReview = () => {
+    setReviewModalMode("write");
+    setUserRating(0);
+    setUserComment("");
+    setSubmitError("");
+    setShowReviewModal(true);
+  };
+
+  // method to open the modal pre-filled with the caller's own review
+  const openEditReview = () => {
+    setReviewModalMode("edit");
+    setUserRating(myReview?.rating ?? 0);
+    setUserComment(myReview?.comment || "");
+    setSubmitError("");
+    setShowReviewModal(true);
+  };
+
+  // method to submit or edit a review
   const handleSubmitReview = async () => {
     if (userRating < 1 || userRating > 5) {
       setSubmitError("Please select a star rating (1 to 5 stars)");
@@ -174,15 +204,17 @@ const ProductDetailScreen = ({ navigation, route }) => {
     }
     setSubmitError("");
     setSubmittingReview(true);
-    api
-      .submitReview({
-        productId: product?._id,
-        rating: userRating,
-        comment: userComment,
-      })
+    const payload = { rating: userRating, comment: userComment.trim() };
+    const request =
+      reviewModalMode === "edit" && myReview
+        ? api.updateReview(myReview._id, payload)
+        : api.submitReview({ productId: product?._id, ...payload });
+    request
       .then((result) => {
         if (result.success) {
-          setError("Review submitted successfully");
+          setError(
+            reviewModalMode === "edit" ? "Review updated successfully" : "Review submitted successfully"
+          );
           setAlertType("success");
           setShowReviewModal(false);
           setUserRating(0);
@@ -190,6 +222,7 @@ const ProductDetailScreen = ({ navigation, route }) => {
           fetchReviews(); // reload reviews
         } else {
           setSubmitError(result.message || "Failed to submit review");
+          fetchReviews(); // e.g. a 409 flips the entry point to "Edit your review"
         }
       })
       .catch((err) => {
@@ -198,16 +231,6 @@ const ProductDetailScreen = ({ navigation, route }) => {
       .finally(() => {
         setSubmittingReview(false);
       });
-  };
-
-  // Helper to format date
-  const formatDate = (dateStr) => {
-    if (!dateStr) return "";
-    const d = new Date(dateStr);
-    const day = String(d.getDate()).padStart(2, '0');
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const year = d.getFullYear();
-    return `${day}-${month}-${year}`;
   };
 
   //set quantity, avaiableQuantity, product image and fetch wishlist on initial render
@@ -268,21 +291,20 @@ const ProductDetailScreen = ({ navigation, route }) => {
 
             {/* Stars Row and Rating Summary */}
             <View style={styles.ratingSummaryContainer} testID="product-detail-rating-summary">
-              <View style={styles.starsRow}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Ionicons
-                    key={star}
-                    name={star <= Math.round(averageRating) ? "star" : "star-outline"}
-                    size={18}
-                    color={star <= Math.round(averageRating) ? "#ffc107" : colors.muted}
-                    style={{ marginRight: 2 }}
-                  />
-                ))}
-              </View>
+              <RatingStars rating={averageRating} size={18} testID="product-detail-rating-stars" />
               <Text style={styles.ratingText} testID="product-detail-rating-text">
-                {totalCount > 0 ? `${averageRating} / 5 ★ (${totalCount} reviews)` : "No reviews yet"}
+                {totalCount > 0
+                  ? `${formatAverageRating(averageRating)} out of 5 (${totalCount} ${totalCount === 1 ? "review" : "reviews"})`
+                  : "No reviews yet"}
               </Text>
             </View>
+            {totalCount > 0 ? (
+              <RatingDistribution
+                distribution={distribution}
+                totalCount={totalCount}
+                testID="product-detail-distribution"
+              />
+            ) : null}
 
             <View style={styles.infoButtonContainer}>
               <View style={styles.wishlistButtonContainer}>
@@ -314,53 +336,73 @@ const ProductDetailScreen = ({ navigation, route }) => {
               <Text testID="product-detail-description">{product?.description}</Text>
             </View>
 
-            {/* Write Review Button */}
-            {isEligible && !hasReviewed ? (
-              <TouchableOpacity
-                style={styles.writeReviewBtn}
-                onPress={() => setShowReviewModal(true)}
-                testID="product-detail-write-review-btn"
-              >
-                <Text style={styles.writeReviewBtnText}>Write a Review</Text>
-              </TouchableOpacity>
+            {/* Write/Edit Review entry point */}
+            {(() => {
+              const reviewAction = getReviewAction({ isEligible, hasReviewed, myReview });
+              if (reviewAction === "write") {
+                return (
+                  <TouchableOpacity
+                    style={styles.writeReviewBtn}
+                    onPress={openWriteReview}
+                    testID="product-detail-write-review-btn"
+                  >
+                    <Text style={styles.writeReviewBtnText}>Write a Review</Text>
+                  </TouchableOpacity>
+                );
+              }
+              if (reviewAction === "edit") {
+                return (
+                  <TouchableOpacity
+                    style={styles.writeReviewBtn}
+                    onPress={openEditReview}
+                    testID="product-detail-edit-review-btn"
+                  >
+                    <Text style={styles.writeReviewBtnText}>Edit your review</Text>
+                  </TouchableOpacity>
+                );
+              }
+              return null;
+            })()}
+
+            {/* Your review (always visible to its author, even when hidden) */}
+            {myReview ? (
+              <View style={styles.myReviewSectionContainer}>
+                <Text style={styles.reviewsSectionTitle} testID="product-detail-my-review-title">
+                  Your review
+                </Text>
+                <ReviewCard
+                  review={myReview}
+                  testID="product-detail-my-review"
+                  testIDPrefix="product-detail-my-review"
+                >
+                  {myReview.visible === false ? (
+                    <Text
+                      style={styles.hiddenNotice}
+                      testID="product-detail-my-review-hidden-notice"
+                      accessibilityRole="alert"
+                    >
+                      This review is hidden by a moderator and is only visible to you.
+                    </Text>
+                  ) : null}
+                </ReviewCard>
+              </View>
             ) : null}
 
             {/* Customer Reviews List */}
             <View style={styles.reviewsSectionContainer} testID="product-detail-reviews-section">
               <Text style={styles.reviewsSectionTitle} testID="product-detail-reviews-title">Customer Reviews</Text>
-              
+
               {reviewsList.length === 0 ? (
                 <Text style={styles.noReviewsText} testID="product-detail-no-reviews">
                   No reviews yet. Be the first to write one!
                 </Text>
               ) : (
                 reviewsList.slice(0, 5).map((rev) => (
-                  <View key={rev._id} style={styles.reviewCard} testID={`product-detail-review-card-${rev._id}`}>
-                    <View style={styles.reviewHeader}>
-                      <Text style={styles.reviewUser} testID="product-detail-review-username">
-                        {formatReviewerName(rev.user?.name)}
-                      </Text>
-                      <Text style={styles.reviewDate} testID="product-detail-review-date">
-                        {formatDate(rev.createdAt)}
-                      </Text>
-                    </View>
-                    <View style={styles.reviewStarsRow} testID="product-detail-review-stars">
-                      {[1, 2, 3, 4, 5].map((star) => (
-                        <Ionicons
-                          key={star}
-                          name={star <= rev.rating ? "star" : "star-outline"}
-                          size={14}
-                          color={star <= rev.rating ? "#ffc107" : colors.muted}
-                          style={{ marginRight: 2 }}
-                        />
-                      ))}
-                    </View>
-                    {rev.comment ? (
-                      <Text style={styles.reviewComment} testID="product-detail-review-comment">
-                        {rev.comment}
-                      </Text>
-                    ) : null}
-                  </View>
+                  <ReviewCard
+                    key={rev._id}
+                    review={rev}
+                    testID={`product-detail-review-card-${rev._id}`}
+                  />
                 ))
               )}
             </View>
@@ -416,14 +458,19 @@ const ProductDetailScreen = ({ navigation, route }) => {
       >
         <View style={styles.modalBackground}>
           <View style={styles.modalContainer}>
-            <Text style={styles.modalTitle} testID="product-detail-review-modal-title">Write a Review</Text>
-            
+            <Text style={styles.modalTitle} testID="product-detail-review-modal-title">
+              {reviewModalMode === "edit" ? "Edit your review" : "Write a Review"}
+            </Text>
+
             <View style={styles.interactiveStarsContainer}>
               {[1, 2, 3, 4, 5].map((star) => (
                 <TouchableOpacity
                   key={star}
                   onPress={() => setUserRating(star)}
                   testID={`review-modal-star-${star}`}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Rate ${star} out of 5 stars`}
+                  accessibilityState={{ selected: star <= userRating }}
                 >
                   <Ionicons
                     name={star <= userRating ? "star" : "star-outline"}
@@ -440,17 +487,17 @@ const ProductDetailScreen = ({ navigation, route }) => {
               placeholder="Write your review here (optional)..."
               value={userComment}
               onChangeText={(text) => {
-                if (text.length <= 500) {
+                if (text.length <= REVIEW_COMMENT_MAX_LENGTH) {
                   setUserComment(text);
                 }
               }}
               multiline={true}
               numberOfLines={4}
-              maxLength={500}
+              maxLength={REVIEW_COMMENT_MAX_LENGTH}
               testID="product-detail-review-modal-input"
             />
             <Text style={styles.charCounter} testID="product-detail-review-modal-char-counter">
-              {userComment.length} / 500
+              {userComment.length} / {REVIEW_COMMENT_MAX_LENGTH}
             </Text>
 
             {submitError ? (
@@ -709,14 +756,11 @@ const styles = StyleSheet.create({
     marginTop: 5,
     marginBottom: 5,
   },
-  starsRow: {
-    flexDirection: "row",
-    marginRight: 8,
-  },
   ratingText: {
     fontSize: 14,
     color: colors.muted,
     fontWeight: "600",
+    marginLeft: 8,
   },
   writeReviewBtn: {
     backgroundColor: colors.primary,
@@ -752,37 +796,15 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginTop: 10,
   },
-  reviewCard: {
-    backgroundColor: colors.light,
-    padding: 15,
-    borderRadius: 10,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
+  myReviewSectionContainer: {
+    width: "100%",
+    paddingHorizontal: 20,
+    marginTop: 10,
   },
-  reviewHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 5,
-  },
-  reviewUser: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: colors.dark,
-  },
-  reviewDate: {
-    fontSize: 12,
-    color: colors.muted,
-  },
-  reviewStarsRow: {
-    flexDirection: "row",
-    marginBottom: 8,
-  },
-  reviewComment: {
-    fontSize: 14,
-    color: colors.dark,
-    lineHeight: 20,
+  hiddenNotice: {
+    color: colors.danger,
+    fontSize: 13,
+    marginTop: 4,
   },
   modalBackground: {
     flex: 1,
