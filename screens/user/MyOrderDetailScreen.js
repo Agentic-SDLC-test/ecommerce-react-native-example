@@ -13,9 +13,11 @@ import CustomAlert from "../../components/CustomAlert/CustomAlert";
 import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import StepIndicator from "react-native-step-indicator";
+import { displayPayment } from "../../utils/payment";
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
+  const { methodLabel, statusLabel } = displayPayment(orderDetail);
   const [isloading, setIsloading] = useState(false);
   const [label, setLabel] = useState("Loading..");
   const [error, setError] = useState("");
@@ -181,6 +183,23 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
               labels={labels}
             />
           </View>
+        </View>
+
+        <View style={styles.containerNameContainer}>
+          <View>
+            <Text style={styles.containerNameText} testID="my-order-detail-payment-heading">Payment</Text>
+          </View>
+        </View>
+        <View style={styles.orderInfoContainer}>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-method">
+            Payment method: {methodLabel}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-status">
+            Payment status: {statusLabel}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="my-order-detail-payment-note">
+            Payment status is separate from package status.
+          </Text>
         </View>
 
         <View style={styles.containerNameContainer}>

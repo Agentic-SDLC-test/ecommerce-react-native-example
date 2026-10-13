@@ -15,9 +15,11 @@ import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import CustomButton from "../../components/CustomButton";
 import DropDownPicker from "react-native-dropdown-picker";
+import { displayPayment } from "../../utils/payment";
 
 const ViewOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
+  const { methodLabel, statusLabel } = displayPayment(orderDetail);
   const [isloading, setIsloading] = useState(false);
   const [label, setLabel] = useState("Loading..");
   const [error, setError] = useState("");
@@ -179,6 +181,22 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
         </View>
         <View style={styles.containerNameContainer}>
           <View>
+            <Text style={styles.containerNameText} testID="view-order-detail-payment-heading">Payment</Text>
+          </View>
+        </View>
+        <View style={styles.orderInfoContainer}>
+          <Text style={styles.secondarytextSm} testID="view-order-detail-payment-method">
+            Payment method: {methodLabel}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="view-order-detail-payment-status">
+            Payment status: {statusLabel}
+          </Text>
+          <Text style={styles.secondarytextSm} testID="view-order-detail-payment-note">
+            Payment status is separate from package status.
+          </Text>
+        </View>
+        <View style={styles.containerNameContainer}>
+          <View>
             <Text style={styles.containerNameText} testID="view-order-detail-package-heading">Package Details</Text>
           </View>
         </View>
@@ -215,6 +233,9 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
         </View>
         <View style={styles.emptyView}></View>
       </ScrollView>
+      <Text style={styles.fulfillmentCaption} testID="view-order-detail-fulfillment-caption">
+        Package status
+      </Text>
       <View style={styles.bottomContainer}>
         <View>
           <DropDownPicker
@@ -392,5 +413,12 @@ const styles = StyleSheet.create({
   },
   emptyView: {
     height: 20,
+  },
+  fulfillmentCaption: {
+    alignSelf: "flex-start",
+    marginLeft: 10,
+    marginBottom: 4,
+    fontSize: 13,
+    color: colors.muted,
   },
 });
