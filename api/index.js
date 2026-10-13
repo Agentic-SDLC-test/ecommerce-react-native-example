@@ -34,6 +34,12 @@ export const removeFromWishlist = client.removeFromWishlist;
 export const getDashboard = client.getDashboard;
 export const getUsers = client.getUsers;
 export const uploadPhoto = client.uploadPhoto;
+export const getProductReviews = client.getProductReviews;
+export const getMyReview = client.getMyReview;
+export const submitReview = client.submitReview;
+export const getAdminReviews = client.getAdminReviews;
+export const updateReviewVisibility = client.updateReviewVisibility;
+export const deleteReview = client.deleteReview;
 export const imageUrl = (filename) => client.imageUrl(filename);
 
 export { getBaseUrl };

@@ -280,6 +280,70 @@ let orders = [
     createdAt: new Date("2024-01-09T08:00:00Z").toISOString(),
     updatedAt: new Date("2024-01-12T16:00:00Z").toISOString(),
   },
+  {
+    _id: "order004",
+    orderId: "ORD-2024-004",
+    user: {
+      _id: "user002",
+      name: "Jane Smith",
+      email: "jane@easybuy.com",
+    },
+    items: [
+      {
+        productId: {
+          _id: "prod007",
+          title: "Organic Basmati Rice (5kg)",
+        },
+        price: 12.99,
+        quantity: 1,
+      },
+      {
+        productId: {
+          _id: "prod001",
+          title: "Classic White T-Shirt",
+        },
+        price: 19.99,
+        quantity: 1,
+      },
+    ],
+    amount: 32.98,
+    discount: 0,
+    payment_type: "cod",
+    country: "Canada",
+    city: "Vancouver",
+    zipcode: "V6B 1A1",
+    shippingAddress: "456 Oak Avenue",
+    status: "delivered",
+    shippedOn: "2024-01-19",
+    deliveredOn: "2024-01-21",
+    createdAt: new Date("2024-01-18T08:00:00Z").toISOString(),
+    updatedAt: new Date("2024-01-21T16:00:00Z").toISOString(),
+  },
+];
+
+// Reviews reference products/users by id string, mirroring the backend's
+// ObjectId references.
+let reviews = [
+  {
+    _id: "review001",
+    product: "prod007",
+    user: "user002",
+    rating: 4,
+    comment: "Good quality rice, cooks evenly.",
+    isVisible: true,
+    createdAt: new Date("2024-01-22T10:00:00Z").toISOString(),
+    updatedAt: new Date("2024-01-22T10:00:00Z").toISOString(),
+  },
+  {
+    _id: "review002",
+    product: "prod001",
+    user: "user002",
+    rating: 5,
+    comment: "",
+    isVisible: true,
+    createdAt: new Date("2024-01-22T10:05:00Z").toISOString(),
+    updatedAt: new Date("2024-01-22T10:05:00Z").toISOString(),
+  },
 ];
 
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
@@ -304,6 +368,57 @@ const adminMiddleware = (req, res, next) => {
     next();
   });
 };
+
+// ─── Review helpers ────────────────────────────────────────────────────────────
+const RECENT_REVIEWS_LIMIT = 5;
+
+function isVerifiedPurchaser(userId, productId) {
+  return orders.some(
+    (o) =>
+      o.user._id === userId &&
+      o.status === "delivered" &&
+      o.items.some((i) => i.productId._id === productId)
+  );
+}
+
+function buildSummary(productId) {
+  const visible = reviews.filter((r) => r.product === productId && r.isVisible);
+  const distribution = { "1": 0, "2": 0, "3": 0, "4": 0, "5": 0 };
+  let sum = 0;
+  visible.forEach((r) => {
+    distribution[String(r.rating)] += 1;
+    sum += r.rating;
+  });
+  const count = visible.length;
+  return {
+    average: count === 0 ? null : Math.round((sum / count) * 10) / 10,
+    count,
+    distribution,
+  };
+}
+
+function toDisplayName(name) {
+  const trimmed = (name || "").trim();
+  if (!trimmed) return "EasyBuy customer";
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) return parts[0];
+  const lastPart = parts[parts.length - 1];
+  return `${parts[0]} ${lastPart[0].toUpperCase()}.`;
+}
+
+function toPublicReview(review) {
+  const author = users.find((u) => u._id === review.user);
+  return {
+    _id: review._id,
+    rating: review.rating,
+    comment: review.comment,
+    reviewerName: toDisplayName(author?.name),
+    verifiedPurchase: true,
+    createdAt: review.createdAt,
+    updatedAt: review.updatedAt,
+    edited: new Date(review.updatedAt) - new Date(review.createdAt) > 1000,
+  };
+}
 
 // ─── Routes ───────────────────────────────────────────────────────────────────
 
@@ -396,6 +511,7 @@ app.get("/delete-product", adminMiddleware, (req, res) => {
     return res.status(404).json({ success: false, message: "Product not found" });
   }
   products.splice(idx, 1);
+  reviews = reviews.filter((r) => r.product !== id);
   res.json({ success: true, message: "Product deleted successfully" });
 });
 
@@ -498,7 +614,7 @@ app.get("/orders", authMiddleware, (req, res) => {
 
 // POST /checkout  (user: place order)
 app.post("/checkout", authMiddleware, (req, res) => {
-  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress, status } = req.body;
+  const { items, amount, discount, payment_type, country, city, zipcode, shippingAddress } = req.body;
   if (!items || items.length === 0) {
     return res.status(400).json({ success: false, message: "Cart is empty" });
   }
@@ -528,12 +644,177 @@ app.post("/checkout", authMiddleware, (req, res) => {
     city: city || "",
     zipcode: zipcode || "",
     shippingAddress: shippingAddress || "",
-    status: status || "pending",
+    // A verified-purchase review requires an order's delivered status to be
+    // set by an admin, not chosen by the client that creates it.
+    status: "pending",
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
   orders.push(newOrder);
   res.json({ success: true, message: "Order placed successfully", data: newOrder });
+});
+
+// GET /product-reviews?productId=
+app.get("/product-reviews", (req, res) => {
+  const { productId } = req.query;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "productId is required" });
+  }
+  const summary = buildSummary(productId);
+  const recent = reviews
+    .filter((r) => r.product === productId && r.isVisible && r.comment !== "")
+    .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+    .slice(0, RECENT_REVIEWS_LIMIT)
+    .map(toPublicReview);
+  res.json({ success: true, message: "product reviews", data: { summary, reviews: recent } });
+});
+
+// GET /my-review?productId=  (auth)
+app.get("/my-review", authMiddleware, (req, res) => {
+  const { productId } = req.query;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "productId is required" });
+  }
+  const eligible = isVerifiedPurchaser(req.user._id, productId);
+  const review = reviews.find((r) => r.product === productId && r.user === req.user._id) || null;
+  res.json({
+    success: true,
+    message: "my review",
+    data: {
+      eligible,
+      review: review
+        ? {
+            _id: review._id,
+            rating: review.rating,
+            comment: review.comment,
+            isVisible: review.isVisible,
+            createdAt: review.createdAt,
+            updatedAt: review.updatedAt,
+          }
+        : null,
+    },
+  });
+});
+
+// POST /review  (auth)
+app.post("/review", authMiddleware, (req, res) => {
+  const { productId, rating, comment = "" } = req.body;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "productId is required" });
+  }
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return res.status(400).json({ success: false, message: "Rating must be a whole number from 1 to 5" });
+  }
+  if (typeof comment !== "string") {
+    return res.status(400).json({ success: false, message: "Comment must be text" });
+  }
+  const text = comment.trim();
+  if (text.length > 500) {
+    return res.status(400).json({ success: false, message: "Comment must be 500 characters or fewer" });
+  }
+  if (!products.find((p) => p._id === productId)) {
+    return res.status(404).json({ success: false, message: "product does not exist" });
+  }
+  if (!isVerifiedPurchaser(req.user._id, productId)) {
+    return res.status(403).json({
+      success: false,
+      message: "Only customers with a delivered order for this product can review it",
+    });
+  }
+
+  const now = new Date().toISOString();
+  const existing = reviews.find((r) => r.product === productId && r.user === req.user._id);
+  let review;
+  let created;
+  if (existing) {
+    existing.rating = rating;
+    existing.comment = text;
+    existing.updatedAt = now;
+    review = existing;
+    created = false;
+  } else {
+    review = {
+      _id: uuidv4(),
+      product: productId,
+      user: req.user._id,
+      rating,
+      comment: text,
+      isVisible: true,
+      createdAt: now,
+      updatedAt: now,
+    };
+    reviews.push(review);
+    created = true;
+  }
+
+  res.status(created ? 201 : 200).json({
+    success: true,
+    message: created ? "review submitted" : "review updated",
+    data: {
+      _id: review._id,
+      rating: review.rating,
+      comment: review.comment,
+      isVisible: review.isVisible,
+      createdAt: review.createdAt,
+      updatedAt: review.updatedAt,
+    },
+  });
+});
+
+// GET /admin/reviews  (admin)
+app.get("/admin/reviews", adminMiddleware, (req, res) => {
+  const data = [...reviews]
+    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+    .map((r) => {
+      const author = users.find((u) => u._id === r.user);
+      const product = products.find((p) => p._id === r.product);
+      return {
+        _id: r._id,
+        rating: r.rating,
+        comment: r.comment,
+        isVisible: r.isVisible,
+        createdAt: r.createdAt,
+        updatedAt: r.updatedAt,
+        user: author ? { _id: author._id, name: author.name, email: author.email } : null,
+        product: product ? { _id: product._id, title: product.title, image: product.image } : null,
+      };
+    });
+  res.json({ success: true, message: "all reviews", data });
+});
+
+// POST /admin/review-visibility  (admin)
+app.post("/admin/review-visibility", adminMiddleware, (req, res) => {
+  const { reviewId, isVisible } = req.body;
+  if (!reviewId) {
+    return res.status(400).json({ success: false, message: "reviewId is required" });
+  }
+  if (typeof isVisible !== "boolean") {
+    return res.status(400).json({ success: false, message: "isVisible must be true or false" });
+  }
+  const review = reviews.find((r) => r._id === reviewId);
+  if (!review) {
+    return res.status(404).json({ success: false, message: "review does not exist" });
+  }
+  review.isVisible = isVisible;
+  res.json({
+    success: true,
+    message: isVisible ? "review restored" : "review hidden",
+    data: review,
+  });
+});
+
+// POST /admin/delete-review  (admin)
+app.post("/admin/delete-review", adminMiddleware, (req, res) => {
+  const { reviewId } = req.body;
+  if (!reviewId) {
+    return res.status(400).json({ success: false, message: "reviewId is required" });
+  }
+  const idx = reviews.findIndex((r) => r._id === reviewId);
+  if (idx === -1) {
+    return res.status(404).json({ success: false, message: "review does not exist" });
+  }
+  reviews.splice(idx, 1);
+  res.json({ success: true, message: "review deleted successfully" });
 });
 
 // GET /delete-user?id=
@@ -544,6 +825,7 @@ app.get("/delete-user", (req, res) => {
     return res.status(404).json({ success: false, message: "User not found" });
   }
   const deleted = users.splice(idx, 1)[0];
+  reviews = reviews.filter((r) => r.user !== id);
   const { password, token, ...safeUser } = deleted;
   res.json({ success: true, message: "Account deleted successfully", data: safeUser });
 });
@@ -614,6 +896,12 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
   console.log(`   GET    /orders               (user)`);
   console.log(`   POST   /checkout             (user)`);
+  console.log(`   GET    /product-reviews?productId=`);
+  console.log(`   GET    /my-review?productId=         (user)`);
+  console.log(`   POST   /review                       (user)`);
+  console.log(`   GET    /admin/reviews                (admin)`);
+  console.log(`   POST   /admin/review-visibility       (admin)`);
+  console.log(`   POST   /admin/delete-review           (admin)`);
   console.log(`   GET    /delete-user?id=`);
   console.log(`   POST   /reset-password?id=`);
   console.log(`   POST   /photos/upload`);

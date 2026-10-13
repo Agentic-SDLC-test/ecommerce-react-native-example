@@ -1,6 +1,6 @@
 # EasyBuy Mock API Server
 
-In-memory Express stand-in for the EasyBuy API. Same paths and `x-auth-token` header as [ecommerce-backend-node-example](https://github.com/Agentic-SDLC-test/ecommerce-backend-node-example). Wishlist routes are on that backend only. Data resets when the process restarts.
+In-memory Express stand-in for the EasyBuy API. Same paths and `x-auth-token` header as [ecommerce-backend-node-example](https://github.com/Agentic-SDLC-test/ecommerce-backend-node-example). Wishlist routes are on that backend only; review routes are implemented here too. Data resets when the process restarts.
 
 ## Setup & Start
 
@@ -21,7 +21,7 @@ npm run dev       # starts with nodemon (auto-restart on file changes)
 | GET | `/products` | — | List all products |
 | POST | `/product` | Admin | Add a product |
 | POST | `/update-product?id=` | Admin | Update a product |
-| GET | `/delete-product?id=` | Admin | Delete a product |
+| GET | `/delete-product?id=` | Admin | Delete a product (also purges its reviews) |
 | GET | `/categories` | — | List all categories |
 | POST | `/category` | Admin | Add a category |
 | POST | `/update-category?id=` | Admin | Update a category |
@@ -32,7 +32,13 @@ npm run dev       # starts with nodemon (auto-restart on file changes)
 | GET | `/admin/order-status?orderId=&status=` | Admin | Update order status |
 | GET | `/orders` | User | Current user's orders |
 | POST | `/checkout` | User | Place an order |
-| GET | `/delete-user?id=` | — | Delete a user account |
+| GET | `/product-reviews?productId=` | — | Rating summary and recent reviews for a product |
+| GET | `/my-review?productId=` | User | Caller's eligibility and own review for a product |
+| POST | `/review` | User | Submit or edit a review (delivered-order customers only) |
+| GET | `/admin/reviews` | Admin | All reviews, visible and hidden |
+| POST | `/admin/review-visibility` | Admin | Hide or restore a review |
+| POST | `/admin/delete-review` | Admin | Permanently delete a review |
+| GET | `/delete-user?id=` | — | Delete a user account (also purges their reviews) |
 | POST | `/reset-password?id=` | — | Update password |
 | POST | `/photos/upload` | — | Upload an image |
 | GET | `/uploads/:filename` | — | Serve uploaded images (SVG placeholder if not found) |
@@ -82,6 +88,7 @@ The server starts with pre-seeded data:
 - **4 categories**: Garments, Electronics, Cosmetics, Groceries
 - **8 products**: 2 per category
 - **3 users**: 1 admin + 2 regular users
-- **3 orders**: in various statuses (pending, shipped, delivered)
+- **4 orders**: in various statuses (pending, shipped, delivered)
+- **2 reviews**: seeded on the delivered `order004` so the review feature can be demonstrated without writing one first
 
 All data is stored in-memory and resets when the server restarts.
