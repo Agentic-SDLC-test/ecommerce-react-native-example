@@ -9,6 +9,12 @@ definitions:
         caches:
           - npm
         script:
+          - &npm-auth |
+            if [ -z "${GH_TOKEN:-}" ]; then
+              echo "GH_TOKEN must be configured as a secured repository variable with the read:packages scope."
+              exit 1
+            fi
+            printf '%s\n' '//npm.pkg.github.com/:_authToken=${GH_TOKEN}' >> .npmrc
           - npm ci
           - export EXPO_NO_TELEMETRY=1
           - npm run lint
@@ -17,6 +23,7 @@ definitions:
         caches:
           - npm
         script:
+          - *npm-auth
           - npm ci
           - npm ci --prefix mock-server
           - npm test -- --ci
@@ -41,6 +48,7 @@ definitions:
               paths:
                 - eas-config.json
         script:
+          - *npm-auth
           - npm ci
           - export EXPO_NO_TELEMETRY=1
           - apt-get update && apt-get install -y --no-install-recommends ca-certificates curl jq

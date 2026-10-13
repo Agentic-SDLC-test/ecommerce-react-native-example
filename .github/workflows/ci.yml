@@ -16,6 +16,10 @@ jobs:
   lint:
     name: Lint
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      actions: write # setup-node npm cache
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -25,9 +29,13 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: "@agentic-sdlc-test"
 
       - name: Install dependencies
         run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Lint
         run: npm run lint
@@ -35,6 +43,10 @@ jobs:
   test:
     name: Test
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      actions: write # setup-node npm cache
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
@@ -44,9 +56,13 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: "@agentic-sdlc-test"
 
       - name: Install dependencies
         run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Install mock-server dependencies
         run: npm ci --prefix mock-server
@@ -74,9 +90,13 @@ jobs:
         with:
           node-version: 20
           cache: npm
+          registry-url: https://npm.pkg.github.com
+          scope: "@agentic-sdlc-test"
 
       - name: Install dependencies
         run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GH_TOKEN }}
 
       - name: Setup EAS CLI
         run: |
