@@ -1,13 +1,13 @@
 # EasyBuy Mock API Server
 
-A local Express.js mock server that replicates all API endpoints used by the EasyBuy React Native app.
+In-memory Express stand-in for the EasyBuy API. Same paths and `x-auth-token` header as [ecommerce-backend-node-example](https://github.com/Agentic-SDLC-test/ecommerce-backend-node-example). Wishlist routes are on that backend only. Data resets when the process restarts.
 
 ## Setup & Start
 
 ```bash
 cd mock-server
 npm install       # only needed once
-npm start         # starts server on http://localhost:3001
+npm start         # starts server on http://localhost:3002
 # or
 npm run dev       # starts with nodemon (auto-restart on file changes)
 ```
@@ -56,13 +56,19 @@ Pass the token in the `x-auth-token` header for protected routes.
 | User | `user@easybuy.com` | `user123` |
 | User | `jane@easybuy.com` | `jane123` |
 
-## Using with a Physical Device
+## Using with a physical device
 
 If you're running the app on a physical device (not a simulator), set `EXPO_PUBLIC_API_URL` to your Mac's LAN address and the mock server port, then restart Expo:
 
 ```bash
 EXPO_PUBLIC_API_URL=http://<LAN-IP>:3002
 ```
+EXPO_PUBLIC_API_URL=http://192.168.1.X:3002
+```
+
+Android emulators get `localhost` rewritten to `10.0.2.2` by `api/config.js`.
+
+Find your LAN IP with:
 
 Find your local IP with:
 
