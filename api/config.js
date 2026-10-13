@@ -1,8 +1,8 @@
 import { Platform } from "react-native";
 
 // Default target when EXPO_PUBLIC_API_URL is not set: the local mock-server.
-// The real Node backend listens on :3000, the mock-server on :3002 — set
-// EXPO_PUBLIC_API_URL to point at whichever you want (e.g. http://localhost:3000).
+// The Node backend and the mock-server both default to :3002. Run one, or
+// move the other and set EXPO_PUBLIC_API_URL (e.g. http://localhost:3002).
 const DEFAULT_PORT = 3002;
 
 // Android emulators reach the host machine through the 10.0.2.2 loopback,

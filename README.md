@@ -1,90 +1,105 @@
-# React-Native Ecommerce App
+# EasyBuy
 
-# Hi, We are Team Charlie! 👋
+Expo React Native ecommerce app for iOS, Android, and web. Screens call one HTTP contract. Point that contract at the in-repo mock server or the Node backend.
 
-[![Up to Date](https://github.com/ikatyang/emoji-cheat-sheet/workflows/Up%20to%20Date/badge.svg)](https://github.com/UsamaSarwar/reactnative-ecommerce-charlie)
+## Stack
 
-## `Development Stack` ➡️ `MERN Stack`
+- Expo SDK 55, React Native 0.83, React 19
+- React Navigation (native stack and bottom tabs)
+- Redux
 
-### `Backend on NodeJs` ➡️ [https://github.com/abidrazaa/backend-node](https://github.com/abidrazaa/backend-node)
+## Related repositories
 
-Open-Source React Native Ecommerce Cross Platform Mobile App :iphone:
+### Backend
 
-## Mockups
+[ecommerce-backend-node-example](https://github.com/Agentic-SDLC-test/ecommerce-backend-node-example) is the Express + MongoDB API. Default port **3002**. Swagger UI at `/api-docs`.
 
-<img align="left" alt="EasyBuy" src="image/easybuy.png" width="1000"/>
-
-.
-
-
-## Features :memo:
-
-- [x] Stack Naviagtion
-- [x] Splash Screen
-- [x] Login Screen
-- [x] Signup Screen
-- [x] Forget Screen
-- [x] User Profile Screen
-- [x] My Account Screen
-- [x] Update Password Screen
-- [x] Admin Login
-- [x] Admin Dashboard
-- [x] Admin Add Product
-- [x] Admin View Product
-- [x] Admin Edit Product
-- [x] Cart Screen
-- [x] Checkout Screen
-
-## How to Run App :white_check_mark:
-
-### `Clone the repo`
-
-To clone this repo, type the following command
-
-```
-git clone https://github.com/UsamaSarwar/reactnative-ecommerce-charlie.git
+```bash
+git clone https://github.com/Agentic-SDLC-test/ecommerce-backend-node-example
+cd ecommerce-backend-node-example
+npm install
+cp .env.example .env   # set DB_CON_STRING and TOKEN_KEY
+npm run dev
 ```
 
-### `Node Package Manager`
+The backend and the mock server both bind **3002**. Run one of them, or change one `PORT` and set `EXPO_PUBLIC_API_URL` to match.
 
-To install all the dependencies, use node package manager and run the command
+### API client
 
-```
-npm i
-```
+[`@agentic-sdlc-test/easybuy-api-client`](https://github.com/Agentic-SDLC-test/easybuy-api-client) is the shared client for that contract. Published to GitHub Packages. This app's `api/` module speaks the same contract in-repo. Import the package when you want the typed client.
 
-### `npm start`
-
-Runs your app in development mode.
-
-Open it in the [Expo app](https://expo.io) on your phone to view it. It will reload if you save edits to your files, and you will see build errors and logs in the terminal.
-
-Sometimes you may need to reset or clear the React Native packager's cache. To do so, you can pass the `--reset-cache` flag to the start script:
+`.npmrc`:
 
 ```
-npm start -- --reset-cache
-# or
-yarn start -- --reset-cache
+@agentic-sdlc-test:registry=https://npm.pkg.github.com
 ```
 
-# v22.07.28
+```bash
+npm install @agentic-sdlc-test/easybuy-api-client
+```
 
-The demonstration of Signup flow and the flow of login from normal user and admin can be seen from [here](https://drive.google.com/drive/folders/1jnFENm2_fdwvpfrqEZxrqx9pOThvSMa3)
+```js
+import { createClient } from "@agentic-sdlc-test/easybuy-api-client";
+import { UserType, validateLogin } from "@agentic-sdlc-test/easybuy-api-client/domain";
 
-The demonstration of the app can be seen from [here](https://drive.google.com/drive/folders/1PNyGSzUDNxUtrmtVk9bp8Lp82INrSct-)
+const client = createClient({
+  baseUrl: "http://localhost:3002",
+  getToken: async () => token,
+  onUnauthorized: () => {},
+});
+```
 
-# Documentation
+`createClient` sends the JWT in `x-auth-token`. A body of `{ err: "jwt expired" }` is treated as logout.
 
-The complete documentation of the project i.e. Software Requirement Specifications, Technologies used can be seen from [here](https://docs.google.com/document/d/1I253JrdKuB3wEQxKVfp_DK8Kuxfb8WrvGbtDqrCsHEc)
+## Mock server
 
-The mockup designs of the application can be seen from [here](https://docs.google.com/presentation/d/1Imw0qHmIPhe_0FL_rpanTAoip-ps9dP-YuZRfTybnIM/edit#slide=id.gc6fa3c898_0_0)
+[`mock-server/`](mock-server/README.md) is an in-memory Express stand-in. Same paths and `x-auth-token` header as the Node API. Data resets when the process restarts. Wishlist routes are on the Node backend only.
 
-# Presentation
+```bash
+cd mock-server
+npm install
+npm start          # http://localhost:3002
+# npm run dev      # nodemon
+```
 
-The presentation of the Mockups can be seen from [here](https://www.youtube.com/watch?v=vgdUdXEXILA)
+Seeded logins:
 
-## Thanks to all the contributors ❤️
+| Role | Email | Password |
+|------|-------|----------|
+| Admin | `admin@easybuy.com` | `admin123` |
+| User | `user@easybuy.com` | `user123` |
 
-<a href = "https://github.com/UsamaSarwar/reactnative-ecommerce-charlie">
-  <img src = "https://contrib.rocks/image?repo=UsamaSarwar/reactnative-ecommerce-charlie"/>
-</a>
+## Run the app
+
+Node 20.
+
+```bash
+git clone https://github.com/Agentic-SDLC-test/ecommerce-react-native-example.git
+cd ecommerce-react-native-example
+npm install
+cp .env.example .env
+npm start
+```
+
+`.env.example` sets `EXPO_PUBLIC_API_URL` to `http://localhost:3002`. With no env var, the app uses that same host and port (`10.0.2.2` on Android emulators). A phone cannot reach `localhost`. Set the URL to your machine's LAN IP and restart Expo.
+
+```bash
+npm run ios
+npm run android
+npm run web
+npm test
+npm run lint
+```
+
+Reset the Metro cache with `npm start -- --reset-cache`.
+
+## Features
+
+- Auth: splash, login, signup, forgot password, update password
+- Shop: home, categories, product detail, cart, checkout
+- Account: profile, orders, wishlist
+- Admin: dashboard, products, categories, orders, users
+
+## License
+
+MIT
