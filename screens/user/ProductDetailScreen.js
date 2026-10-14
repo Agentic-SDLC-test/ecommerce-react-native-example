@@ -5,6 +5,7 @@ import {
   View,
   StatusBar,
   Text,
+  ScrollView,
 } from "react-native";
 import React, { useState, useEffect } from "react";
 import { Ionicons } from "@expo/vector-icons";
@@ -16,6 +17,7 @@ import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import * as api from "../../api";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import ReviewSection from "../../components/ReviewSection";
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -37,6 +39,38 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const [error, setError] = useState("");
   const [isDisable, setIsDisbale] = useState(true);
   const [alertType, setAlertType] = useState("error");
+  const [reviewData, setReviewData] = useState(null);
+  const [myReview, setMyReview] = useState(null);
+  const [reviewsError, setReviewsError] = useState(false);
+
+  //method to fetch the rating summary, recent reviews, and the caller's own review
+  const fetchReviews = () => {
+    api
+      .getProductReviews(product?._id)
+      .then((result) => {
+        if (result.success) {
+          setReviewData(result.data);
+          setReviewsError(false);
+        } else {
+          setReviewsError(true);
+        }
+      })
+      .catch((error) => {
+        setReviewsError(true);
+        console.log("error", error);
+      });
+
+    api
+      .getMyReview(product?._id)
+      .then((result) => {
+        if (result.success) {
+          setMyReview(result.data);
+        }
+      })
+      .catch((error) => {
+        console.log("error", error);
+      });
+  };
 
   //method to fetch wishlist from server using API call
   const fetchWishlist = async () => {
@@ -133,6 +167,12 @@ const ProductDetailScreen = ({ navigation, route }) => {
     fetchWishlist();
   }, []);
 
+  //refresh the review summary whenever this screen regains focus (e.g. after writing a review)
+  useEffect(() => {
+    const unsubscribe = navigation.addListener("focus", fetchReviews);
+    return unsubscribe;
+  }, [navigation]);
+
   //render whenever the value of wishlistItems change
   useEffect(() => {}, [wishlistItems]);
 
@@ -176,38 +216,54 @@ const ProductDetailScreen = ({ navigation, route }) => {
         <CustomAlert message={error} type={alertType} testID="product-detail-alert" />
         <View style={styles.productInfoContainer}>
           <View style={styles.productInfoTopContainer}>
-            <View style={styles.productNameContaier}>
-              <Text style={styles.productNameText} testID="product-detail-title">{product?.title}</Text>
-            </View>
-            <View style={styles.infoButtonContainer}>
-              <View style={styles.wishlistButtonContainer}>
-                <TouchableOpacity
-                  testID="product-detail-wishlist-btn"
-                  disabled={isDisable}
-                  style={styles.iconContainer}
-                  onPress={() => handleWishlistBtn()}
-                >
-                  {onWishlist == false ? (
-                    <Ionicons name="heart" size={25} color={colors.muted} />
-                  ) : (
-                    <Ionicons name="heart" size={25} color={colors.danger} />
-                  )}
-                </TouchableOpacity>
+            <ScrollView
+              testID="product-detail-scroll"
+              style={{ width: "100%" }}
+              contentContainerStyle={{ alignItems: "center" }}
+              showsVerticalScrollIndicator={false}
+            >
+              <View style={styles.productNameContaier}>
+                <Text style={styles.productNameText} testID="product-detail-title">{product?.title}</Text>
               </View>
-            </View>
-            <View style={styles.productDetailContainer}>
-              <View style={styles.productSizeOptionContainer}>
-                {/* <Text style={styles.secondaryTextSm}>Size:</Text> */}
+              <View style={styles.infoButtonContainer}>
+                <View style={styles.wishlistButtonContainer}>
+                  <TouchableOpacity
+                    testID="product-detail-wishlist-btn"
+                    disabled={isDisable}
+                    style={styles.iconContainer}
+                    onPress={() => handleWishlistBtn()}
+                  >
+                    {onWishlist == false ? (
+                      <Ionicons name="heart" size={25} color={colors.muted} />
+                    ) : (
+                      <Ionicons name="heart" size={25} color={colors.danger} />
+                    )}
+                  </TouchableOpacity>
+                </View>
               </View>
-              <View style={styles.productPriceContainer}>
-                <Text style={styles.secondaryTextSm} testID="product-detail-price-label">Price:</Text>
-                <Text style={styles.primaryTextSm} testID="product-detail-price">{product?.price}$</Text>
+              <View style={styles.productDetailContainer}>
+                <View style={styles.productSizeOptionContainer}>
+                  {/* <Text style={styles.secondaryTextSm}>Size:</Text> */}
+                </View>
+                <View style={styles.productPriceContainer}>
+                  <Text style={styles.secondaryTextSm} testID="product-detail-price-label">Price:</Text>
+                  <Text style={styles.primaryTextSm} testID="product-detail-price">{product?.price}$</Text>
+                </View>
               </View>
-            </View>
-            <View style={styles.productDescriptionContainer}>
-              <Text style={styles.secondaryTextSm} testID="product-detail-description-label">Description:</Text>
-              <Text testID="product-detail-description">{product?.description}</Text>
-            </View>
+              <View style={styles.productDescriptionContainer}>
+                <Text style={styles.secondaryTextSm} testID="product-detail-description-label">Description:</Text>
+                <Text testID="product-detail-description">{product?.description}</Text>
+              </View>
+              <ReviewSection
+                summary={reviewData?.summary}
+                reviews={reviewData?.reviews || []}
+                myReview={myReview}
+                loadError={reviewsError}
+                onWritePress={() =>
+                  navigation.navigate("writereview", { product, review: myReview?.review ?? null })
+                }
+              />
+            </ScrollView>
           </View>
           <View style={styles.productInfoBottomContainer}>
             <View style={styles.counterContainer}>
