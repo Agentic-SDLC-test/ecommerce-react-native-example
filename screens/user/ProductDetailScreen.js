@@ -5,8 +5,10 @@ import {
   View,
   StatusBar,
   Text,
+  ScrollView,
 } from "react-native";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { useFocusEffect } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import cartIcon from "../../assets/icons/cart_beg.png";
 import { colors } from "../../constants";
@@ -16,6 +18,11 @@ import { bindActionCreators } from "redux";
 import * as actionCreaters from "../../states/actionCreaters/actionCreaters";
 import * as api from "../../api";
 import CustomAlert from "../../components/CustomAlert/CustomAlert";
+import ReviewSummary from "../../components/ReviewSummary";
+import ReviewList from "../../components/ReviewList";
+import StarRating from "../../components/StarRating";
+import { eligibilityMessage } from "../../utils/reviews";
+import { ReviewEligibility } from "@agentic-sdlc-test/easybuy-api-client/domain";
 
 const ProductDetailScreen = ({ navigation, route }) => {
   const { product } = route.params;
@@ -37,6 +44,9 @@ const ProductDetailScreen = ({ navigation, route }) => {
   const [error, setError] = useState("");
   const [isDisable, setIsDisbale] = useState(true);
   const [alertType, setAlertType] = useState("error");
+  const [reviewData, setReviewData] = useState(null);
+  const [myReview, setMyReview] = useState(null);
+  const [eligibility, setEligibility] = useState(null);
 
   //method to fetch wishlist from server using API call
   const fetchWishlist = async () => {
@@ -136,6 +146,43 @@ const ProductDetailScreen = ({ navigation, route }) => {
   //render whenever the value of wishlistItems change
   useEffect(() => {}, [wishlistItems]);
 
+  //method to fetch the rating summary and recent written reviews for this product
+  const fetchReviews = () => {
+    api
+      .getProductReviews(product?._id, { limit: 5 })
+      .then((result) => {
+        if (result.success) {
+          setReviewData(result.data);
+        }
+      })
+      .catch((error) => {
+        console.log("error", error);
+      });
+  };
+
+  //method to fetch the caller's own review and eligibility for this product
+  const fetchMyReview = () => {
+    api
+      .getMyReview(product?._id)
+      .then((result) => {
+        if (result.success) {
+          setEligibility(result.data.eligibility);
+          setMyReview(result.data.review);
+        }
+      })
+      .catch((error) => {
+        console.log("error", error);
+      });
+  };
+
+  //refresh reviews and the caller's own review every time this screen regains focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchReviews();
+      fetchMyReview();
+    }, [product?._id])
+  );
+
   return (
     <View style={styles.container} testID="product-detail-screen">
       <StatusBar testID="product-detail-status-bar"></StatusBar>
@@ -175,6 +222,11 @@ const ProductDetailScreen = ({ navigation, route }) => {
         </View>
         <CustomAlert message={error} type={alertType} testID="product-detail-alert" />
         <View style={styles.productInfoContainer}>
+          <ScrollView
+            testID="product-detail-info-scroll"
+            style={{ width: "100%" }}
+            showsVerticalScrollIndicator={false}
+          >
           <View style={styles.productInfoTopContainer}>
             <View style={styles.productNameContaier}>
               <Text style={styles.productNameText} testID="product-detail-title">{product?.title}</Text>
@@ -208,7 +260,77 @@ const ProductDetailScreen = ({ navigation, route }) => {
               <Text style={styles.secondaryTextSm} testID="product-detail-description-label">Description:</Text>
               <Text testID="product-detail-description">{product?.description}</Text>
             </View>
+            <View style={styles.reviewsSectionContainer} testID="product-detail-reviews-section">
+              <Text style={styles.reviewsHeading}>Ratings &amp; Reviews</Text>
+              <ReviewSummary summary={reviewData?.summary} testID="product-detail-review-summary" />
+              {reviewData?.reviews?.map((item, index) => (
+                <ReviewList key={item._id} review={item} testID={`product-detail-review-${index}`} />
+              ))}
+              {reviewData?.summary?.count > 0 && reviewData?.writtenCount === 0 && (
+                <Text style={styles.noWrittenReviewsText} testID="product-detail-no-written-reviews">
+                  No written reviews yet.
+                </Text>
+              )}
+              {reviewData?.writtenCount > 0 && (
+                <TouchableOpacity
+                  testID="product-detail-see-all-reviews-btn"
+                  onPress={() => navigation.navigate("productreviews", { product })}
+                >
+                  <Text style={styles.seeAllReviewsText}>
+                    See all reviews ({reviewData.writtenCount})
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <View style={styles.reviewCtaContainer} testID="product-detail-review-cta">
+                {eligibility === ReviewEligibility.ELIGIBLE && !myReview && (
+                  <CustomButton
+                    testID="product-detail-write-review-btn"
+                    text={"Write a review"}
+                    onPress={() =>
+                      navigation.navigate("writereview", {
+                        productId: product?._id,
+                        productTitle: product?.title,
+                      })
+                    }
+                  />
+                )}
+                {eligibility === ReviewEligibility.ELIGIBLE && myReview && (
+                  <View testID="product-detail-my-review">
+                    <View style={styles.myRatingRow} testID="product-detail-my-rating">
+                      <Text style={styles.myRatingLabel}>Your rating:</Text>
+                      <StarRating rating={myReview.rating} size={16} />
+                    </View>
+                    {myReview.hidden && (
+                      <Text style={styles.hiddenNoteText} testID="product-detail-hidden-note">
+                        Hidden by the store
+                      </Text>
+                    )}
+                    <CustomButton
+                      testID="product-detail-edit-review-btn"
+                      text={"Edit your review"}
+                      onPress={() =>
+                        navigation.navigate("writereview", {
+                          productId: product?._id,
+                          productTitle: product?.title,
+                        })
+                      }
+                    />
+                  </View>
+                )}
+                {eligibility === ReviewEligibility.NOT_DELIVERED && (
+                  <Text style={styles.eligibilityMessageText} testID="product-detail-not-delivered-msg">
+                    {eligibilityMessage(ReviewEligibility.NOT_DELIVERED)}
+                  </Text>
+                )}
+                {eligibility === ReviewEligibility.NOT_PURCHASED && (
+                  <Text style={styles.eligibilityMessageText} testID="product-detail-not-purchased-msg">
+                    {eligibilityMessage(ReviewEligibility.NOT_PURCHASED)}
+                  </Text>
+                )}
+              </View>
+            </View>
           </View>
+          </ScrollView>
           <View style={styles.productInfoBottomContainer}>
             <View style={styles.counterContainer}>
               <View style={styles.counter}>
@@ -465,5 +587,53 @@ const styles = StyleSheet.create({
     color: colors.white,
     fontWeight: "bold",
     fontSize: 10,
+  },
+  reviewsSectionContainer: {
+    width: "100%",
+    paddingLeft: 20,
+    paddingRight: 20,
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  reviewsHeading: {
+    fontSize: 18,
+    fontWeight: "800",
+    color: colors.dark,
+    marginBottom: 10,
+  },
+  noWrittenReviewsText: {
+    color: colors.muted,
+    fontSize: 13,
+    marginTop: 10,
+  },
+  seeAllReviewsText: {
+    color: colors.primary,
+    fontSize: 14,
+    fontWeight: "700",
+    marginTop: 10,
+  },
+  reviewCtaContainer: {
+    marginTop: 15,
+  },
+  myRatingRow: {
+    display: "flex",
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  myRatingLabel: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: colors.dark,
+    marginRight: 8,
+  },
+  hiddenNoteText: {
+    color: colors.muted,
+    fontSize: 12,
+    marginBottom: 10,
+  },
+  eligibilityMessageText: {
+    color: colors.muted,
+    fontSize: 13,
   },
 });

@@ -70,6 +70,9 @@ jobs:
       - name: Test
         run: npm test -- --ci
 
+      - name: Test mock server
+        run: npm test --prefix mock-server
+
   build-android:
     name: Build Android
     runs-on: ubuntu-latest

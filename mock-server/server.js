@@ -6,6 +6,7 @@ const { v4: uuidv4 } = require("uuid");
 
 const app = express();
 const PORT = 3002;
+const REVIEW_TEXT_MAX = 500;
 
 app.use(cors());
 app.use(express.json());
@@ -280,7 +281,183 @@ let orders = [
     createdAt: new Date("2024-01-09T08:00:00Z").toISOString(),
     updatedAt: new Date("2024-01-12T16:00:00Z").toISOString(),
   },
+  {
+    _id: "order004",
+    orderId: "ORD-2024-004",
+    user: {
+      _id: "user002",
+      name: "Jane Smith",
+      email: "jane@easybuy.com",
+    },
+    items: [
+      {
+        productId: {
+          _id: "prod007",
+          title: "Organic Basmati Rice (5kg)",
+        },
+        price: 12.99,
+        quantity: 1,
+      },
+      {
+        productId: {
+          _id: "prod001",
+          title: "Classic White T-Shirt",
+        },
+        price: 19.99,
+        quantity: 1,
+      },
+      {
+        productId: {
+          _id: "prod003",
+          title: "Wireless Bluetooth Headphones",
+        },
+        price: 89.99,
+        quantity: 1,
+      },
+    ],
+    amount: 122.97,
+    discount: 0,
+    payment_type: "cod",
+    country: "Canada",
+    city: "Vancouver",
+    zipcode: "V6B 1A1",
+    shippingAddress: "456 Oak Avenue",
+    status: "delivered",
+    shippedOn: "2024-01-20",
+    deliveredOn: "2024-01-22",
+    createdAt: new Date("2024-01-19T08:00:00Z").toISOString(),
+    updatedAt: new Date("2024-01-22T16:00:00Z").toISOString(),
+  },
 ];
+
+// ─── Reviews (verified purchaser ratings and reviews) ─────────────────────────
+let reviews = [
+  {
+    _id: "rev001",
+    product: "prod007",
+    user: "user002",
+    rating: 4,
+    text: "Fluffy and fragrant, cooks evenly. Would buy again.",
+    hidden: false,
+    edited: false,
+    postedAt: "2024-01-23T10:00:00.000Z",
+  },
+  {
+    _id: "rev002",
+    product: "prod001",
+    user: "user002",
+    rating: 3,
+    text: "",
+    hidden: false,
+    edited: false,
+    postedAt: "2024-01-23T11:00:00.000Z",
+  },
+  {
+    _id: "rev003",
+    product: "prod003",
+    user: "user002",
+    rating: 2,
+    text: "Sound is fine but the ear cushions wore out within a week.",
+    hidden: true,
+    edited: false,
+    postedAt: "2024-01-24T09:00:00.000Z",
+  },
+];
+
+// ─── Review helpers ─────────────────────────────────────────────────────────────
+
+// method to decide whether a customer may review a product (eligible | not_delivered | not_purchased)
+const reviewEligibility = (userId, productId) => {
+  const delivered = orders.some(
+    (o) =>
+      o.user._id === userId &&
+      o.status === "delivered" &&
+      o.items.some((i) => i.productId._id === productId)
+  );
+  if (delivered) return "eligible";
+  const purchased = orders.some(
+    (o) =>
+      o.user._id === userId && o.items.some((i) => i.productId._id === productId)
+  );
+  return purchased ? "not_delivered" : "not_purchased";
+};
+
+// method to validate and normalize the rating/text submitted for a review
+const parseReviewInput = (body) => {
+  const rating = Number(body?.rating);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return { error: "Please select a star rating from 1 to 5" };
+  }
+  let text = body?.text;
+  if (text === undefined || text === null) {
+    text = "";
+  } else if (typeof text !== "string") {
+    return { error: "Review text must be plain text" };
+  } else {
+    text = text.trim();
+  }
+  if (text.length > REVIEW_TEXT_MAX) {
+    return { error: "Review text must be 500 characters or fewer" };
+  }
+  return { rating, text };
+};
+
+// method to clamp paging query params the same way the backend does
+const parsePaging = (query, defaultLimit) => {
+  let limit = parseInt(query.limit, 10);
+  if (!Number.isInteger(limit)) limit = defaultLimit;
+  limit = Math.min(Math.max(limit, 1), 50);
+  let skip = parseInt(query.skip, 10);
+  if (!Number.isInteger(skip) || skip < 0) skip = 0;
+  return { limit, skip };
+};
+
+// method to shape the average/count/distribution summary from a list of reviews
+const buildSummary = (list) => {
+  const distribution = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  let count = 0;
+  let sum = 0;
+  list.forEach((r) => {
+    distribution[r.rating] += 1;
+    count += 1;
+    sum += r.rating;
+  });
+  return {
+    average: count ? Math.round((sum / count) * 10) / 10 : null,
+    count,
+    distribution,
+  };
+};
+
+const reviewerName = (userId) => {
+  const user = users.find((u) => u._id === userId);
+  return user?.name || "EasyBuy customer";
+};
+
+const toPublicReview = (r) => ({
+  _id: r._id,
+  rating: r.rating,
+  text: r.text,
+  edited: r.edited,
+  postedAt: r.postedAt,
+  reviewer: { name: reviewerName(r.user) },
+});
+
+const toOwnReview = (r) => ({
+  ...toPublicReview(r),
+  product: r.product,
+  hidden: r.hidden,
+});
+
+const toAdminReview = (r) => {
+  const product = products.find((p) => p._id === r.product);
+  return {
+    ...toPublicReview(r),
+    hidden: r.hidden,
+    product: { _id: r.product, title: product?.title || "Deleted product" },
+    reviewer: { _id: r.user, name: reviewerName(r.user) },
+  };
+};
 
 // ─── Auth middleware (simple token check) ─────────────────────────────────────
 const authMiddleware = (req, res, next) => {
@@ -396,6 +573,7 @@ app.get("/delete-product", adminMiddleware, (req, res) => {
     return res.status(404).json({ success: false, message: "Product not found" });
   }
   products.splice(idx, 1);
+  reviews = reviews.filter((r) => r.product !== id);
   res.json({ success: true, message: "Product deleted successfully" });
 });
 
@@ -544,8 +722,196 @@ app.get("/delete-user", (req, res) => {
     return res.status(404).json({ success: false, message: "User not found" });
   }
   const deleted = users.splice(idx, 1)[0];
+  reviews = reviews.filter((r) => r.user !== id);
   const { password, token, ...safeUser } = deleted;
   res.json({ success: true, message: "Account deleted successfully", data: safeUser });
+});
+
+// GET /product-reviews?productId=&limit=&skip=
+app.get("/product-reviews", (req, res) => {
+  const { productId } = req.query;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "Invalid productId" });
+  }
+  const product = products.find((p) => p._id === productId);
+  if (!product) {
+    return res.status(404).json({ success: false, message: "Product not found" });
+  }
+  const { limit, skip } = parsePaging(req.query, 5);
+  const visible = reviews.filter((r) => r.product === productId && !r.hidden);
+  const written = visible.filter((r) => r.text !== "");
+  const sorted = [...written].sort(
+    (a, b) => new Date(b.postedAt) - new Date(a.postedAt)
+  );
+  const page = sorted.slice(skip, skip + limit);
+  res.json({
+    success: true,
+    message: "product reviews",
+    data: {
+      summary: buildSummary(visible),
+      reviews: page.map(toPublicReview),
+      writtenCount: written.length,
+    },
+  });
+});
+
+// GET /my-review?productId=  (auth)
+app.get("/my-review", authMiddleware, (req, res) => {
+  const { productId } = req.query;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "Invalid productId" });
+  }
+  const eligibility = reviewEligibility(req.user._id, productId);
+  const review = reviews.find(
+    (r) => r.user === req.user._id && r.product === productId
+  );
+  res.json({
+    success: true,
+    message: "my review",
+    data: { eligibility, review: review ? toOwnReview(review) : null },
+  });
+});
+
+// POST /review  (auth)
+app.post("/review", authMiddleware, (req, res) => {
+  const { productId } = req.body;
+  if (!productId) {
+    return res.status(400).json({ success: false, message: "Invalid productId" });
+  }
+  const product = products.find((p) => p._id === productId);
+  if (!product) {
+    return res.status(404).json({ success: false, message: "Product not found" });
+  }
+  const parsed = parseReviewInput(req.body);
+  if (parsed.error) {
+    return res.status(400).json({ success: false, message: parsed.error });
+  }
+  const eligibility = reviewEligibility(req.user._id, productId);
+  if (eligibility === "not_delivered") {
+    return res.status(403).json({
+      success: false,
+      message: "You can review this product once your order is delivered",
+    });
+  }
+  if (eligibility === "not_purchased") {
+    return res.status(403).json({
+      success: false,
+      message: "Only customers who have received this product can review it",
+    });
+  }
+  if (reviews.some((r) => r.user === req.user._id && r.product === productId)) {
+    return res.status(409).json({
+      success: false,
+      message:
+        "You have already reviewed this product. Edit your existing review instead",
+    });
+  }
+  const review = {
+    _id: uuidv4(),
+    product: productId,
+    user: req.user._id,
+    rating: parsed.rating,
+    text: parsed.text,
+    hidden: false,
+    edited: false,
+    postedAt: new Date().toISOString(),
+  };
+  reviews.push(review);
+  res.status(201).json({
+    success: true,
+    message: "Review submitted",
+    data: toOwnReview(review),
+  });
+});
+
+// POST /update-review?id=  (auth; only the author's own review matches)
+app.post("/update-review", authMiddleware, (req, res) => {
+  const { id } = req.query;
+  if (!id) {
+    return res.status(400).json({ success: false, message: "Invalid id" });
+  }
+  const review = reviews.find((r) => r._id === id && r.user === req.user._id);
+  if (!review) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+  const parsed = parseReviewInput(req.body);
+  if (parsed.error) {
+    return res.status(400).json({ success: false, message: parsed.error });
+  }
+  const eligibility = reviewEligibility(req.user._id, review.product);
+  if (eligibility === "not_delivered") {
+    return res.status(403).json({
+      success: false,
+      message: "You can review this product once your order is delivered",
+    });
+  }
+  if (eligibility === "not_purchased") {
+    return res.status(403).json({
+      success: false,
+      message: "Only customers who have received this product can review it",
+    });
+  }
+  review.rating = parsed.rating;
+  review.text = parsed.text;
+  review.edited = true;
+  review.postedAt = new Date().toISOString();
+  res.json({ success: true, message: "Review updated", data: toOwnReview(review) });
+});
+
+// GET /admin/reviews?visibility=all|visible|hidden&limit=&skip=  (admin)
+app.get("/admin/reviews", adminMiddleware, (req, res) => {
+  const visibility = req.query.visibility || "all";
+  if (!["all", "visible", "hidden"].includes(visibility)) {
+    return res.status(400).json({ success: false, message: "Invalid visibility" });
+  }
+  const { limit, skip } = parsePaging(req.query, 20);
+  let filtered = reviews;
+  if (visibility === "visible") filtered = reviews.filter((r) => !r.hidden);
+  if (visibility === "hidden") filtered = reviews.filter((r) => r.hidden);
+  const sorted = [...filtered].sort(
+    (a, b) => new Date(b.postedAt) - new Date(a.postedAt)
+  );
+  const page = sorted.slice(skip, skip + limit);
+  res.json({
+    success: true,
+    message: "all reviews",
+    data: { reviews: page.map(toAdminReview), total: filtered.length },
+  });
+});
+
+// POST /admin/review-visibility?id=&hidden=true|false  (admin)
+app.post("/admin/review-visibility", adminMiddleware, (req, res) => {
+  const { id } = req.query;
+  if (!id) {
+    return res.status(400).json({ success: false, message: "Invalid id" });
+  }
+  if (req.query.hidden !== "true" && req.query.hidden !== "false") {
+    return res.status(400).json({ success: false, message: "Invalid hidden value" });
+  }
+  const review = reviews.find((r) => r._id === id);
+  if (!review) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+  review.hidden = req.query.hidden === "true";
+  res.json({
+    success: true,
+    message: review.hidden ? "Review hidden" : "Review visible",
+    data: toAdminReview(review),
+  });
+});
+
+// POST /admin/delete-review?id=  (admin)
+app.post("/admin/delete-review", adminMiddleware, (req, res) => {
+  const { id } = req.query;
+  if (!id) {
+    return res.status(400).json({ success: false, message: "Invalid id" });
+  }
+  const idx = reviews.findIndex((r) => r._id === id);
+  if (idx === -1) {
+    return res.status(404).json({ success: false, message: "Review not found" });
+  }
+  reviews.splice(idx, 1);
+  res.json({ success: true, message: "Review removed" });
 });
 
 // POST /reset-password?id=
@@ -595,35 +961,48 @@ app.get("/uploads/:filename", (req, res) => {
 });
 
 // ─── Start server ─────────────────────────────────────────────────────────────
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`\n🚀 EasyBuy Mock Server running at http://localhost:${PORT}`);
-  console.log(`\n📋 Available endpoints:`);
-  console.log(`   POST   /register`);
-  console.log(`   POST   /login`);
-  console.log(`   GET    /products`);
-  console.log(`   POST   /product              (admin)`);
-  console.log(`   POST   /update-product?id=   (admin)`);
-  console.log(`   GET    /delete-product?id=   (admin)`);
-  console.log(`   GET    /categories`);
-  console.log(`   POST   /category             (admin)`);
-  console.log(`   POST   /update-category?id=  (admin)`);
-  console.log(`   GET    /delete-category?id=  (admin)`);
-  console.log(`   GET    /dashboard            (admin)`);
-  console.log(`   GET    /admin/orders         (admin)`);
-  console.log(`   GET    /admin/users          (admin)`);
-  console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
-  console.log(`   GET    /orders               (user)`);
-  console.log(`   POST   /checkout             (user)`);
-  console.log(`   GET    /delete-user?id=`);
-  console.log(`   POST   /reset-password?id=`);
-  console.log(`   POST   /photos/upload`);
-  console.log(`   GET    /uploads/:filename`);
-  console.log(`\n🔑 Test tokens:`);
-  console.log(`   Admin token : mock-admin-token-001`);
-  console.log(`   User token  : mock-user-token-001`);
-  console.log(`\n👤 Test credentials:`);
-  console.log(`   Admin  → email: admin@easybuy.com  | password: admin123`);
-  console.log(`   User   → email: user@easybuy.com   | password: user123\n`);
-});
+// Guarded so `require("./server")` (used by the review HTTP tests) can import
+// `app` without also binding the port.
+if (require.main === module) {
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`\n🚀 EasyBuy Mock Server running at http://localhost:${PORT}`);
+    console.log(`\n📋 Available endpoints:`);
+    console.log(`   POST   /register`);
+    console.log(`   POST   /login`);
+    console.log(`   GET    /products`);
+    console.log(`   POST   /product              (admin)`);
+    console.log(`   POST   /update-product?id=   (admin)`);
+    console.log(`   GET    /delete-product?id=   (admin)`);
+    console.log(`   GET    /categories`);
+    console.log(`   POST   /category             (admin)`);
+    console.log(`   POST   /update-category?id=  (admin)`);
+    console.log(`   GET    /delete-category?id=  (admin)`);
+    console.log(`   GET    /dashboard            (admin)`);
+    console.log(`   GET    /admin/orders         (admin)`);
+    console.log(`   GET    /admin/users          (admin)`);
+    console.log(`   GET    /admin/order-status?orderId=&status=  (admin)`);
+    console.log(`   GET    /orders               (user)`);
+    console.log(`   POST   /checkout             (user)`);
+    console.log(`   GET    /delete-user?id=`);
+    console.log(`   POST   /reset-password?id=`);
+    console.log(`   POST   /photos/upload`);
+    console.log(`   GET    /uploads/:filename`);
+    console.log(`   GET    /product-reviews?productId=&limit=&skip=`);
+    console.log(`   GET    /my-review?productId=                 (user)`);
+    console.log(`   POST   /review                                (user)`);
+    console.log(`   POST   /update-review?id=                     (user)`);
+    console.log(`   GET    /admin/reviews?visibility=&limit=&skip= (admin)`);
+    console.log(`   POST   /admin/review-visibility?id=&hidden=    (admin)`);
+    console.log(`   POST   /admin/delete-review?id=                (admin)`);
+    console.log(`\n🔑 Test tokens:`);
+    console.log(`   Admin token : mock-admin-token-001`);
+    console.log(`   User token  : mock-user-token-001`);
+    console.log(`\n👤 Test credentials:`);
+    console.log(`   Admin  → email: admin@easybuy.com  | password: admin123`);
+    console.log(`   User   → email: user@easybuy.com   | password: user123\n`);
+  });
+}
+
+module.exports = app;
 
 // Made with Bob
