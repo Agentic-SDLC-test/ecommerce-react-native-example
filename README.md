@@ -1,6 +1,6 @@
 # EasyBuy
 
-Expo React Native ecommerce app for iOS, Android, and web. Screens call one HTTP contract. Point that contract at the in-repo mock server or the Node backend.
+Expo React Native ecommerce app for iOS, Android, and web. Screens talk to one HTTP API. For local development, point that API at the in-repo mock server, or at any server that speaks the same contract.
 
 ## Stack
 
@@ -8,52 +8,9 @@ Expo React Native ecommerce app for iOS, Android, and web. Screens call one HTTP
 - React Navigation (native stack and bottom tabs)
 - Redux
 
-## Related repositories
-
-### Backend
-
-[ecommerce-backend-node-example](https://github.com/Agentic-SDLC-test/ecommerce-backend-node-example) is the Express + MongoDB API. Default port **3002**. Swagger UI at `/api-docs`.
-
-```bash
-git clone https://github.com/Agentic-SDLC-test/ecommerce-backend-node-example
-cd ecommerce-backend-node-example
-npm install
-cp .env.example .env   # set DB_CON_STRING and TOKEN_KEY
-npm run dev
-```
-
-The backend and the mock server both bind **3002**. Run one of them, or change one `PORT` and set `EXPO_PUBLIC_API_URL` to match.
-
-### API client
-
-[`@agentic-sdlc-test/easybuy-api-client`](https://github.com/Agentic-SDLC-test/easybuy-api-client) is the shared client for that contract. Published to GitHub Packages. This app's `api/` module speaks the same contract in-repo. Import the package when you want the typed client.
-
-`.npmrc`:
-
-```
-@agentic-sdlc-test:registry=https://npm.pkg.github.com
-```
-
-```bash
-npm install @agentic-sdlc-test/easybuy-api-client
-```
-
-```js
-import { createClient } from "@agentic-sdlc-test/easybuy-api-client";
-import { UserType, validateLogin } from "@agentic-sdlc-test/easybuy-api-client/domain";
-
-const client = createClient({
-  baseUrl: "http://localhost:3002",
-  getToken: async () => token,
-  onUnauthorized: () => {},
-});
-```
-
-`createClient` sends the JWT in `x-auth-token`. A body of `{ err: "jwt expired" }` is treated as logout.
-
 ## Mock server
 
-[`mock-server/`](mock-server/README.md) is an in-memory Express stand-in. Same paths and `x-auth-token` header as the Node API. Data resets when the process restarts. Wishlist routes are on the Node backend only.
+[`mock-server/`](mock-server/README.md) is an in-memory Express stand-in. Same paths and `x-auth-token` header as the API the app calls. Data resets when the process restarts. Wishlist routes are not implemented here.
 
 ```bash
 cd mock-server
