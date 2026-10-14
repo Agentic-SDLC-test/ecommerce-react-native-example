@@ -212,6 +212,20 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
                   price={product?.price}
                   quantity={product?.quantity}
                 />
+                {orderDetail?.status === OrderStatus.DELIVERED && (
+                  <TouchableOpacity
+                    testID={`my-order-detail-review-btn-${index}`}
+                    style={styles.rateProductButton}
+                    onPress={() =>
+                      navigation.navigate("writereview", {
+                        productId: product?.productId?._id,
+                        productTitle: product?.productId?.title,
+                      })
+                    }
+                  >
+                    <Text style={styles.rateProductText}>Rate this product</Text>
+                  </TouchableOpacity>
+                )}
               </View>
             ))}
           </ScrollView>
@@ -368,5 +382,15 @@ const styles = StyleSheet.create({
   },
   emptyView: {
     height: 20,
+  },
+  rateProductButton: {
+    alignSelf: "flex-end",
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+  },
+  rateProductText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: "700",
   },
 });

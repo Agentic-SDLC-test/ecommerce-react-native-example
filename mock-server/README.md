@@ -36,6 +36,13 @@ npm run dev       # starts with nodemon (auto-restart on file changes)
 | POST | `/reset-password?id=` | — | Update password |
 | POST | `/photos/upload` | — | Upload an image |
 | GET | `/uploads/:filename` | — | Serve uploaded images (SVG placeholder if not found) |
+| GET | `/product-reviews?productId=&limit=&skip=` | — | Rating summary + paginated written reviews for a product |
+| GET | `/my-review?productId=` | User | Caller's eligibility and own review (if any) for a product |
+| POST | `/review` | User | Submit a review (409 if one already exists for this product) |
+| POST | `/update-review?id=` | User | Edit the caller's own review (marks it Edited) |
+| GET | `/admin/reviews?visibility=all\|visible\|hidden&limit=&skip=` | Admin | List reviews, newest first |
+| POST | `/admin/review-visibility?id=&hidden=true\|false` | Admin | Hide or unhide a review |
+| POST | `/admin/delete-review?id=` | Admin | Permanently remove a review |
 
 ## Authentication
 
@@ -82,6 +89,31 @@ The server starts with pre-seeded data:
 - **4 categories**: Garments, Electronics, Cosmetics, Groceries
 - **8 products**: 2 per category
 - **3 users**: 1 admin + 2 regular users
-- **3 orders**: in various statuses (pending, shipped, delivered)
+- **4 orders**: in various statuses (pending, shipped, 2x delivered)
+- **3 reviews**: see below
 
 All data is stored in-memory and resets when the server restarts.
+
+### Review demo states
+
+`order004` is a Delivered order for Jane Smith (`jane@easybuy.com`) covering `prod007`, `prod001` and `prod003`, which makes her reviews on those products legitimate "Verified Purchase" entries:
+
+| Review | Product | Rating | Text | Visible |
+|--------|---------|--------|------|---------|
+| `rev001` | Organic Basmati Rice (`prod007`) | 4 | yes | yes |
+| `rev002` | Classic White T-Shirt (`prod001`) | 3 | no (rating-only) | yes |
+| `rev003` | Wireless Bluetooth Headphones (`prod003`) | 2 | yes | **hidden** by admin |
+
+For John Doe (`user@easybuy.com`), `GET /my-review`'s `eligibility` resolves to:
+- `eligible` for `prod007` (delivered `order003`)
+- `not_delivered` for `prod001` and `prod003` (pending `order001`)
+- `not_purchased` for `prod002` (never ordered)
+
+## Tests
+
+```bash
+cd mock-server
+npm test
+```
+
+Runs the HTTP review-flow tests in `test/reviews.test.js` against the real Express `app` on an ephemeral port.

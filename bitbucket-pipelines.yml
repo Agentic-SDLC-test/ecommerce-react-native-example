@@ -27,6 +27,7 @@ definitions:
           - npm ci
           - npm ci --prefix mock-server
           - npm test -- --ci
+          - npm test --prefix mock-server
     - step: &build-android
         name: Build Android
         caches:
