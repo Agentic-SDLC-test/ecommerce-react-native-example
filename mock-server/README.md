@@ -31,7 +31,7 @@ npm run dev       # starts with nodemon (auto-restart on file changes)
 | GET | `/admin/users` | Admin | All users |
 | GET | `/admin/order-status?orderId=&status=` | Admin | Update order status |
 | GET | `/orders` | User | Current user's orders |
-| POST | `/checkout` | User | Place an order |
+| POST | `/checkout` | User | Place an order. Accepts `payment_type` (`cod` default, or `online`) and `payment_status` (`pending` default, `paid`, `failed`); `online` requires `paid`, otherwise 400 |
 | GET | `/delete-user?id=` | — | Delete a user account |
 | POST | `/reset-password?id=` | — | Update password |
 | POST | `/photos/upload` | — | Upload an image |

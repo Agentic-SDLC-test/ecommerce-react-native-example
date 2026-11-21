@@ -16,6 +16,7 @@ import BasicProductList from "../../components/BasicProductList/BasicProductList
 import CustomButton from "../../components/CustomButton";
 import DropDownPicker from "react-native-dropdown-picker";
 import { OrderStatus } from "@agentic-sdlc-test/easybuy-api-client/domain";
+import PaymentBadge from "../../components/PaymentBadge";
 
 const ViewOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -187,6 +188,10 @@ const ViewOrderDetailScreen = ({ navigation, route }) => {
           <View style={styles.orderItemContainer}>
             <Text style={styles.orderItemText} testID="view-order-detail-package-status">Package</Text>
             <Text>{value}</Text>
+          </View>
+          <View style={styles.orderItemContainer}>
+            <Text style={styles.orderItemText}>Payment</Text>
+            <PaymentBadge order={orderDetail} testID="view-order-detail-payment" />
           </View>
           <View style={styles.orderItemContainer}>
             <Text style={styles.orderItemText} testID="view-order-detail-package-date">

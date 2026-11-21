@@ -1,6 +1,7 @@
 import { StyleSheet, Text, TouchableOpacity, View } from "react-native";
 import React, { useState, useEffect } from "react";
 import { colors } from "../../constants";
+import PaymentBadge from "../PaymentBadge";
 
 function getTime(date) {
   let t = new Date(date);
@@ -83,7 +84,10 @@ const OrderList = ({ item, onPress, testID }) => {
         <TouchableOpacity style={styles.detailButton} onPress={onPress} testID={testID ? `${testID}-details-btn` : undefined}>
           <Text>Details</Text>
         </TouchableOpacity>
-        <Text style={styles.secondaryText} testID={testID ? `${testID}-status` : undefined}>{item?.status}</Text>
+        <View style={styles.statusColumn}>
+          <Text style={styles.secondaryText} testID={testID ? `${testID}-status` : undefined}>{item?.status}</Text>
+          <PaymentBadge order={item} testID={testID ? `${testID}-payment` : undefined} />
+        </View>
       </View>
     </View>
   );
@@ -132,6 +136,9 @@ const styles = StyleSheet.create({
     flexDirection: "column",
     justifyContent: "center",
     alignItems: "center",
+  },
+  statusColumn: {
+    alignItems: "flex-end",
   },
   detailButton: {
     marginTop: 10,
