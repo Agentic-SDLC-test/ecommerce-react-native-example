@@ -6,6 +6,7 @@ import {
   Text,
   ScrollView,
   Modal,
+  Switch,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect } from "react";
@@ -19,6 +20,9 @@ import * as api from "../../api";
 import CustomInput from "../../components/CustomInput";
 import ProgressDialog from "react-native-progress-dialog";
 import { OrderStatus, PaymentType } from "@agentic-sdlc-test/easybuy-api-client/domain";
+import PaymentMethodSelector from "../../components/PaymentMethodSelector";
+import { PAYMENT_METHODS, paymentStatusFor } from "../../utils/payment";
+import { simulateCardPayment, isFailingTestCard } from "../../utils/paymentSimulator";
 
 const CheckoutScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
@@ -34,9 +38,39 @@ const CheckoutScreen = ({ navigation, route }) => {
   const [city, setCity] = useState("");
   const [streetAddress, setStreetAddress] = useState("");
   const [zipcode, setZipcode] = useState("");
+  const [paymentType, setPaymentType] = useState(PaymentType.COD);
+  // Demo card fields live in component state only; never sent, stored or logged.
+  const [cardName, setCardName] = useState("");
+  const [cardNumber, setCardNumber] = useState("");
+  const [cardExpiry, setCardExpiry] = useState("");
+  const [cardCvc, setCardCvc] = useState("");
+  const [forceFail, setForceFail] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
+
+  const handleSelectMethod = (type) => {
+    setPaymentType(type);
+    setPaymentError("");
+    if (type !== PaymentType.ONLINE) {
+      setCardName("");
+      setCardNumber("");
+      setCardExpiry("");
+      setCardCvc("");
+      setForceFail(false);
+    }
+  };
 
   //method to handle checkout
   const handleCheckout = async () => {
+    if (isloading) return;
+    setPaymentError("");
+
+    if (
+      paymentType === PaymentType.ONLINE &&
+      !(cardName && cardNumber && cardExpiry && cardCvc)
+    ) {
+      setPaymentError("Please fill in the demo card details");
+      return;
+    }
     setIsloading(true);
 
     var payload = [];
@@ -53,12 +87,26 @@ const CheckoutScreen = ({ navigation, route }) => {
       payload.push(obj);
     });
 
+    if (paymentType === PaymentType.ONLINE) {
+      const paymentResult = await simulateCardPayment({
+        amount: totalamount,
+        forceFail: forceFail || isFailingTestCard(cardNumber),
+      });
+      console.log("Payment=>", { type: paymentType, success: paymentResult.success });
+      if (!paymentResult.success) {
+        setIsloading(false);
+        setPaymentError(paymentResult.message);
+        return;
+      }
+    }
+
     api
       .checkout({
         items: payload,
         amount: totalamount,
         discount: 0,
-        payment_type: PaymentType.COD,
+        payment_type: paymentType,
+        payment_status: paymentStatusFor(paymentType),
         country: country,
         status: OrderStatus.PENDING,
         city: city,
@@ -70,13 +118,15 @@ const CheckoutScreen = ({ navigation, route }) => {
         if (result.success == true) {
           setIsloading(false);
           emptyCart("empty");
-          navigation.replace("orderconfirm");
+          navigation.replace("orderconfirm", { order: result.data });
         } else {
           setIsloading(false);
+          setPaymentError(result.message || "Could not place the order");
         }
       })
       .catch((error) => {
         setIsloading(false);
+        setPaymentError("Could not place the order. Please try again.");
         console.log("error", error);
       });
   };
@@ -98,7 +148,7 @@ const CheckoutScreen = ({ navigation, route }) => {
   return (
     <View style={styles.container} testID="checkout-screen">
       <StatusBar testID="checkout-status-bar"></StatusBar>
-      <ProgressDialog visible={isloading} label={"Placing Order..."} />
+      <ProgressDialog visible={isloading} label={paymentType === PaymentType.ONLINE ? "Processing payment..." : "Placing Order..."} />
       <View style={styles.topBarContainer}>
         <TouchableOpacity
           testID="checkout-back-btn"
@@ -190,10 +240,63 @@ const CheckoutScreen = ({ navigation, route }) => {
         </View>
         <Text style={styles.primaryText} testID="checkout-payment-heading">Payment</Text>
         <View style={styles.listContainer}>
+          <PaymentMethodSelector
+            testID="checkout-method-selector"
+            value={paymentType}
+            onChange={handleSelectMethod}
+          />
           <View style={styles.list}>
             <Text style={styles.secondaryTextSm} testID="checkout-method-label">Method</Text>
-            <Text style={styles.primaryTextSm} testID="checkout-method-value">Cash On Delivery</Text>
+            <Text style={styles.primaryTextSm} testID="checkout-method-value">
+              {PAYMENT_METHODS.find((m) => m.type === paymentType)?.label}
+            </Text>
           </View>
+          {paymentType === PaymentType.ONLINE && (
+            <View testID="checkout-card-form">
+              <Text style={styles.demoBanner} testID="checkout-demo-banner">
+                Demo only — do not enter real card details
+              </Text>
+              <CustomInput
+                testID="checkout-card-name-input"
+                value={cardName}
+                setValue={setCardName}
+                placeholder={"Name on card"}
+              />
+              <CustomInput
+                testID="checkout-card-number-input"
+                value={cardNumber}
+                setValue={setCardNumber}
+                placeholder={"Card number"}
+                keyboardType={"number-pad"}
+              />
+              <CustomInput
+                testID="checkout-card-expiry-input"
+                value={cardExpiry}
+                setValue={setCardExpiry}
+                placeholder={"MM/YY"}
+              />
+              <CustomInput
+                testID="checkout-card-cvc-input"
+                value={cardCvc}
+                setValue={setCardCvc}
+                placeholder={"CVC"}
+                keyboardType={"number-pad"}
+              />
+              <View style={styles.list}>
+                <Text style={styles.secondaryTextSm}>Simulate failure (demo)</Text>
+                <Switch
+                  testID="checkout-simulate-failure-switch"
+                  value={forceFail}
+                  onValueChange={setForceFail}
+                />
+              </View>
+            </View>
+          )}
+          {paymentError !== "" && (
+            <Text style={styles.paymentError} testID="checkout-payment-error">
+              {paymentError}
+            </Text>
+          )}
         </View>
 
         <View style={styles.emptyView}></View>
@@ -350,6 +453,19 @@ const styles = StyleSheet.create({
     padding: 20,
     paddingLeft: 30,
     paddingRight: 30,
+  },
+  demoBanner: {
+    backgroundColor: colors.warning,
+    color: colors.dark,
+    fontWeight: "bold",
+    padding: 8,
+    borderRadius: 6,
+    marginVertical: 8,
+  },
+  paymentError: {
+    color: colors.danger,
+    fontWeight: "bold",
+    marginTop: 8,
   },
   emptyView: {
     width: "100%",

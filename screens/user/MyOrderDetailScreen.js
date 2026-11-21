@@ -14,6 +14,7 @@ import ProgressDialog from "react-native-progress-dialog";
 import BasicProductList from "../../components/BasicProductList/BasicProductList";
 import StepIndicator from "react-native-step-indicator";
 import { OrderStatus } from "@agentic-sdlc-test/easybuy-api-client/domain";
+import PaymentBadge from "../../components/PaymentBadge";
 
 const MyOrderDetailScreen = ({ navigation, route }) => {
   const { orderDetail } = route.params;
@@ -193,6 +194,10 @@ const MyOrderDetailScreen = ({ navigation, route }) => {
           <View style={styles.orderItemContainer}>
             <Text style={styles.orderItemText}>Package</Text>
             <Text testID="my-order-detail-package-status">{value}</Text>
+          </View>
+          <View style={styles.orderItemContainer}>
+            <Text style={styles.orderItemText}>Payment</Text>
+            <PaymentBadge order={orderDetail} testID="my-order-detail-payment" />
           </View>
           <View style={styles.orderItemContainer}>
             <Text style={styles.orderItemText} testID="my-order-detail-package-date">
